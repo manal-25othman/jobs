@@ -22,7 +22,7 @@
 | C01 | Career Profile | P1→P2 | `THIN` (8–12 حقلًا) | Profile Facets فوق Career Graph — إضافة وجه جديد لا يمس النواة |
 | C02 | Career Diagnosis | P1→P2 | `THIN` (دور مرجعي واحد) | Role Reference Spec + Gap Engine — كل دور جديد = ملف محتوى |
 | C03 | Career Roadmap 30/60/90 | P2 | `CONTRACT` (Next Best Action فقط) | Plan Engine يقرأ Gap Set ويكتب Plan — الواجهة محجوزة |
-| C04 | Project Hub | P2 | `THIN` (حاوية تسليم واحدة) | Work Item موحّد: مهمة/مشروع تخرج/Freelance/تطوعي نوعٌ واحد بحقل `kind` |
+| C04 | Project / Evidence Hub | P1→P2 | `THIN` (Work Item كامل الحقول، بلا إدارة مشاريع) | Work Item موحّد: مهمة/مشروع تخرج/Freelance/تطوعي نوعٌ واحد بحقل `kind` |
 | C05 | Achievement Engine | P1 | `BUILT` | يستهلك أحداث الإنجاز من Career Event Log — أي مصدر جديد يُغذّيه بلا تعديل |
 | C06 | Job Simulation | P3 | `THIN` (مهمة + تدخّل مدير) | Activity Spec Profile = `simulation` — نفس مخطط المحتوى بعمق أكبر |
 | C07 | Performance Evaluation | P1→P3 | `BUILT` (قواعد + رُبريك)، السلوكي P3 | Evaluator Plugins — إضافة مقيّم سلوكي = تسجيل plugin جديد |
@@ -45,7 +45,7 @@
 
 | ID | الوكيل | المرحلة | حالة Phase 1 | وحدة التنفيذ في P1 |
 |---|---|---|---|---|
-| A01 | Personal Career Companion | P2 | `REGISTERED` | يُستعاض عنه بقاعدة تذكير محدّدة |
+| A01 | Personal Career Companion | P1→P2 | `THIN` | وحدة Companion فوق حالة النظام — بلا تخطيط حر |
 | A02 | Career Strategist | P2 | `THIN` | داخل Diagnosis (حتمي + استدعاء واحد) |
 | A03 | Technical Mentor | P2→P3 | `REGISTERED` | — |
 | A04 | Recruiter | P3 | `REGISTERED` | — |
@@ -91,4 +91,4 @@
 ---
 
 **الخلاصة:** 18 مكوّنًا + 19 وكيلًا + 6 مصادر بيانات + 7 ضوابط = **50 عنصرًا، صفر محذوف**.
-في Phase 1: 12 عنصرًا `BUILT`، 14 `THIN`، 4 `CONTRACT`، 20 `REGISTERED`.
+في Phase 1: 12 عنصرًا `BUILT`، 15 `THIN`، 4 `CONTRACT`، 19 `REGISTERED`. *(محدّث بعد قرارات الاعتماد: A01 Companion وC04 Project Hub رُفعا إلى `THIN` في Phase 1.)*
