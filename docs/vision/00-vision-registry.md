@@ -87,6 +87,9 @@
 | G05 | توجيه النماذج + التخزين المؤقت + سقوف الميزانية | `THIN` | البوابة موجودة، السياسات تنضج |
 | G06 | سجل الموافقات وخصوصية البيانات (PDPL) | `BUILT` | التزام قانوني وأثر رجعي مستحيل |
 | G07 | أثر تدقيق كامل لكل مخرج AI (نموذج، إصدار prompt، تكلفة، مصدر) | `BUILT` | أساس المصداقية والمعايرة |
+| G08 | `Activity Score ≠ Skill Verification Level` | `BUILT` | الثابت التاسع (D-016) |
+| G09 | Integrity Checks إلزامية لكل نشاط يمنح `Verified` | `BUILT` | D-013 |
+| G10 | Validation Activity لترقية `self_reported` | `THIN` | D-018a |
 
 ---
 
