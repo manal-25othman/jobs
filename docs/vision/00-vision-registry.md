@@ -95,3 +95,73 @@
 
 **الخلاصة:** 18 مكوّنًا + 19 وكيلًا + 6 مصادر بيانات + 7 ضوابط = **50 عنصرًا، صفر محذوف**.
 في Phase 1: 12 عنصرًا `BUILT`، 15 `THIN`، 4 `CONTRACT`، 19 `REGISTERED`. *(محدّث بعد قرارات الاعتماد: A01 Companion وC04 Project Hub رُفعا إلى `THIN` في Phase 1.)*
+
+---
+
+## هـ. المسارات المهنية (Career Tracks) — *(D-027 · D-028)*
+
+> **مبدأ هوية معتمد:**
+> **`Career OS is multi-discipline by design.` — `Data Analyst / BI` مسار تحقق أول (validation beachhead)، وليس هوية المنتج.**
+>
+> **قيد ملزم على كل عمل لاحق:** يُمنع على أي Requirement أو Entity أو Agent Contract أو State Machine أو Activity Model أو Evidence Model أن يفترض أن المنتج خاص بتحليل البيانات. المسار **معطى محتوى (content parameter)**، لا افتراض بنيوي.
+
+**حالة التنفيذ:** `Data Analyst / BI` هو المسار الوحيد المُفعَّل في Phase 1. كل ما عداه `REGISTERED`.
+
+### TF-1 — تطوير البرمجيات (Software Development)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-01 | Frontend Developer | `REGISTERED` |
+| TRK-02 | Backend Developer | `REGISTERED` |
+| TRK-03 | Full-Stack Developer | `REGISTERED` |
+| TRK-04 | Mobile Developer | `REGISTERED` |
+
+### TF-2 — البيانات والذكاء الاصطناعي (Data & AI)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-05 | **Data Analyst** | **`ACTIVE` — مسار التحقق الأول (P0/P1)** |
+| TRK-06 | **BI Analyst** | **`ACTIVE` — ضمن مسار التحقق الأول** |
+| TRK-07 | Data Engineer | `REGISTERED` |
+| TRK-08 | Data Scientist | `REGISTERED` |
+| TRK-09 | AI / ML Engineer | `REGISTERED` |
+| TRK-10 | Generative AI / AI Automation | `REGISTERED` |
+
+### TF-3 — تقنية المعلومات والبنية التحتية (IT & Infrastructure)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-11 | IT Support | `REGISTERED` |
+| TRK-12 | Application Support | `REGISTERED` |
+| TRK-13 | System Administrator | `REGISTERED` |
+| TRK-14 | Cloud Support / Cloud Engineer | `REGISTERED` |
+| TRK-15 | Network / Infrastructure | `REGISTERED` |
+
+### TF-4 — الأمن السيبراني (Cybersecurity)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-16 | SOC Analyst | `REGISTERED` |
+| TRK-17 | Cybersecurity Analyst | `REGISTERED` |
+| TRK-18 | GRC | `REGISTERED` |
+| TRK-19 | Security Engineering | `REGISTERED` |
+
+### TF-5 — تقنية الأعمال والأنظمة (Business & Systems Technology)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-20 | Business Analyst | `REGISTERED` |
+| TRK-21 | Systems Analyst | `REGISTERED` |
+| TRK-22 | ERP / Application Specialist | `REGISTERED` |
+| TRK-23 | Technical Project / Product Coordinator | `REGISTERED` |
+
+### TF-6 — المنتج الرقمي (Digital Product)
+| ID | المسار | الحالة |
+|---|---|---|
+| TRK-24 | UI/UX Designer | `REGISTERED` |
+| TRK-25 | Product Designer | `REGISTERED` |
+
+**الإجمالي: 25 مسارًا في 6 عائلات — مسار واحد مُفعَّل (مركّب من TRK-05/06)، و23 مسجّلة.**
+
+### ما يلزم لتفعيل أي مسار مسجّل *(D-029 — محتوى لا كود)*
+`RoleReferenceSpec` · `Skill[]` + `recency_policy` + `SkillMapping` · `ActivitySpec[]` · `RubricVersion[]` + `ScoringPolicy` · `IntegrityCheck[]` · `LearningResource[]` · إعدادات المحتوى (اللغة، الزمن، أنماط AI).
+
+### ما يُمنع أن يتغير لإضافة مسار *(D-029 — شرط قبول معماري)*
+`Career Graph` · `Evidence model` · `Claim lifecycle` · `Evaluation pipeline` · `Agent orchestration contracts` · `Project/WorkItem model` · `CV/LinkedIn/Portfolio projection architecture`.
+
+> **احتياج المسار الثاني لتغيير جوهري في أيٍّ منها = Architecture Failure يُصحَّح قبل أي توسّع.**
