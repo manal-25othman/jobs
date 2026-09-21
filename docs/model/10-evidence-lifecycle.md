@@ -67,8 +67,8 @@ Submission (مقفل)
 | T04 | `Demonstrated` | `Verified` | `verification.completed` | V1–V8 كاملة | A18 | — |
 | T05 | `Demonstrated` | `Verified` | استثناء موثّق | `high_strength` + `platform_controlled` + مراجعة بشرية + V1–V7 (D-012a) | مراجع بشري | — |
 | T06 | `Verified` | `Demonstrated` | `verification.downgraded` · نتيجة نزاهة N2/N3 · دليل داعم سُحب | فقدان شرط | A18 / مراجع | نعم بعمل جديد |
-| T07 | `Verified` | `Verified (Aging)` | مرور الزمن | 12–24 شهرًا بلا إثبات جديد | النظام (حتمي) | نعم |
-| T08 | `Verified (Aging)` | `Verified (Historical)` | مرور الزمن | > 24 شهرًا | النظام (حتمي) | نعم |
+| T07 | `Verified` | `Verified (Aging)` | مرور الزمن | تجاوز `current_window` من `recency_policy` (D-023) | النظام (حتمي) | نعم |
+| T08 | `Verified (Aging)` | `Verified (Historical)` | مرور الزمن | تجاوز `stale_after` من `recency_policy` | النظام (حتمي) | نعم |
 | T09 | `Verified (Aging/Historical)` | `Verified` | دليل جديد | إثبات حديث يستوفي الشروط | A14 + A18 | — |
 | T10 | أي حالة | `Under Review` | اعتراض · حالة حدّية · عيّنة معايرة | — | النظام / المستخدم | نعم |
 | T11 | `Under Review` | الحالة المحسوبة | `human_review.completed` | قرار المراجع | مراجع بشري | — |
