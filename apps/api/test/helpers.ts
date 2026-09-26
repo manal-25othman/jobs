@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
+import { DomainExceptionFilter } from '../src/infra/domain-exception.filter';
 
 /**
  * E2E harness.
@@ -32,8 +33,11 @@ export async function newUser(): Promise<TestUser> {
 
 export async function bootApp(): Promise<INestApplication> {
   process.env['SUPABASE_JWT_SECRET'] = JWT_SECRET;
+  // TEST DOUBLE for storage; proves ownership/provenance/report boundary, not Supabase.
+  process.env['STORAGE_DRIVER'] = 'memory';
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
+  app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', {
     // A share link may live for 90 days; it must not break on a version bump.
     exclude: ['health', 'ready', 'public/reports/:id'],
@@ -49,10 +53,8 @@ export const FIXTURE = {
   skillUiTesting: 'a0000000-0000-4000-8000-000000000002',
 } as const;
 
-/** A submission that satisfies every mandatory criterion. */
+/** Structured facts that satisfy every mandatory criterion. Files are uploads. */
 export const COMPLETE_ARTIFACTS = [
-  { key: 'file.component', kind: 'file' as const, valueText: 'HabitList.jsx', locator: 'HabitList.jsx' },
-  { key: 'file.test', kind: 'file' as const, valueText: 'HabitList.test.jsx', locator: 'HabitList.test.jsx' },
   { key: 'test.empty_state', kind: 'boolean' as const, valueBool: true, locator: 'HabitList.test.jsx:12' },
   { key: 'test.loading_state', kind: 'boolean' as const, valueBool: true, locator: 'HabitList.test.jsx:28' },
   { key: 'test.error_message', kind: 'boolean' as const, valueBool: true, locator: 'HabitList.test.jsx:44' },
@@ -79,13 +81,15 @@ export async function expectRejected(
   pattern: RegExp,
 ): Promise<void> {
   await client.query('savepoint expect_rejected');
+  let succeeded = false;
   try {
     await client.query(sql, params);
+    succeeded = true;
     await client.query('release savepoint expect_rejected');
     throw new Error(`expected the statement to be rejected, but it succeeded: ${sql.slice(0, 60)}`);
   } catch (e) {
     const message = (e as Error).message;
-    await client.query('rollback to savepoint expect_rejected');
+    if (!succeeded) await client.query('rollback to savepoint expect_rejected');
     if (message.startsWith('expected the statement to be rejected')) throw e;
     if (!pattern.test(message)) {
       throw new Error(`rejected for the wrong reason: ${message} (expected ${pattern})`);
@@ -111,3 +115,34 @@ export async function asAuthenticatedUser<T>(
     c.release();
   }
 }
+
+import { STORAGE_PORT } from '../src/storage/storage.port';
+import type { MemoryStorageAdapter } from '../src/storage/memory-storage.adapter';
+
+/** The in-memory storage the booted app is using. */
+export function memoryStorage(app: INestApplication): MemoryStorageAdapter {
+  return app.get(STORAGE_PORT) as MemoryStorageAdapter;
+}
+
+/**
+ * Full client-side upload round trip: intent → PUT bytes to the signed target
+ * → confirm. Returns the upload id a submission can reference.
+ */
+export async function uploadFile(
+  app: INestApplication,
+  http: ReturnType<typeof import('supertest')>,
+  user: TestUser,
+  name: string,
+  bytes: Uint8Array,
+  contentType = 'text/javascript',
+): Promise<string> {
+  const intent = await http.post('/v1/uploads').set('Authorization', `Bearer ${user.token}`)
+    .send({ declaredName: name, contentType, declaredSize: bytes.byteLength }).expect(201);
+  const { uploadId, target } = intent.body.data;
+  memoryStorage(app).put(target.url, bytes);
+  await http.post(`/v1/uploads/${uploadId}/confirm`).set('Authorization', `Bearer ${user.token}`).expect(201);
+  return uploadId;
+}
+
+export const COMPONENT_BYTES = new TextEncoder().encode('export function HabitList() { /* ... */ }');
+export const TEST_BYTES = new TextEncoder().encode('test("empty state", () => {}); test("loading", () => {}); test("error message", () => {});');

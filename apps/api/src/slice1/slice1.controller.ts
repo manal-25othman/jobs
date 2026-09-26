@@ -10,6 +10,8 @@ import { EvaluationService } from './evaluation.service';
 import { AssetService } from './asset.service';
 import { ReportService } from './report.service';
 import { ShareService } from './share.service';
+import { UploadService } from './upload.service';
+import { Delete } from '@nestjs/common';
 
 /**
  * Vertical Slice 1 endpoints.
@@ -28,6 +30,7 @@ export class Slice1Controller {
     private readonly assets: AssetService,
     private readonly reports: ReportService,
     private readonly share: ShareService,
+    private readonly uploads: UploadService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -94,10 +97,33 @@ export class Slice1Controller {
       skillIds: string[];
       artifacts: SubmissionArtifactInput[];
       repositoryUrl?: string;
+      uploadIds?: string[];
+      externalUrls?: string[];
       aiDisclosure: { declaredUse: string[]; explanation?: string | null };
     },
   ) {
     return { ok: true, data: await this.submissions.createSubmission(user.id, projectId, body) };
+  }
+
+  /* ───────────────────────────── uploads ────────────────────────────── */
+
+  @Post('uploads')
+  async uploadIntent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { declaredName: string; contentType: string; declaredSize: number; purpose?: 'submission_file' | 'cv_upload' },
+  ) {
+    await this.users.ensureUser(user);
+    return { ok: true, data: await this.uploads.createIntent(user.id, body) };
+  }
+
+  @Post('uploads/:id/confirm')
+  async uploadConfirm(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.uploads.confirm(user.id, id) };
+  }
+
+  @Get('uploads/:id/download')
+  async uploadDownload(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.uploads.signedDownload(user.id, id) };
   }
 
   @Get('submissions/:id')
@@ -169,6 +195,11 @@ export class Slice1Controller {
     @Body() body: { resourceKind: 'recruiter_report'; resourceId: string; expiresInDays: number },
   ) {
     return { ok: true, data: await this.share.create(user.id, body) };
+  }
+
+  @Delete('share-links/:id')
+  async revokeShareLink(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.share.revoke(user.id, id) };
   }
 }
 

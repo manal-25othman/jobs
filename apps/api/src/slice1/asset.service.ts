@@ -147,11 +147,9 @@ export class AssetService {
       const asset = await this.loadOwnAsset(c, userId, assetId);
       const approvedAt = new Date().toISOString();
 
-      assertAssetTransition(
-        asset.lifecycle_state === 'draft' ? 'preview' : asset.lifecycle_state,
-        'approved',
-        { userApprovedAt: approvedAt },
-      );
+      // D-057: preview → optional edit → explicit approval → active. A draft
+      // that was never previewed cannot be approved; the user must have seen it.
+      assertAssetTransition(asset.lifecycle_state, 'approved', { userApprovedAt: approvedAt });
 
       // An edit outside the evidence drops the verified tag: the wording is
       // now the user's, not something the evaluation supports.

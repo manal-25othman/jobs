@@ -13,7 +13,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS,
-  expectRejected, asAuthenticatedUser, type TestUser,
+  expectRejected, asAuthenticatedUser, uploadFile, COMPONENT_BYTES, TEST_BYTES, type TestUser,
 } from './helpers';
 
 let app: INestApplication;
@@ -32,7 +32,7 @@ after(async () => {
 });
 
 /** Walks a user through goal → project → submission. Returns the ids. */
-async function upToSubmission(user: TestUser, artifacts = COMPLETE_ARTIFACTS) {
+async function upToSubmission(user: TestUser, artifacts = COMPLETE_ARTIFACTS, withTestFile = true) {
   await http.post('/v1/me/bootstrap').set('Authorization', `Bearer ${user.token}`)
     .send({ displayName: 'Test' }).expect(201);
 
@@ -45,15 +45,22 @@ async function upToSubmission(user: TestUser, artifacts = COMPLETE_ARTIFACTS) {
       activitySpecId: FIXTURE.activitySpecId,
     }).expect(201);
 
+  const componentUpload = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
+  const testUpload = withTestFile ? await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES) : null;
+
   const submission = await http.post(`/v1/projects/${project.body.data.id}/submissions`)
     .set('Authorization', `Bearer ${user.token}`)
     .send({
       skillIds: [FIXTURE.skillUiTesting],
       artifacts,
+      uploadIds: [componentUpload, ...(testUpload ? [testUpload] : [])],
       aiDisclosure: { declaredUse: [], explanation: null },
     }).expect(201);
 
-  return { projectId: project.body.data.id, submissionId: submission.body.data.id };
+  return {
+    projectId: project.body.data.id, submissionId: submission.body.data.id,
+    uploadIds: [componentUpload, ...(testUpload ? [testUpload] : [])],
+  };
 }
 
 /* ═══════════════════════ 1 · career goal ════════════════════════════════ */
@@ -218,8 +225,7 @@ describe('5, 6, 7 — evaluation against the rubric', () => {
 
   test('NEGATIVE: a blocking integrity failure stops before scoring', async () => {
     const user = await newUser();
-    const withoutTestFile = COMPLETE_ARTIFACTS.filter((a) => a.key !== 'file.test');
-    const { submissionId } = await upToSubmission(user, withoutTestFile);
+    const { submissionId } = await upToSubmission(user, COMPLETE_ARTIFACTS, false);
 
     const res = await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
@@ -370,6 +376,8 @@ describe('11 — the report is built from allowed fields only', () => {
       .set('Authorization', `Bearer ${user.token}`).expect(201);
     const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
+    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
+      .set('Authorization', `Bearer ${user.token}`).expect(201);
     await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
       .set('Authorization', `Bearer ${user.token}`).send({ approved: true }).expect(201);
 
@@ -425,6 +433,8 @@ describe('12 — a second user sees none of the first user’s work', () => {
       .set('Authorization', `Bearer ${owner.token}`).expect(201);
     const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
       .set('Authorization', `Bearer ${owner.token}`).expect(201);
+    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
+      .set('Authorization', `Bearer ${owner.token}`).expect(201);
     await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
       .set('Authorization', `Bearer ${owner.token}`).send({ approved: true }).expect(201);
     const report = await http.post('/v1/me/evidence-report')
@@ -475,6 +485,8 @@ describe('13 — a shared report reveals only the public projection', () => {
     const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
     const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
+      .set('Authorization', `Bearer ${user.token}`).expect(201);
+    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
     await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
       .set('Authorization', `Bearer ${user.token}`).send({ approved: true }).expect(201);

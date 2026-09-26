@@ -86,6 +86,18 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'Prefix for Supabase Storage buckets, so environments cannot collide.',
     example: 'dev', validate: nonEmpty },
 
+  { name: 'SUPABASE_JWT_SECRET', scope: 'api', required: true, secret: true,
+    description: 'The Supabase project JWT secret. The API verifies every access token signature with it.',
+    example: 'local-jwt-secret-change-me', validate: nonEmpty },
+
+  { name: 'STORAGE_DRIVER', scope: 'api', required: false, secret: false,
+    description: 'supabase (default) or memory. memory is refused when NODE_ENV=production.',
+    example: 'supabase', validate: oneOf('supabase', 'memory') },
+
+  { name: 'UPLOAD_MAX_BYTES', scope: 'api', required: false, secret: false,
+    description: 'Maximum accepted upload size in bytes. Defaults to 10 MiB.', example: '10485760',
+    validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
+
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
     validate: oneOf('debug', 'info', 'warn', 'error') },
@@ -130,6 +142,10 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
     if (key.startsWith('NEXT_PUBLIC_') && /SERVICE_ROLE|SECRET|PRIVATE_KEY/i.test(key)) {
       problems.push(`${key} exposes a secret to the browser; rename it without the NEXT_PUBLIC_ prefix`);
     }
+  }
+
+  if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
+    problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');
   }
 
   if (problems.length > 0) throw new ConfigError(problems);

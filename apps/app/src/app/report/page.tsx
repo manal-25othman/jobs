@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, type EvidenceReport } from '../../lib/api';
+import { api, revokeShareLink, type EvidenceReport } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 
@@ -15,7 +15,7 @@ export default function ReportPage() {
   const { token, loading } = useSession();
   const [report, setReport] = useState<EvidenceReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<string | null>(null);
+  const [link, setLink] = useState<{ id: string; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -29,12 +29,12 @@ export default function ReportPage() {
     if (!token || !report) return;
     setBusy(true);
     try {
-      const l = await api<{ token: string }>('/share-links', {
+      const l = await api<{ id: string; token: string }>('/share-links', {
         method: 'POST', token,
         body: { resourceKind: 'recruiter_report', resourceId: report.id, expiresInDays: 7 },
       });
       const base = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
-      setLink(`${base}/public/reports/${report.id}?token=${l.token}`);
+      setLink({ id: l.id, url: `${base}/public/reports/${report.id}?token=${l.token}` });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -144,7 +144,13 @@ export default function ReportPage() {
         {link ? (
           <div className="stack" style={{ gap: 6 }}>
             <span className="field__label">الرابط — يُعرض مرة واحدة</span>
-            <input className="input term" dir="ltr" readOnly value={link} onFocus={(e) => e.target.select()} />
+            <input className="input term" dir="ltr" readOnly value={link.url} onFocus={(e) => e.target.select()} />
+            <div>
+              <button className="btn btn--ghost btn--sm" disabled={busy}
+                      onClick={async () => { if (!token) return; setBusy(true); try { await revokeShareLink(link.id, token); setLink(null); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>
+                إلغاء الرابط الآن
+              </button>
+            </div>
           </div>
         ) : null}
       </section>

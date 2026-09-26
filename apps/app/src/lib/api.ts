@@ -92,3 +92,29 @@ export interface EvidenceReport {
   generatedAt: string;
   scopeNote: string;
 }
+
+/* ─────────────────────────── uploads (signed only) ─────────────────────── */
+
+export interface UploadIntent {
+  uploadId: string;
+  target: { url: string; method: 'PUT'; headers: Record<string, string>; expiresInSeconds: number };
+}
+
+/**
+ * Client-side upload: intent → PUT bytes straight to storage → confirm.
+ * The API never proxies the bytes and never reveals where they live.
+ */
+export async function uploadEvidenceFile(file: File, token: string): Promise<string> {
+  const intent = await api<UploadIntent>('/uploads', {
+    method: 'POST', token,
+    body: { declaredName: file.name, contentType: file.type || 'text/plain', declaredSize: file.size },
+  });
+  const put = await fetch(intent.target.url, { method: 'PUT', headers: intent.target.headers, body: file });
+  if (!put.ok) throw new Error(`upload failed (${put.status})`);
+  await api(`/uploads/${intent.uploadId}/confirm`, { method: 'POST', token });
+  return intent.uploadId;
+}
+
+export async function revokeShareLink(id: string, token: string): Promise<void> {
+  await api(`/share-links/${id}`, { method: 'DELETE', token });
+}

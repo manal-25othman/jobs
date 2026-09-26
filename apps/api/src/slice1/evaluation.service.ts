@@ -4,7 +4,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
-  assertEvaluationResultValid, decideVerification, verificationApplies,
+  assertEvaluationResultValid, decideVerification, verificationApplies, assertStateAvailableInProduction,
   type PublishedRubric, type SubmissionArtifact, type IntegrityCheckSpec,
   type EvidenceState, type EvaluationRun,
 } from '@naqla/domain';
@@ -203,6 +203,7 @@ export class EvaluationService {
     userId: string; skillId: string; from: EvidenceState; to: EvidenceState;
     evaluationResultId: string; rubricVersion: string; projectId: string; reason: string;
   }) {
+    assertStateAvailableInProduction(p.to);
     const rule = assertTransitionAllowed({
       from: p.from,
       to: p.to,

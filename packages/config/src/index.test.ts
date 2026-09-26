@@ -13,7 +13,7 @@ describe('config validation', () => {
   test('a complete api environment loads', () => {
     const env = loadEnv({
       scope: 'api',
-      env: { ...base, SUPABASE_SERVICE_ROLE_KEY: 'k', DATABASE_URL: 'postgresql://x@y:5432/z' },
+      env: { ...base, SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z' },
     });
     assert.equal(env.NODE_ENV, 'development');
   });
@@ -42,7 +42,7 @@ describe('config validation', () => {
     try {
       loadEnv({
         scope: 'api',
-        env: { ...base, SUPABASE_SERVICE_ROLE_KEY: 'k', DATABASE_URL: 'postgresql://x@y:5432/z',
+        env: { ...base, SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z',
                NEXT_PUBLIC_SERVICE_ROLE_KEY: 'leaked' },
       });
       assert.fail('expected ConfigError');
@@ -61,6 +61,17 @@ describe('config validation', () => {
   test('Phase 0 carries no model-provider credentials', () => {
     const providerish = ENV_SPEC.filter((v) => /OPENAI|ANTHROPIC|MODEL_API|LLM_KEY/i.test(v.name));
     assert.deepEqual(providerish, [], 'no AI calls exist yet and OPEN-023 is unresolved');
+  });
+
+  test('the memory storage driver is refused in production', () => {
+    try {
+      loadEnv({ scope: 'api', env: { ...base, NODE_ENV: 'production', SUPABASE_SERVICE_ROLE_KEY: 'k',
+        SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z', STORAGE_DRIVER: 'memory' } });
+      assert.fail('expected ConfigError');
+    } catch (e) {
+      assert.ok(e instanceof ConfigError);
+      assert.ok(e.problems.some((p) => p.includes('refused in production')));
+    }
   });
 
   test('.env.example renders every variable in the spec', () => {

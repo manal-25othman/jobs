@@ -178,3 +178,28 @@ DATABASE_URL=... npm run test:e2e -w @naqla/api   # 29 اختبار طرف-إل�
 ### ملاحظة على Supabase محليًا
 الحزمة الكاملة (Auth وStorage وStudio) تحتاج **Docker** عبر `supabase start`.
 وهذه الشريحة **لم تُشغَّل على حزمة Supabase حيّة** — راجعي `VERTICAL-SLICE-01-REPORT.md` §DEMO/FIXTURE.
+
+
+---
+
+## ١٠. التشغيل على مشروع Supabase حقيقي
+
+```bash
+# 1 · الهجرات والبذرة (Supabase CLI مرتبط بالمشروع)
+supabase link --project-ref <ref>
+supabase db push                           # يطبّق supabase/migrations بالترتيب
+psql "$DATABASE_URL" -f supabase/seed/0001_demo_role.sql
+
+# 2 · المتغيرات — في بيئة التشغيل لا في الدردشة
+#   NEXT_PUBLIC_SUPABASE_URL · NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   SUPABASE_SERVICE_ROLE_KEY · SUPABASE_JWT_SECRET · DATABASE_URL
+#   STORAGE_DRIVER=supabase (الافتراضي)
+
+# 3 · الـAPI ثم الإثبات الحيّ
+npm run start -w @naqla/api
+NAQLA_API_URL=http://localhost:3001 npm run live:supabase
+```
+
+`live:supabase` يُنشئ مستخدمَين مؤقتَين ويحذفهما، ويثبت: الجلسة، وتجديد الرمز، ورفض الرمز المزوّر، وRLS بمفتاح `anon` الحقيقي، ورفعًا وتنزيلًا موقّعين، وعزل الملفات بين مستخدمَين (بما فيه محاولة توقيع من المستخدم الآخر عبر Storage مباشرة)، والمسار كاملًا، ورابط مشاركة يُفتح ثم يُغلق بالإلغاء.
+
+> **في بيئة البناء هذه:** لا بيانات اعتماد Supabase، والسياسة الشبكية ترفض `supabase.com`. لذلك لم يُشغَّل هذا السكربت بعد.

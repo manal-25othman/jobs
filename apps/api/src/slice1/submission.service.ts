@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
-import { assertModeRespected, type AiUsageMode } from '@naqla/domain';
+import { assertModeRespected, assertExternalUrlValid, type AiUsageMode } from '@naqla/domain';
+import { UploadService } from './upload.service';
 
 export interface SubmissionArtifactInput {
   key: string;
@@ -21,20 +22,31 @@ export interface SubmissionArtifactInput {
  */
 @Injectable()
 export class SubmissionService {
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly uploads: UploadService) {}
 
   async createSubmission(userId: string, projectId: string, input: {
     skillIds: string[];
     artifacts: SubmissionArtifactInput[];
     repositoryUrl?: string;
+    /** Confirmed uploads the user owns. Become `file` artifacts. */
+    uploadIds?: string[];
+    /** External http(s) evidence. Become `link` artifacts. */
+    externalUrls?: string[];
     aiDisclosure: { declaredUse: string[]; explanation?: string | null };
   }) {
     if (!input.skillIds?.length) {
       throw new BadRequestException('a submission must name at least one skill it claims');
     }
-    if (!input.artifacts?.length) {
+    const hasAny = (input.artifacts?.length ?? 0) + (input.uploadIds?.length ?? 0) + (input.externalUrls?.length ?? 0);
+    if (hasAny === 0) {
       throw new BadRequestException('a submission with no evidence artifacts cannot be evaluated');
     }
+    for (const a of input.artifacts ?? []) {
+      // A file artifact is a confirmed upload, never a free-text filename.
+      if (a.kind === 'file') throw new BadRequestException('file artifacts come from uploadIds, not free text');
+      if (a.kind === 'link') assertExternalUrlValid(a.valueText ?? '');
+    }
+    for (const url of input.externalUrls ?? []) assertExternalUrlValid(url);
 
     return this.db.asService(async (c) => {
       const project = await c.query(
@@ -69,7 +81,32 @@ export class SubmissionService {
         );
       }
 
-      for (const a of input.artifacts) {
+      let fileIndex = 0;
+      for (const uploadId of input.uploadIds ?? []) {
+        const up = await this.uploads.assertOwnedConfirmed(c, userId, uploadId);
+        // The artifact key is what the rubric checks. The first file is the
+        // component, the second the test — a convention of the demo rubric,
+        // recorded as the locator so a reviewer sees which file was which.
+        const key = fileIndex === 0 ? 'file.component' : fileIndex === 1 ? 'file.test' : `file.extra_${fileIndex}`;
+        fileIndex++;
+        await c.query(
+          `insert into submission_artifact
+             (submission_id, user_id, key, kind, value_text, locator, upload_id)
+           values ($1,$2,$3,'file',$4,$5,$6)`,
+          [submissionId, userId, key, up.declared_name, up.declared_name, up.id],
+        );
+      }
+      let linkIndex = 0;
+      for (const url of input.externalUrls ?? []) {
+        await c.query(
+          `insert into submission_artifact (submission_id, user_id, key, kind, value_text, locator)
+           values ($1,$2,$3,'link',$4,$5)`,
+          [submissionId, userId, linkIndex === 0 ? 'link.repository' : `link.extra_${linkIndex}`, url, url],
+        );
+        linkIndex++;
+      }
+
+      for (const a of input.artifacts ?? []) {
         await c.query(
           `insert into submission_artifact
              (submission_id, user_id, key, kind, value_bool, value_number, value_text, locator)
@@ -98,7 +135,7 @@ export class SubmissionService {
         userId, actorKind: 'user', actorId: userId,
         subjectTable: 'submission', subjectId: submissionId,
         reason: 'the user submitted work for evaluation; the submission is locked and cannot be edited',
-        payload: { projectId, artifactCount: input.artifacts.length },
+        payload: { projectId, artifactCount: hasAny, uploads: input.uploadIds?.length ?? 0, links: input.externalUrls?.length ?? 0 },
       });
 
       return { ...sub.rows[0], claimedSkillIds: input.skillIds };

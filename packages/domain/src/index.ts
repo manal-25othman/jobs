@@ -20,6 +20,9 @@ export * from './verification.js';
 export * from './evaluator.js';
 export * from './cv-bullet.js';
 export * from './evidence-report.js';
+export * from './production-limits.js';
+export * from './progress.js';
+export * from './uploads.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.1.0';
+export const DOMAIN_RULESET_VERSION = '0.2.0';

@@ -29,7 +29,27 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
+/**
+ * The current access token, refreshed when it is about to expire.
+ *
+ * supabase-js refreshes in the background (autoRefreshToken), but a tab that
+ * was asleep can wake with an expired token. Forcing a refresh when fewer
+ * than 60 s remain means the API never sees a stale signature from us.
+ */
 export async function accessToken(): Promise<string | null> {
-  const { data } = await supabase().auth.getSession();
-  return data.session?.access_token ?? null;
+  const client = supabase();
+  const { data } = await client.auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+  const expiresIn = (session.expires_at ?? 0) * 1000 - Date.now();
+  if (expiresIn < 60_000) {
+    const { data: refreshed, error } = await client.auth.refreshSession();
+    if (error || !refreshed.session) return null;
+    return refreshed.session.access_token;
+  }
+  return session.access_token;
+}
+
+export async function signOut(): Promise<void> {
+  await supabase().auth.signOut();
 }

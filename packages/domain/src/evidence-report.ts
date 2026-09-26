@@ -40,6 +40,8 @@ export const REPORT_FORBIDDEN_KEYS: readonly string[] = [
   'integrityDetail', 'integritySignal', 'assessmentOnly',
   'auditEvent', 'modelCall', 'tokenHash', 'token_hash',
   'email', 'internalId', 'serviceRoleKey',
+  'signedUrl', 'signed_url', 'downloadUrl', 'uploadId', 'upload_id', 'declaredName', 'declared_name',
+  'checksum', 'checksum_sha256',
 ];
 
 /* ────────────────────────────── the report ─────────────────────────────── */

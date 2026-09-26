@@ -11,6 +11,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { loadEnv, ConfigError } from '@naqla/config';
 import { AppModule } from './app.module';
+import { DomainExceptionFilter } from './infra/domain-exception.filter';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('bootstrap');
@@ -28,6 +29,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const app = await NestFactory.create(AppModule, { cors: true });
+  app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', {
     // A share link may live for 90 days; it must not break on a version bump.
     exclude: ['health', 'ready', 'public/reports/:id'],

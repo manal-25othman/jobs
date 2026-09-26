@@ -23,7 +23,8 @@
     "verify:boundaries": "node scripts/verify-boundaries.mjs",
     "verify:prototype": "node scripts/verify-frozen-prototype.mjs",
     "verify:tokens": "node scripts/verify-tokens.mjs",
-    "verify": "npm run verify:boundaries && npm run verify:prototype && npm run verify:tokens"
+    "verify": "npm run verify:boundaries && npm run verify:prototype && npm run verify:tokens",
+    "live:supabase": "node scripts/supabase-live-check.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"
