@@ -81,7 +81,7 @@
 | `@naqla/config` · `@naqla/agents` (حوكمة + منصّة) | 9 · 77 | PASS |
 | `apps/api` e2e — `career-data` (خط · مراجعة · RLS · حارس الإنتاج · تكامل الوكلاء) | 11 | PASS |
 | `apps/api` e2e — `slice1` 29 · `hardening` 12 · `agents` 10 · `withdrawal` 2 | 53 | PASS |
-| `scripts/db-test.sh` — إثباتات القيود (منها **١٣ لحوكمة بيانات المهن**) وRLS | 76 PASS | PASS |
+| `scripts/db-test.sh` — إثباتات القيود (منها **١٣ لحوكمة بيانات المهن**) وRLS | 84 PASS · 0 FAIL | PASS |
 | `career:import` مرتين · `career:validate` | — | متكرّر · PASSED |
 | `verify:boundaries` · `verify:prototype` · `verify:tokens` · Next typecheck | — | PASS |
 
