@@ -28,7 +28,10 @@ async function bootstrap(): Promise<void> {
   }
 
   const app = await NestFactory.create(AppModule, { cors: true });
-  app.setGlobalPrefix('v1', { exclude: ['health', 'ready'] });
+  app.setGlobalPrefix('v1', {
+    // A share link may live for 90 days; it must not break on a version bump.
+    exclude: ['health', 'ready', 'public/reports/:id'],
+  });
 
   const port = Number(env['API_PORT'] ?? 3001);
   await app.listen(port);

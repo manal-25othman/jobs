@@ -16,6 +16,10 @@ export * from './claims.js';
 export * from './scoring.js';
 export * from './sharing.js';
 export * from './invariants.js';
+export * from './verification.js';
+export * from './evaluator.js';
+export * from './cv-bullet.js';
+export * from './evidence-report.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
 export const DOMAIN_RULESET_VERSION = '0.1.0';

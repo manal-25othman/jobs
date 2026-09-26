@@ -2,7 +2,7 @@
   "name": "naqla",
   "private": true,
   "version": "0.0.0",
-  "description": "NAQLA — AI Career Operating System. Phase 0 production foundations.",
+  "description": "NAQLA \u2014 AI Career Operating System. Phase 0 production foundations.",
   "workspaces": [
     "packages/domain",
     "packages/contracts",
@@ -11,7 +11,9 @@
     "apps/app",
     "apps/api"
   ],
-  "engines": { "node": ">=20.11" },
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "build:domain": "npm run build -w @naqla/domain",
     "test:domain": "npm run test -w @naqla/domain",
@@ -19,7 +21,9 @@
     "build:config": "npm run build -w @naqla/config",
     "test": "npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run build -w @naqla/contracts && npm run test -w @naqla/domain && npm run test -w @naqla/config",
     "verify:boundaries": "node scripts/verify-boundaries.mjs",
-    "verify:prototype": "node scripts/verify-frozen-prototype.mjs"
+    "verify:prototype": "node scripts/verify-frozen-prototype.mjs",
+    "verify:tokens": "node scripts/verify-tokens.mjs",
+    "verify": "npm run verify:boundaries && npm run verify:prototype && npm run verify:tokens"
   },
   "devDependencies": {
     "typescript": "5.9.3"

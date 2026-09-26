@@ -7,7 +7,8 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "test": "node --test dist/**/*.spec.js"
+    "test": "node --test dist/**/*.spec.js",
+    "test:e2e": "node --test dist/test/*.e2e.js"
   },
   "dependencies": {
     "@naqla/config": "*",
@@ -17,12 +18,18 @@
     "@nestjs/core": "11.0.12",
     "@nestjs/platform-express": "11.0.12",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.1"
+    "rxjs": "7.8.1",
+    "pg": "8.13.1",
+    "jose": "5.9.6"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.5",
     "@types/express": "5.0.0",
     "@types/node": "22.10.2",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@types/pg": "8.11.10",
+    "supertest": "7.0.0",
+    "@types/supertest": "6.0.2",
+    "@nestjs/testing": "11.0.12"
   }
 }

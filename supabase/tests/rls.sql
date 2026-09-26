@@ -8,6 +8,13 @@
 --   psql -d naqla_test -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
 -- ═══════════════════════════════════════════════════════════════════════════
 
+--
+-- NOT IDEMPOTENT: this script inserts its own fixtures (a published profile, a
+-- case study, a share link). Run it once against a freshly created database —
+-- scripts/db-test.sh drops and recreates one each time. Running it twice makes
+-- "anon sees no unpublished profile" fail on the row the first run published,
+-- which is the harness repeating itself, not a policy regression.
+
 \set ON_ERROR_STOP on
 
 create or replace function expect_rows(stmt text, expected int, label text) returns void

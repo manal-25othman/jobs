@@ -1,0 +1,143 @@
+/*
+ * Production styles for Vertical Slice 1.
+ *
+ * This is a SUBSET re-implementation of the frozen prototype's component
+ * classes — only what these five screens need — built on the same tokens.
+ * It is not a migration of the full component library: @naqla/ui will own that
+ * once real components reveal stable patterns (owner decision).
+ *
+ * Visual reference: apps/web/assets/css/components.css. Do not redesign.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ar);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 30px var(--s-9) 90px; }
+
+h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); font-weight: 500; margin: 0 0 var(--s-4); }
+h2 { font-size: var(--fs-h2); font-weight: 500; margin: 0; }
+
+.kicker {
+  font-size: var(--fs-label); font-weight: 500; color: var(--text-2);
+  letter-spacing: 0;
+}
+.body-sm { font-size: var(--fs-body-sm); line-height: var(--lh-body-sm); }
+.micro   { font-size: var(--fs-micro); }
+.muted   { color: var(--text-2); }
+.stack   { display: flex; flex-direction: column; }
+.row     { display: flex; align-items: center; }
+.grow    { flex: 1 1 auto; min-width: 0; }
+.push    { margin-inline-start: auto; }
+
+/* English terms inside Arabic keep an isolated LTR run (handoff §5). */
+.term { font-family: var(--font-en); direction: ltr; unicode-bidi: isolate; }
+.num  { font-family: var(--font-en); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.transition { font-family: var(--font-en); direction: ltr; unicode-bidi: isolate; display: inline-block; }
+
+.card {
+  background: var(--surface); border-radius: var(--r-card); padding: 22px 24px;
+  box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 12px;
+  margin-block-end: var(--s-5);
+}
+
+.rows > * + * { border-block-start: 1px solid var(--border); padding-block-start: 12px; margin-block-start: 12px; }
+
+.btn {
+  height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-control);
+  font: inherit; font-size: var(--fs-button); font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; transition: background var(--t-state);
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn--primary   { background: var(--primary); color: var(--primary-on); }
+.btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn--secondary { background: var(--primary-tint); color: var(--primary); }
+.btn--ghost     { background: var(--bg-2); color: var(--text-body); }
+.btn--on-dark   { background: #fff; color: var(--primary); }
+.btn--sm        { height: 36px; padding: 0 14px; font-size: var(--fs-body-sm); }
+
+.input {
+  height: 44px; padding: 0 14px; border: 0; border-radius: var(--r-control);
+  background: var(--surface); box-shadow: 0 0 0 1px var(--border);
+  font: inherit; font-size: var(--fs-body-sm); width: 100%;
+}
+.input:focus { outline: 0; box-shadow: 0 0 0 2px var(--primary); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-label); padding: 5px 10px;
+  border-radius: var(--r-chip); background: var(--bg-2); color: var(--text-body);
+}
+.chip--success   { background: var(--success-bg);   color: var(--success);        font-weight: 500; }
+.chip--attention { background: var(--attention-bg); color: var(--attention-text); font-weight: 500; }
+.chip--info      { background: var(--info-bg);      color: var(--info-text);      font-weight: 500; }
+.chip--new       { background: var(--primary-tint); color: var(--primary);        font-weight: 500; }
+
+/* Evidence states carry a shape AND a label — never colour alone (§13). */
+.dot { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; display: inline-block; }
+.dot--gap          { border: 1.5px dashed var(--text-muted); }
+.dot--self         { border: 1.5px solid var(--text-2); }
+.dot--practiced    { border: 1.5px solid var(--sage); background: linear-gradient(90deg, var(--sage) 50%, transparent 50%); }
+.dot--demonstrated { background: var(--primary); }
+.dot--verified     { background: var(--primary); box-shadow: 0 0 0 2px var(--primary-tint); }
+
+.state-label { font-size: var(--fs-label); font-weight: 500; color: var(--text-2); }
+.state-label--practiced    { color: var(--sage); }
+.state-label--demonstrated { color: var(--primary); }
+.state-label--gap          { color: var(--text-muted); }
+
+/* The one dark block per screen: the next action. */
+.next-action {
+  background: var(--primary); color: var(--primary-on);
+  border-radius: var(--r-card); padding: 24px;
+  display: flex; flex-direction: column; gap: 12px; margin-block-end: var(--s-5);
+}
+.next-action .kicker { color: var(--primary-soft-text); }
+.next-action p { color: var(--primary-soft-body); margin: 0; font-size: var(--fs-body-sm); }
+.next-action h2 { color: var(--primary-on); }
+
+.banner {
+  display: flex; align-items: center; gap: 12px;
+  border-radius: var(--r-banner); padding: 14px 16px;
+  font-size: var(--fs-body-sm); margin-block-end: var(--s-5);
+}
+.banner--success   { background: var(--success-bg);   color: var(--success); }
+.banner--attention { background: var(--attention-bg); color: var(--attention-text); }
+.banner--info      { background: var(--bg-2);         color: var(--text-body); }
+
+.disclaimer { font-size: var(--fs-micro); color: var(--text-2); line-height: 1.6; }
+
+.steps { display: flex; gap: 6px; flex-wrap: wrap; margin-block-end: var(--s-6); }
+.step {
+  font-size: var(--fs-label); padding: 6px 12px; border-radius: var(--r-pill);
+  background: var(--bg-2); color: var(--text-2);
+}
+.step.is-done    { background: var(--primary-tint); color: var(--primary); }
+.step.is-current { background: var(--primary); color: var(--primary-on); }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label { font-size: var(--fs-label); font-weight: 500; color: var(--text-2); }
+.field__error { font-size: var(--fs-label); color: var(--critical); }
+
+.check-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; }
+.check-row input { margin-block-start: 4px; width: 18px; height: 18px; accent-color: var(--primary); }
+
+.link { color: var(--primary); text-decoration: none; font-weight: 500; font-size: var(--fs-body-sm); }
+.link:hover { text-decoration: underline; }
+
+.divider { height: 1px; background: var(--border); border: 0; margin: 4px 0; }
+
+@media (max-width: 767px) {
+  .wrap { padding: 20px 20px 90px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition-duration: 1ms !important; }
+}

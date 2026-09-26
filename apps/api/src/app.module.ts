@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { DomainInfoController } from './domain-info.controller';
+import { InfraModule } from './infra/infra.module';
+import { Slice1Module } from './slice1/slice1.module';
 
 /**
- * Phase 0 module graph, deliberately almost empty.
+ * Vertical Slice 1 only.
  *
- * Feature modules (projects, submissions, evaluation, assets) arrive in the
- * first vertical slice. Adding them now would be feature work, which Phase 0
- * excludes.
+ * No CV builder, no LinkedIn module, no learning centre, no notifications, no
+ * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
+  imports: [InfraModule, Slice1Module],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

@@ -136,3 +136,45 @@ docs/architecture/  DOMAIN-MODEL · DATA-MODEL · AI-BOUNDARY · ACCESS-CONTROL-
 | `verify:prototype` يفشل | عُدِّل ملف في `apps/web/`. إن كان مقصودًا: سجّلي السبب ثم `node scripts/verify-frozen-prototype.mjs --write` |
 | `role "authenticated" does not exist` | يعمل على PostgreSQL عادي بلا `0002_rls.sql`. طبّقي الهجرتين بالترتيب |
 | اختبار RLS ينجح كله بلا سبب | **افحصي حارس `assert_effective_role`** — بلا تبديل دور حقيقي كل شيء يمر بصلاحية superuser ويثبت لا شيء |
+
+---
+
+## ٩. تشغيل الشريحة الرأسية الأولى كاملة
+
+```bash
+# 1 · قاعدة البيانات
+createdb naqla_dev
+export DATABASE_URL="postgresql://postgres@localhost:5432/naqla_dev"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/0001_init.sql \
+  -f supabase/migrations/0002_rls.sql \
+  -f supabase/migrations/0003_slice_1.sql \
+  -f supabase/seed/0001_demo_role.sql
+
+# 2 · الإعدادات
+cp .env.example .env.local        # ثم املئي القيم، ومنها SUPABASE_JWT_SECRET
+
+# 3 · الـAPI
+npm run build -w @naqla/api && npm run start -w @naqla/api      # :3001
+
+# 4 · الواجهة
+npm run dev -w @naqla/app                                        # :3000
+```
+
+ثم في المتصفح: `/login` ← `/goal` ← `/project` ← `/evaluation` ← `/asset` ← `/report`.
+
+### الاختبارات
+
+```bash
+npm test                          # 94 اختبار نطاق + 7 إعدادات
+npm run verify                    # الحدود + النموذج المُجمَّد + الرموز
+scripts/db-test.sh                # 29 إثبات ثابت + 42 إثبات وصول
+DATABASE_URL=... npm run test:e2e -w @naqla/api   # 29 اختبار طرف-إلى-طرف
+```
+
+**اختبارات الطرف إلى الطرف تحتاج قاعدة بيانات مهاجَرة ومزروعة**، ويمكن أن تكون نفس `naqla_dev`.
+`SUPABASE_JWT_SECRET` مطلوب للـAPI، وتُصدَّر الرموز في الاختبارات محليًا بنفس الخوارزمية والمطالبات التي يصدرها Supabase.
+
+### ملاحظة على Supabase محليًا
+الحزمة الكاملة (Auth وStorage وStudio) تحتاج **Docker** عبر `supabase start`.
+وهذه الشريحة **لم تُشغَّل على حزمة Supabase حيّة** — راجعي `VERTICAL-SLICE-01-REPORT.md` §DEMO/FIXTURE.
