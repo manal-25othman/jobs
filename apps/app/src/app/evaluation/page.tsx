@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api, type EvaluationResult } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
+import { CompanionNudge } from '../../components/CompanionNudge';
 
 function EvaluationInner() {
   const { token, loading } = useSession();
@@ -149,6 +150,8 @@ function EvaluationInner() {
         </section>
       )}
 
+      <CompanionNudge token={token} />
+      <p className="body-sm"><a className="link" href="/proposals">اقتراحات الرفيق المهني ←</a></p>
       <p className="disclaimer">
         هذا التقييم حتمي بالكامل: نفس المدخلات تعطي نفس النتيجة، ولم يُستدعَ أي نموذج لغوي.
       </p>

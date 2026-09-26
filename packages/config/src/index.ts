@@ -98,6 +98,14 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'Maximum accepted upload size in bytes. Defaults to 10 MiB.', example: '10485760',
     validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
 
+  { name: 'AGENT_PROVIDER', scope: 'api', required: false, secret: false,
+    description: 'Agent provider. Only local-test exists (TEST/NON-PRODUCTION); refused when NODE_ENV=production. A real provider arrives after OPEN-023.',
+    example: 'local-test', validate: oneOf('local-test') },
+
+  { name: 'AGENT_BUDGET_CALLS_PER_DAY', scope: 'api', required: false, secret: false,
+    description: 'Per-user daily cap on agent invocations. Defaults to 50.', example: '50',
+    validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
+
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
     validate: oneOf('debug', 'info', 'warn', 'error') },
@@ -144,6 +152,9 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
     }
   }
 
+  if (env['NODE_ENV'] === 'production' && env['AGENT_PROVIDER'] === 'local-test') {
+    problems.push('AGENT_PROVIDER=local-test is TEST/NON-PRODUCTION and is refused in production (OPEN-023 unresolved)');
+  }
   if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
     problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');
   }

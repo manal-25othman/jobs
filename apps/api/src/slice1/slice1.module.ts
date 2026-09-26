@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AgentsModule } from '../agents/agents.module';
 import { Slice1Controller, PublicReportController } from './slice1.controller';
 import { CareerService } from './career.service';
 import { SubmissionService } from './submission.service';
@@ -10,6 +11,7 @@ import { UploadService } from './upload.service';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
 
 @Module({
+  imports: [AgentsModule],
   controllers: [Slice1Controller, PublicReportController],
   providers: [
     UserProvisioningService, CareerService, SubmissionService,

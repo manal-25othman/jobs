@@ -70,6 +70,23 @@ for (const file of walk(join(ROOT, 'packages/contracts/src'))) {
   }
 }
 
+/* 2b. agents: node: builtins, relative files, and @naqla/domain only — no model SDK. */
+for (const file of walk(join(ROOT, 'packages/agents/src'))) {
+  for (const spec of importsOf(file)) {
+    if (isRelative(spec) || isNodeBuiltin(spec) || spec === '@naqla/domain') continue;
+    violations.push(`[agents-purity] ${relative(ROOT, file)} imports '${spec}'. @naqla/agents may depend on @naqla/domain only; no model SDK.`);
+  }
+}
+for (const dir of ['packages/domain/src', 'packages/agents/src', 'apps/api/src', 'apps/app/src']) {
+  for (const file of walk(join(ROOT, dir))) {
+    for (const spec of importsOf(file)) {
+      if (/^(@anthropic-ai\/|openai|@google\/generative|cohere|mistral)/.test(spec)) {
+        violations.push(`[no-external-ai] ${relative(ROOT, file)} imports '${spec}'. OPEN-023 is unresolved; no model SDK may be bound.`);
+      }
+    }
+  }
+}
+
 /* 3. drift alarm: an app must not define its own copy of a domain rule. */
 const GUARDED_NAMES = [
   'assertTransitionAllowed',

@@ -4,6 +4,7 @@ import { DomainInfoController } from './domain-info.controller';
 import { InfraModule } from './infra/infra.module';
 import { Slice1Module } from './slice1/slice1.module';
 import { StorageModule } from './storage/storage.module';
+import { AgentsModule } from './agents/agents.module';
 
 /**
  * Vertical Slice 1 only.
@@ -12,7 +13,7 @@ import { StorageModule } from './storage/storage.module';
  * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
-  imports: [InfraModule, StorageModule, Slice1Module],
+  imports: [InfraModule, StorageModule, AgentsModule, Slice1Module],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

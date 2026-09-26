@@ -5,6 +5,7 @@
   "description": "NAQLA \u2014 AI Career Operating System. Phase 0 production foundations.",
   "workspaces": [
     "packages/domain",
+    "packages/agents",
     "packages/contracts",
     "packages/config",
     "packages/ui",
@@ -19,7 +20,7 @@
     "test:domain": "npm run test -w @naqla/domain",
     "build:contracts": "npm run build -w @naqla/contracts",
     "build:config": "npm run build -w @naqla/config",
-    "test": "npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run build -w @naqla/contracts && npm run test -w @naqla/domain && npm run test -w @naqla/config",
+    "test": "npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run build -w @naqla/contracts && npm run build -w @naqla/agents && npm run test -w @naqla/domain && npm run test -w @naqla/config && npm run test -w @naqla/agents",
     "verify:boundaries": "node scripts/verify-boundaries.mjs",
     "verify:prototype": "node scripts/verify-frozen-prototype.mjs",
     "verify:tokens": "node scripts/verify-tokens.mjs",

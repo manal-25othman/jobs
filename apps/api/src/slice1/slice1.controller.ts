@@ -11,6 +11,7 @@ import { AssetService } from './asset.service';
 import { ReportService } from './report.service';
 import { ShareService } from './share.service';
 import { UploadService } from './upload.service';
+import { AgentService } from '../agents/agent.service';
 import { Delete } from '@nestjs/common';
 
 /**
@@ -31,6 +32,7 @@ export class Slice1Controller {
     private readonly reports: ReportService,
     private readonly share: ShareService,
     private readonly uploads: UploadService,
+    private readonly agents: AgentService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -135,7 +137,18 @@ export class Slice1Controller {
 
   @Post('submissions/:id/evaluate')
   async evaluate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return { ok: true, data: await this.evaluations.evaluateSubmission(user.id, id) };
+    // The evaluation transaction commits first. Orchestration runs AFTER it,
+    // outside it, and its failure is swallowed: agents never break the product.
+    const result = await this.evaluations.evaluateSubmission(user.id, id);
+    const anyUnmet = result.criteria.some((c) => c.score < c.maxScore);
+    const skillId = result.criteria[0]?.skillId ?? null;
+    if (result.transition?.to === 'demonstrated') {
+      await this.agents.onEvent({ type: 'evidence.demonstrated', userId: user.id,
+        facts: { evidenceId: result.transition.evidenceId, evaluationResultId: result.resultId }, refs: [{ kind: 'evidence', id: result.transition.evidenceId }, { kind: 'evaluation_result', id: result.resultId }] });
+    }
+    await this.agents.onEvent({ type: 'evaluation.completed', userId: user.id,
+      facts: { outcome: result.outcome, anyCriterionUnmet: anyUnmet, evaluationResultId: result.resultId, skillId }, refs: [{ kind: 'evaluation_result', id: result.resultId }] });
+    return { ok: true, data: result };
   }
 
   @Get('submissions/:id/evaluation')

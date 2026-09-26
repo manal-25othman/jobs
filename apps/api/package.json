@@ -21,7 +21,8 @@
     "rxjs": "7.8.1",
     "pg": "8.13.1",
     "jose": "5.9.6",
-    "@supabase/supabase-js": "2.47.10"
+    "@supabase/supabase-js": "2.47.10",
+    "@naqla/agents": "*"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.5",
