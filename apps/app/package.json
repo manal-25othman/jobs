@@ -1,0 +1,26 @@
+{
+  "name": "@naqla/app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "NAQLA production web application (Next.js). Phase 0 bootstrap: no screens migrated.",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@naqla/config": "*",
+    "@naqla/contracts": "*",
+    "@naqla/domain": "*",
+    "next": "16.3.6",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "typescript": "5.9.3"
+  }
+}

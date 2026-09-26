@@ -1,0 +1,24 @@
+{
+  "note": "Frozen reference prototype. Regenerate only with a recorded decision.",
+  "frozenAt": "2026-09-26",
+  "files": {
+    "README.md": "e7640cb9552a5854",
+    "assets/css/base.css": "3d39c86a361505df",
+    "assets/css/components.css": "8cfc0a98d8322206",
+    "assets/css/tokens.css": "c36bb0fa94c8675e",
+    "assets/js/app.js": "32ff19586be0d67c",
+    "assets/js/data.js": "e0d40683bee18b2b",
+    "career.html": "6186e41c2621e431",
+    "en/index.html": "2bc09af6a76f19d6",
+    "index.html": "f8e9422a92cb17cc",
+    "mission.html": "87d4d79127ca6d0d",
+    "profile-assets.html": "f1f0866c37d8dddc",
+    "profile-case-studies.html": "be36cd3e85c3571d",
+    "profile-cv.html": "ef249fcb47181c5e",
+    "profile-linkedin.html": "9d8fa6314ed18cf9",
+    "profile.html": "415a1b39d016a74f",
+    "projects.html": "dce25b01d7c73caf",
+    "skills.html": "e5430ebb4e58f083",
+    "states.html": "9b6ed34d46321704"
+  }
+}

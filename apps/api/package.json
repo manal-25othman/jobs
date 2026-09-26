@@ -1,0 +1,28 @@
+{
+  "name": "@naqla/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "NAQLA API (NestJS). Phase 0 bootstrap: health and readiness only, no product endpoints.",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "test": "node --test dist/**/*.spec.js"
+  },
+  "dependencies": {
+    "@naqla/config": "*",
+    "@naqla/contracts": "*",
+    "@naqla/domain": "*",
+    "@nestjs/common": "11.0.12",
+    "@nestjs/core": "11.0.12",
+    "@nestjs/platform-express": "11.0.12",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "11.0.5",
+    "@types/express": "5.0.0",
+    "@types/node": "22.10.2",
+    "typescript": "5.9.3"
+  }
+}
