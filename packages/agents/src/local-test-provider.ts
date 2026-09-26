@@ -16,15 +16,19 @@ export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 's
 /** Mode B: candidates supplied verbatim by a scenario. The gateway must judge them. */
 export interface ScriptedOutput { readonly candidates: readonly unknown[]; }
 
+/** Bumped whenever a template changes, so a harness run names what it ran against. */
+export const LOCAL_TEST_PROVIDER_VERSION = '0.2.0';
+
 export class LocalTestProvider implements AgentProvider {
   readonly name = 'local-test';
+  readonly version = LOCAL_TEST_PROVIDER_VERSION;
   readonly testOnly = true;
   constructor(private readonly mode: TestProviderMode = 'normal', private readonly scripted: ScriptedOutput | null = null) {}
 
   async complete(req: ProviderRequest): Promise<ProviderResponse> {
     const started = Date.now();
     const inputBytes = Buffer.byteLength(JSON.stringify(req.context));
-    const base = { provider: this.name, model: 'deterministic-template/0', inputBytes, estimatedCost: null, cacheStatus: 'n/a' as const };
+    const base = { provider: this.name, model: `deterministic-template/${this.version}`, inputBytes, estimatedCost: null, cacheStatus: 'n/a' as const };
 
     if (this.mode === 'error') throw new Error('local-test provider: injected failure');
 
@@ -74,6 +78,23 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
       structuredPayload: { kind: 'action', action: `resolve: ${amb.kind}`, why: 'a professional claim needs an unambiguous support path', estimatedMinutes: 5 },
       evidenceRefs: [], sourceRefs: [], rationale: 'conservative handling of ambiguity', warnings: [], requiresUserApproval: false,
     }];
+  }
+  // R4 — a claim the user made that nothing supports: explain the gap and the
+  // way to close it. Never a rewrite that keeps the claim.
+  const unsupported = ctx['unsupportedClaims'] as { claim: string; skillId: string; currentState: string }[] | undefined;
+  if (unsupported && unsupported.length > 0) {
+    return unsupported.flatMap((u) => [{
+      proposalType: 'profile_gap', subjectType: 'skill_claim', subjectId: u.skillId,
+      summary: `ادعاء غير مدعوم: «${u.claim}»`,
+      structuredPayload: { kind: 'gap', skillId: u.skillId, explanation: `the profile states "${u.claim}" but the claim's state is '${u.currentState}'; nothing evaluated supports presenting it`, currentState: u.currentState },
+      evidenceRefs: [], sourceRefs: [], rationale: 'a self-description is not evidence; the gap is stated, not papered over',
+      warnings: [`unsupported claim: ${u.claim}`], requiresUserApproval: false,
+    }, {
+      proposalType: 'recruiter_next_action', subjectType: 'skill_claim', subjectId: u.skillId,
+      summary: 'أثبتي المهارة بنشاط مُقيَّم قبل عرضها',
+      structuredPayload: { kind: 'action', action: `complete an evaluated activity for skill ${u.skillId}, or remove the claim from the profile`, why: 'a claim needs an evidence path before a recruiter sees it', estimatedMinutes: 45 },
+      evidenceRefs: [], sourceRefs: [], rationale: 'the only two honest options', warnings: [], requiresUserApproval: false,
+    }]);
   }
   const ev = ctx['evidence'] as { id: string; skillId: string; skillLabelAr: string; skillLabelEn: string; state: string;
     projectTitle: string; evaluationResultId: string; criteriaMet: string[]; totalScore: number; maxScore: number } | undefined;

@@ -2,7 +2,7 @@
   "name": "naqla",
   "private": true,
   "version": "0.0.0",
-  "description": "NAQLA \u2014 AI Career Operating System. Phase 0 production foundations.",
+  "description": "NAQLA — AI Career Operating System. Phase 0 production foundations.",
   "workspaces": [
     "packages/domain",
     "packages/agents",
@@ -25,7 +25,8 @@
     "verify:prototype": "node scripts/verify-frozen-prototype.mjs",
     "verify:tokens": "node scripts/verify-tokens.mjs",
     "verify": "npm run verify:boundaries && npm run verify:prototype && npm run verify:tokens",
-    "live:supabase": "node scripts/supabase-live-check.mjs"
+    "live:supabase": "node scripts/supabase-live-check.mjs",
+    "eval:agents": "npm run build -w @naqla/domain -w @naqla/agents && node scripts/run-agent-harness.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

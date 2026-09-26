@@ -92,6 +92,18 @@ export interface DomainFacts {
   readonly approvedTechnologies: ReadonlySet<string>;
   /** The technology vocabulary (data, seeded from track packs), with aliases. */
   readonly knownTechnologies: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Numbers a wording may contain, as strings: recorded scores, maxima and
+   * met-criterion counts of the user's evaluations. Any other number in a
+   * professional wording is an invented metric (INV-4), whatever its unit.
+   */
+  readonly numericFacts: ReadonlySet<string>;
+}
+
+/** Every number in a text, Arabic-Indic digits normalised to ASCII. */
+export function numbersIn(text: string): string[] {
+  const ascii = text.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  return ascii.match(/\d+(?:\.\d+)?/g) ?? [];
 }
 
 /** Finds vocabulary terms present in the text, by term or alias, word-bounded. */
@@ -109,18 +121,26 @@ export function technologiesMentioned(text: string, known: ReadonlyMap<string, r
 const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\b(at|for)\s+[A-Z][A-Za-z]+\s+(Inc|Ltd|LLC|Corp|Company|Bank|Group)\b/, 'an employer'],
   [/\bcertif(ied|ication|icate)\b/i, 'a certification'],
-  [/\b(شهادة|معتمد|معتمدة)\b/, 'a certification'],
+  [/(^|[\s،,.؛;:'"«»(])(شهادة|معتمد|معتمدة)($|[\s،,.؛;:'"«»)])/, 'a certification'],
   [/\b(senior|lead|principal|head of|manager)\b/i, 'seniority'],
-  [/\b(كبير|قائد|رئيس|مدير)\b/, 'seniority'],
+  [/(^|[\s،,.؛;:'"«»(])(كبير|كبيرة|قائد|قائدة|رئيس|رئيسة|مدير|مديرة)($|[\s،,.؛;:'"«»)])/, 'seniority'],
   [/\b\d+\+?\s*(years?|yrs)\b/i, 'years of experience'],
   [/\bworked at\b/i, 'employment'],
 ];
 
 export function validateAgainstDomain(
-  p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'>,
+  p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'> & Partial<Pick<AgentProposal, 'summary' | 'rationale'>>,
   facts: DomainFacts,
 ): void {
   const payload = p.structuredPayload;
+
+  // D-076 for EVERY proposal, wording or not: a technology term anywhere in
+  // the text needs an approved source. Technical feedback that says "your
+  // React component" infers a framework the user never declared.
+  const everywhere = [p.summary ?? '', p.rationale ?? '', JSON.stringify(payload)].join(' ');
+  for (const t of technologiesMentioned(everywhere, facts.knownTechnologies)) {
+    if (!facts.approvedTechnologies.has(t)) throw new ProposalRejected('domain', `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`);
+  }
 
   if (payload.kind === 'wording') {
     // Every claim needs evidence that exists.
@@ -159,6 +179,11 @@ export function validateAgainstDomain(
     } catch (e) {
       if (e instanceof InvariantViolation) throw new ProposalRejected('domain', e.message);
       throw e;
+    }
+    // INV-4, generically: a number is a metric. A wording may carry only
+    // numbers that are recorded facts — not "2x faster", not "from 3s to 1s".
+    for (const n of new Set([...numbersIn(payload.suggestedValueAr), ...numbersIn(payload.suggestedValueEn ?? '')])) {
+      if (!facts.numericFacts.has(n)) throw new ProposalRejected('domain', `the wording contains the number ${n}, which no recorded fact supports; a metric needs a measured source`);
     }
   }
 

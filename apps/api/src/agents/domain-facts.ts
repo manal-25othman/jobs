@@ -20,11 +20,21 @@ export async function loadDomainFacts(c: PoolClient, userId: string): Promise<Do
         select unnest(declared_technologies) as t from submission where user_id = $1
      ) x`, [userId]);
   const known = await c.query('select term, aliases from technology_term');
+  // Recorded numbers only: per evaluation result, the total, the maximum and
+  // the count of fully met criteria. Nothing else is a number a wording may use.
+  const scores = await c.query(
+    `select sum(score)::text as total, sum(max_score)::text as max,
+            count(*) filter (where score >= max_score)::text as met
+       from evaluation_criterion_score s join evaluation_result r on r.id = s.evaluation_result_id
+      where r.user_id = $1 group by r.id`, [userId]);
+  const numericFacts = new Set<string>();
+  for (const r of scores.rows) for (const v of [r.total, r.max, r.met]) numericFacts.add(String(Number(v)));
   return {
     skillStates: Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state as EvidenceState])),
     existingEvidence: new Set<string>(ev.rows.map((r) => r.id)),
     approvedTechnologies: new Set<string>(approved.rows.map((r) => String(r.t))),
     knownTechnologies: new Map<string, readonly string[]>(known.rows.map((r) => [String(r.term), (r.aliases as string[]) ?? []])),
+    numericFacts,
   };
 }
 

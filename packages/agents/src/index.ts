@@ -7,3 +7,4 @@ export * from './orchestrator.js';
 export * from './companion.js';
 export * from './agents.js';
 export * from './gateway.js';
+export * from './harness/index.js';

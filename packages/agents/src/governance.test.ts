@@ -12,6 +12,7 @@ const facts: DomainFacts = {
   skillStates: { skl_testing: 'demonstrated', skl_css: 'self_reported', skl_comp: 'practiced' },
   existingEvidence: new Set(['ev_1']), approvedTechnologies: new Set(),
   knownTechnologies: new Map([['React', ['ReactJS']], ['Vue', []], ['Next.js', ['NextJS']]]),
+  numericFacts: new Set(['2', '4']),
 };
 const evidenceCtx = { evidence: { id: 'ev_1', skillId: 'skl_testing', skillLabelAr: 'اختبار الواجهات', skillLabelEn: 'UI testing',
   state: 'demonstrated', projectTitle: 'متتبّع عادات', evaluationResultId: 'er_1', criteriaMet: ['a', 'b'], totalScore: 4, maxScore: 4 },

@@ -73,7 +73,7 @@ export class ReportService {
           where sc.user_id = $1
             and evidence_ordinal(sc.state) >= evidence_ordinal('practiced')
             -- D-077: a claim whose primary evidence was withdrawn is not shown
-            -- as supported. The claim row itself is untouched (OPEN-025).
+            -- as supported. The claim row itself is untouched (OPEN-038).
             and (e.id is null or e.withdrawn_at is null)
           order by evidence_ordinal(sc.state) desc, sk.label_en`,
         [userId],

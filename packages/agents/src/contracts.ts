@@ -7,6 +7,12 @@
  * request the domain and the user decide on.
  */
 
+/**
+ * Version of the proposal envelope and payload contract. Bumped when a field,
+ * payload kind or validation-relevant semantic changes. Recorded by the harness.
+ */
+export const PROPOSAL_SCHEMA_VERSION = '1.1.0';
+
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
 export const AGENT_TYPES = ['recruitment', 'technical', 'learning', 'personal_branding', 'business'] as const;

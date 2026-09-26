@@ -81,6 +81,10 @@ export function assertNoUnsupportedLanguage(bodyAr: string, bodyEn: string): voi
   for (const w of FORBIDDEN_WORDS_EN) if (new RegExp(`\\b${w}\\b`).test(lowerEn)) throw new InvariantViolation('INV-1', `the wording asserts mastery or seniority with "${w}"`, { word: w });
   if (/\d+\s*%/.test(bodyAr) || /\d+\s*%/.test(bodyEn) || /٪/.test(bodyAr)) throw new InvariantViolation('INV-4', 'the wording contains a percentage, which no evidence derives');
   if (/\b\d+\+?\s*(years?|yrs)\b/i.test(bodyEn) || /\d+\s*(سنوات|سنة|أعوام)/.test(bodyAr)) throw new InvariantViolation('INV-4', 'the wording asserts years of experience, which no evidence records');
+  // A quantity in words is still a metric: "in half", "doubled", "tenfold".
+  if (/\b(halved|in half|doubled?|twice as|tripled?|tenfold|\w+-fold)\b/i.test(bodyEn) || /(إلى النصف|بالنصف|ضعفين|ثلاثة أضعاف|أضعاف|مرتين)/.test(bodyAr)) {
+    throw new InvariantViolation('INV-4', 'the wording quantifies an outcome in words, which no evidence measures');
+  }
 }
 
 /* ────────────────────── approval lifecycle: draft → active ──────────────── */

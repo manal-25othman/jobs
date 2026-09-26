@@ -38,6 +38,7 @@ npm test                    # النطاق + الإعدادات
 | `npm run test:domain` | اختبارات النطاق وحدها — **أسرع حلقة، استعمليها أثناء العمل** |
 | `npm run verify:boundaries` | **يفشل** إن استورد النطاق إطارًا، أو أعاد تطبيقٌ تعريف قاعدة |
 | `npm run verify:prototype` | **يفشل** إن تغيّر النموذج المُجمَّد في `apps/web/` |
+| `npm run eval:agents` | منصّة تقييم الوكلاء: ٣٠ سيناريو عبر المُنسّق والبوابة والنطاق بالمزوّد الاختباري، تشغيلان متطابقان، يكتب `packages/agents/eval/last-run.json` |
 | `npm run build -w @naqla/api` | يبني الـAPI |
 | `npm run build -w @naqla/app` | يبني تطبيق Next.js |
 | `scripts/db-test.sh` | يطبّق الهجرات ويشغّل إثباتات القاعدة والوصول |

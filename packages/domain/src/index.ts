@@ -26,4 +26,4 @@ export * from './uploads.js';
 export * from './withdrawal.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.3.0';
+export const DOMAIN_RULESET_VERSION = '0.4.0';
