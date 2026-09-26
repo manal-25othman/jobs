@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · الحالات والتنبيهات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="states">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">مرجع تنفيذي · ليس شاشة مستخدم</span>
+        <h1>الحالات العامة: التنبيهات · الرفيق المهني · فارغ/تحميل/نجاح/انتباه/خطأ</h1>
+        <p class="body-sm muted">هذه الصفحة تجمع الصفحات <span class="num">11</span>–<span class="num">13</span> من جرد الصفحات (حالات عامة لا شاشات مستقلة)، كما وردت في <span class="term" lang="en">§10–§14</span> من وثيقة التسليم.</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="st-notif">
+      <h2 id="st-notif" style="font-size:var(--fs-button)"><span class="term" lang="en">§10</span> · التنبيهات — العقد اللوني المُجمَّد</h2>
+      <div class="rows">
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">success</span> — نجاح · إنشاء دليل · إكمال</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-toast="تم إنشاء دليل جديد: إدارة الحالة · Demonstrated" data-toast-type="success" data-toast-action="اعرضي ما تغيّر" data-toast-href="skills.html">جرّبي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">improvement</span> — تحسين جديد متاح</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-toast="لينكدإن تحسّن +٤ بعد إضافة مشروعك." data-toast-type="improvement" data-toast-action="عرض" data-toast-href="profile-linkedin.html">جرّبي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">attention</span> — متوقف · ادعاء غير مدعوم · تذكير</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-toast="مشروعك «متتبّع عادات» متوقف منذ ٣ أيام." data-toast-type="attention" data-toast-action="استئناف" data-toast-href="projects.html">جرّبي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">info</span> — معلوماتي</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-toast="لديك مهارة جديدة جاهزة للعرض." data-toast-type="info">جرّبي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">critical</span> — فشل حفظ أو رفع فقط، لا للفجوات</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-toast="تعذّر حفظ التغييرات." data-toast-type="critical" data-toast-action="إعادة المحاولة">جرّبي</button>
+        </div>
+      </div>
+      <p class="disclaimer">واحد في كل مرة (طابور) · ٤ ثوانٍ، و٨ إن كان فيه إجراء · يبقى أثناء التمرير عليه أو تركيزه.</p>
+    </section>
+
+    <section class="card" aria-labelledby="st-banner">
+      <h2 id="st-banner" style="font-size:var(--fs-button)"><span class="term" lang="en">§10</span> · الشرائط السياقية — واحد لكل شاشة</h2>
+      <div class="banner banner--success" role="region" aria-label="دليل جديد">
+        <span class="banner__icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+        </span>
+        <span class="banner__text">تم إنشاء دليل جديد: <strong style="font-weight:500;">إدارة الحالة · <span class="term" lang="en">Demonstrated</span></strong>.</span>
+        <a class="link" href="skills.html">اعرضي ما تغيّر</a>
+        <button class="banner__close" aria-label="إخفاء">×</button>
+      </div>
+      <div class="banner banner--attention" role="region" aria-label="مشروع متوقف">
+        <span class="banner__icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>
+        </span>
+        <span class="banner__text">مشروعك «متتبّع عادات» متوقف منذ ٣ أيام.</span>
+        <a class="link" href="projects.html">استئناف</a>
+        <button class="banner__close" aria-label="إخفاء">×</button>
+      </div>
+      <div class="banner banner--info" role="region" aria-label="معلومة">
+        <span class="banner__icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+        </span>
+        <span class="banner__text"><span class="term" lang="en">Verified</span> يحتاج مراجعة على مشروع ثانٍ — ليس تلقائيًا.</span>
+        <button class="banner__close" aria-label="إخفاء">×</button>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="st-evidence">
+        <h2 id="st-evidence" style="font-size:var(--fs-button)"><span class="term" lang="en">§8</span> · حالات الدليل — شكل + نص، لا لون وحده</h2>
+        <div class="rows">
+          <div class="row" style="gap:12px;"><span class="dot dot--gap" aria-hidden="true"></span><span class="grow body-sm">فجوة</span><span class="state-label state-label--gap">فجوة</span></div>
+          <div class="row" style="gap:12px;"><span class="dot dot--self" aria-hidden="true"></span><span class="grow body-sm">مُعلنة ذاتيًا</span><span class="state-label">مُعلنة ذاتيًا</span></div>
+          <div class="row" style="gap:12px;"><span class="dot dot--practiced" aria-hidden="true"></span><span class="grow body-sm">ظهرت في مشروع</span><span class="state-label state-label--practiced term" lang="en">Practiced</span></div>
+          <div class="row" style="gap:12px;"><span class="dot dot--demonstrated" aria-hidden="true"></span><span class="grow body-sm">مُثبتة بدليل</span><span class="state-label state-label--demonstrated term" lang="en">Demonstrated</span></div>
+          <div class="row" style="gap:12px;"><span class="seal" aria-hidden="true"></span><span class="grow body-sm">موثّقة</span><span class="state-label state-label--demonstrated term" lang="en">Verified</span></div>
+        </div>
+        <div class="stack" style="gap:8px;">
+          <span class="kicker">شريط الدرجة · ٤ خلايا (٠–٤)</span>
+          <div class="cells" role="img" aria-label="ظهرت في مشروع، وقيد الإثبات — ٢ من ٤"><span class="is-sage"></span><span class="is-sage"></span><span class="is-proving"></span><span></span></div>
+          <span class="micro muted">الخلية المخططة = «قيد الإثبات». الخلية الأولى متقطعة عند الفجوة.</span>
+        </div>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">الانتقال — للأمام فقط (٠→٤)</span>
+          <span class="transition" lang="en">No evidence → Self-reported → Practiced → Demonstrated → Verified</span>
+          <span class="micro muted">لا تراجع في الإصدار الأول. السهم داخل مجرى معزول حتى لا ينعكس في RTL.</span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="st-blocks">
+        <h2 id="st-blocks" style="font-size:var(--fs-button)"><span class="term" lang="en">§14</span> · فارغ · تحميل · نجاح · انتباه · خطأ</h2>
+
+        <div class="empty">
+          <span class="empty__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          </span>
+          <span class="empty__title">لا دراسات حالة بعد — وهذا طبيعي</span>
+          <span class="body-sm muted">تُكتب تلقائيًا من أول مشروع مُقيَّم.</span>
+          <a class="link" href="projects.html">ابدئي مشروعًا</a>
+        </div>
+
+        <div class="stack" style="gap:8px;">
+          <span class="kicker">تحميل — هياكل بمقاس المحتوى الحقيقي</span>
+          <span class="skeleton" style="height:13px; width:60%;"></span>
+          <span class="skeleton" style="height:7px; width:100%; border-radius:4px;"></span>
+          <span class="skeleton" style="height:13px; width:40%;"></span>
+        </div>
+
+        <div class="success-block">
+          <span class="success-block__icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+          </span>
+          <div class="grow stack" style="gap:2px;">
+            <span class="body-sm" style="font-weight:500;">تمّ.</span>
+            <span class="body-sm muted">ما تغيّر: السيرة <span class="delta num">+3</span> · لينكدإن <span class="delta num">+4</span></span>
+          </div>
+        </div>
+
+        <div class="attention-block">
+          <span aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>
+          </span>
+          <span class="grow">«خبيرة <span class="term" lang="en">CSS</span>» ادعاء غير مدعوم — احذفيه أو انقليه إلى «أعمل عليها».</span>
+        </div>
+
+        <div class="field">
+          <span class="field__label">رابط المستودع</span>
+          <input class="input term" lang="en" dir="ltr" value="github/…" aria-invalid="true" aria-describedby="st-err">
+          <span class="field__error" id="st-err" role="alert">تعذّر حفظ الرابط. أعيدي المحاولة.</span>
+        </div>
+        <p class="disclaimer"><span class="term" lang="en">critical</span> للفشل فقط — لا يُستخدم أبدًا للفجوات ولا للنسب المنخفضة.</p>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="st-comp">
+      <h2 id="st-comp" style="font-size:var(--fs-button)"><span class="term" lang="en">§11</span> · حالات الرفيق المهني</h2>
+      <div class="rows">
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">silent</span> — لا شيء معلَّق</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-companion-state="silent">اعرضي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">new-insight</span> — نبضة <span class="num">2.6</span>ث</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-companion-state="new-insight">اعرضي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">nudge</span> — جملة واحدة وإجراء واحد</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-companion-state="nudge">اعرضي</button>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="grow body-sm"><span class="term" lang="en">expanded</span> — الخطوة / لماذا / بعدها</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-companion-state="expanded">اعرضي</button>
+        </div>
+      </div>
+      <div class="insight">
+        <span class="insight__mark" aria-hidden="true"><span class="insight__core"></span></span>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">الرفيق المهني · <span class="term" lang="en">inline insight</span></span>
+          <p class="body-sm">واحد لكل شاشة، داخل السياق، برابطين كحد أقصى. لا اسم وكيل ولا وجه ولا فقاعة محادثة.</p>
+          <a class="link" href="#">لماذا هذا الترتيب؟</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">اختاري حالة من القائمة أعلاه.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">هذه صفحة مرجعية للتنفيذ، لا شاشة مستخدم.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">الحالات كلها من <span class="term" lang="en">§10–§14</span>.</span></div>
+    <div class="pills"><button class="pill">ماذا ينقصني؟</button><button class="pill">اقترحي بديلًا</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* States reference page only — drives the companion state machine for review. */
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-companion-state]');
+  if (!b) return;
+  var c = document.querySelector('.companion');
+  if (c) c.setAttribute('data-state', b.getAttribute('data-companion-state'));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NAQLA · Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/tokens.css">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+</head>
+<body data-page="home" data-base="../">
+<div class="app">
+  <nav data-shell="nav" aria-label="Main navigation"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">Good evening, Sara · Goal: <span class="term">Frontend Developer</span></span>
+        <h1>Your first evidence landed yesterday. One small step today makes your profile say so.</h1>
+      </div>
+      <div class="row push" style="gap:10px;">
+        <a class="btn btn--ghost btn--sm" href="../index.html" lang="ar" dir="rtl">العربية</a>
+        <a class="btn btn--secondary btn--sm" href="../profile.html">Professional profile →</a>
+      </div>
+    </header>
+
+    <div class="banner banner--success" role="status">
+      <span class="banner__icon" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+      </span>
+      <span class="banner__text">New evidence created: <strong style="font-weight:500;">UI state management · Demonstrated</strong>. LinkedIn <span class="num">+4</span> and a CV bullet is ready.</span>
+      <a class="link" href="../skills.html">See what changed</a>
+      <button class="banner__close" aria-label="Dismiss">×</button>
+    </div>
+
+    <div class="grid-2">
+      <section class="next-action" aria-labelledby="en-na">
+        <span class="next-action__kicker">Your next step · ≈ <span class="num">5</span> min</span>
+        <h2 id="en-na" class="next-action__title">Update your LinkedIn Headline — it's backed by evidence now.</h2>
+        <p class="next-action__reason">"Frontend Developer | UI State Management | Interactive Web Interfaces". The wording is ready, and it lifts LinkedIn more than any other edit.</p>
+        <div class="next-action__actions">
+          <a class="btn btn--on-dark" href="../profile-linkedin.html">See wording</a>
+          <button class="btn btn--ghost btn--sm next-action__later" type="button">Later</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="en-imp">
+        <div class="row" style="gap:10px; align-items:baseline;">
+          <h2 id="en-imp" style="font-size:var(--fs-button);">Latest improvement</h2>
+          <span class="body-sm muted push">Yesterday</span>
+        </div>
+        <div class="success-block">
+          <span class="success-block__icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+          </span>
+          <span class="grow body-sm" style="font-weight:500;">"Interactive task board" evaluated</span>
+        </div>
+        <p class="body-sm">UI state management moved <span class="transition">No evidence → Demonstrated</span>. It produced a CV bullet, a LinkedIn skill and a case-study draft.</p>
+        <div class="row" style="gap:8px; flex-wrap:wrap;">
+          <span class="chip chip--success">CV bullet</span>
+          <span class="chip chip--success">LinkedIn skill</span>
+          <span class="chip chip--attention">Case study</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="en-sk">
+        <div class="row" style="gap:10px; align-items:baseline; flex-wrap:wrap;">
+          <h2 id="en-sk" style="font-size:var(--fs-button);">Your skills toward the role</h2>
+          <span class="body-sm muted">First proven skill ✓ · two await a short check</span>
+        </div>
+        <div class="grid-2e" style="gap:14px 24px;">
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span style="font-weight:500;">UI state management</span>
+              <span class="state-label state-label--demonstrated">Demonstrated</span>
+            </div>
+            <div class="cells" role="img" aria-label="Backed by evidence — 3 of 4">
+              <span class="is-on"></span><span class="is-on"></span><span class="is-on"></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>Component building</span>
+              <span class="state-label state-label--practiced">Practiced</span>
+            </div>
+            <div class="cells" role="img" aria-label="Seen in a project — 2 of 4">
+              <span class="is-sage"></span><span class="is-sage"></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>UI testing</span>
+              <span class="state-label state-label--practiced">Practiced</span>
+            </div>
+            <div class="cells" role="img" aria-label="Seen in a project, verification in progress — 2 of 4">
+              <span class="is-sage"></span><span class="is-sage"></span><span class="is-proving"></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>Performance &amp; accessibility</span>
+              <span class="state-label state-label--gap">Gap · next</span>
+            </div>
+            <div class="cells" role="img" aria-label="No evidence yet">
+              <span class="is-gap"></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+        <a class="link" href="../skills.html">All skills and evidence →</a>
+      </section>
+
+      <section class="card" aria-labelledby="en-proj">
+        <div class="row" style="gap:10px; align-items:baseline; flex-wrap:wrap;">
+          <h2 id="en-proj" style="font-size:var(--fs-button);">Current project</h2>
+          <span class="chip chip--attention push">Paused 3 days</span>
+        </div>
+        <div class="stack" style="gap:6px;">
+          <span style="font-weight:500;">Daily habit tracker · short check</span>
+          <p class="body-sm muted"><span class="num">20</span> minutes lift "UI testing" to <span class="term">Demonstrated</span>. Pick up where you left off.</p>
+        </div>
+        <a class="btn btn--secondary btn--sm" href="../mission.html">Resume →</a>
+        <p class="disclaimer">Readiness figures on NAQLA are internal indicators, not a hiring score or a guarantee.</p>
+      </section>
+    </div>
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="nudge">
+  <button class="companion__mark" aria-label="Career Companion"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">I have a new LinkedIn improvement for you — and a CV bullet ready.</span>
+    <a class="link" href="#">Show me</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="Career Companion">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">Career Companion</span>
+      <button class="banner__close" data-companion-min aria-label="Minimise">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">Step</span><span class="body-sm">Update your LinkedIn Headline.</span></div>
+    <div class="companion__block"><span class="kicker">Why</span><span class="body-sm muted">You now have evidence that backs the new wording.</span></div>
+    <div class="companion__block"><span class="kicker">Next</span><span class="body-sm muted">The short check for UI testing.</span></div>
+    <div class="pills"><button class="pill">What am I missing?</button><button class="pill">Suggest an alternative</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="Notifications"></div>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/app.js"></script>
+</body>
+</html>

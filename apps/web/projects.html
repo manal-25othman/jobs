@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · المشاريع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="projects">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">المشاريع · نحو <span class="term" lang="en">Frontend Developer</span></span>
+        <h1>ثلاثة مشاريع؛ واحد أنتج أول دليل، وواحد يفصله ٢٠ دقيقة عن الثاني.</h1>
+      </div>
+      <button class="btn btn--secondary btn--sm push">+ إضافة مشروع</button>
+    </header>
+
+    <div class="pills" data-pills="#projects-list">
+      <button class="pill" data-filter="all" aria-pressed="true">الكل · <span class="num">3</span></button>
+      <button class="pill" data-filter="platform" aria-pressed="false">أنشطة المنصة</button>
+      <button class="pill" data-filter="own" aria-pressed="false">مشاريعي</button>
+    </div>
+
+    <div id="projects-list" class="stack" style="gap:var(--card-gap);">
+
+      <article class="card" data-tag="own">
+        <div class="row" style="gap:10px; flex-wrap:wrap;">
+          <span class="kicker">مشروع شخصي · تحقق قصير</span>
+          <span class="chip chip--attention push">متوقف منذ ٣ أيام</span>
+        </div>
+        <h2 class="card__title">متتبّع عادات يومية</h2>
+        <span class="body-sm muted">اختبار الواجهات · <span class="transition">Practiced → Demonstrated</span></span>
+        <div class="chain" aria-hidden="true">
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link"></span>
+          <span class="chain__node is-current"></span><span class="chain__link"></span>
+          <span class="chain__node is-pending"></span><span class="chain__link"></span>
+          <span class="chain__node"></span><span class="chain__link"></span>
+          <span class="chain__node"></span>
+        </div>
+        <div class="chain-labels"><span>مشروع</span><span>تقدّم</span><span>مهارة</span><span>دليل</span><span>إنجاز</span><span>أصل</span></div>
+        <div class="row" style="gap:14px; flex-wrap:wrap;">
+          <a class="btn btn--primary btn--sm" href="mission.html">ابدئي التحقق · ٢٠ د</a>
+          <span class="body-sm muted">يفتح بند سيرة + مهارة لينكدإن</span>
+        </div>
+      </article>
+
+      <article class="card" data-tag="platform">
+        <div class="row" style="gap:10px; flex-wrap:wrap;">
+          <span class="kicker">نشاط المنصة · مُقيَّم ✓</span>
+          <span class="chip chip--success push">أنتج دليلًا</span>
+        </div>
+        <h2 class="card__title">لوحة مهام تفاعلية</h2>
+        <span class="body-sm muted">إدارة الحالة · <span class="term" lang="en">Demonstrated</span> · <span class="num">4/4</span> معايير</span>
+        <div class="chain" aria-hidden="true">
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span>
+        </div>
+        <div class="chain-labels"><span>مشروع</span><span>تقدّم</span><span>مهارة</span><span>دليل</span><span>إنجاز</span><span>أصل</span></div>
+        <div class="row" style="gap:8px; flex-wrap:wrap;">
+          <span class="body-sm muted">الأصول الناتجة ←</span>
+          <span class="chip">بند سيرة</span><span class="chip">مهارة</span><span class="chip">دراسة حالة</span>
+        </div>
+      </article>
+
+      <article class="card" data-tag="own">
+        <div class="row" style="gap:10px; flex-wrap:wrap;">
+          <span class="kicker">مشروع تخرج · مُعلن ذاتيًا</span>
+        </div>
+        <h2 class="card__title">نظام تسجيل جامعي</h2>
+        <span class="body-sm muted">بناء المكونات · <span class="term" lang="en">Practiced</span></span>
+        <div class="chain" aria-hidden="true">
+          <span class="chain__node is-done"></span><span class="chain__link is-done"></span>
+          <span class="chain__node is-done"></span><span class="chain__link"></span>
+          <span class="chain__node is-current"></span><span class="chain__link"></span>
+          <span class="chain__node is-pending"></span><span class="chain__link"></span>
+          <span class="chain__node"></span><span class="chain__link"></span>
+          <span class="chain__node"></span>
+        </div>
+        <div class="chain-labels"><span>مشروع</span><span>تقدّم</span><span>مهارة</span><span>دليل</span><span>إنجاز</span><span>أصل</span></div>
+        <div class="row" style="gap:14px; flex-wrap:wrap;">
+          <span class="body-sm muted">بند سيرة جاهز ←</span>
+          <a class="link" href="#">تحقق قصير لرفع المهارة لاحقًا</a>
+        </div>
+      </article>
+    </div>
+
+    <section class="card">
+      <div class="insight">
+        <span class="insight__mark" aria-hidden="true"><span class="insight__core"></span></span>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">الرفيق المهني</span>
+          <p class="body-sm">مشروعاكِ المُعلنان لا يحتاجان إعادة؛ تحقق قصير لكلٍّ منهما يكفي. ابدئي بمتتبّع العادات — أقرب إلى الاكتمال.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">تحقق قصير على «متتبّع عادات».</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">أقل جهد مقابل أكبر أثر على ملفك.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">بند سيرة ومهارة لينكدإن جديدة.</span></div>
+    <div class="pills"><button class="pill">ماذا ينقصني؟</button><button class="pill">لماذا هذا الترتيب؟</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · ملفي المهني</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="profile">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">ملفي المهني · <span class="term" lang="en">Frontend Developer</span></span>
+        <h1>مهارة واحدة مُثبتة تحرّك ثلاثة أرقام: الملف والسيرة ولينكدإن.</h1>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="أقسام الملف المهني">
+      <a class="tab" role="tab" aria-selected="true" aria-current="page" href="profile.html">نظرة عامة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-cv.html">السيرة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-linkedin.html">لينكدإن</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-case-studies.html">دراسات الحالة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-assets.html">الأصول</a>
+      </div>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="pr-score">
+        <div class="score">
+          <div class="score__head">
+            <span class="score__label" id="pr-score">الملف المهني</span>
+            <span class="score__value num">71%</span>
+            <button class="link push" type="button" data-drilldown="#dd-profile">كيف حُسبت؟</button>
+          </div>
+          <div class="score__bar"><span class="score__fill score__fill--primary" data-value="71"></span></div>
+          <p class="disclaimer">مؤشر جاهزية داخلي من نقلة — ليس تقييمًا من لينكدإن ولا ضمانًا للتوظيف.</p>
+        </div>
+
+        <div class="drilldown" id="dd-profile">
+          <div class="stack" style="gap:10px;">
+            <span class="kicker">ما الذي يحرّك النسبة</span>
+            <div class="rows">
+              <div class="row" style="gap:12px; flex-wrap:wrap;">
+                <span class="dot dot--demonstrated" aria-hidden="true"></span>
+                <div class="grow stack" style="gap:2px;">
+                  <span class="body-sm" style="font-weight:500;">مدعوم الآن</span>
+                  <span class="body-sm muted">إدارة الحالة — من تقييم مشروع مُقيَّم ٤/٤.</span>
+                </div>
+              </div>
+              <div class="row" style="gap:12px; flex-wrap:wrap;">
+                <span class="dot dot--practiced" aria-hidden="true"></span>
+                <div class="grow stack" style="gap:2px;">
+                  <span class="body-sm" style="font-weight:500;">ينتظر التقييم</span>
+                  <span class="body-sm muted">اختبار الواجهات — تحقق قصير، مخرج ١ من ٣.</span>
+                </div>
+              </div>
+              <div class="row" style="gap:12px; flex-wrap:wrap;">
+                <span class="dot dot--gap" aria-hidden="true"></span>
+                <div class="grow stack" style="gap:2px;">
+                  <span class="body-sm" style="font-weight:500;">غير مدعوم</span>
+                  <span class="body-sm muted">«خبيرة <span class="term" lang="en">CSS</span>» — لا مشروع ولا دليل. يخفض النسبة والثقة.</span>
+                </div>
+              </div>
+            </div>
+            <div class="stack" style="gap:4px;">
+              <span class="kicker">الخطوة التي تغيّر الرقم أكثر</span>
+              <span class="body-sm">إضافة بند المشروع المُقيَّم إلى السيرة: <span class="delta num">+3</span>. حذف الادعاء غير المدعوم: <span class="delta num">+2</span>.</span>
+            </div>
+            <p class="disclaimer">النسبة تتغيّر بعملك — بمشروع مُقيَّم ودليل جديد — لا بتعبئة الحقول.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="pr-two">
+        <h2 id="pr-two" class="sr-only">السيرة ولينكدإن</h2>
+        <div class="score">
+          <div class="score__head">
+            <span class="score__label">السيرة</span>
+            <span class="score__value num">74%</span>
+            <a class="link push" href="profile-cv.html">التفاصيل</a>
+          </div>
+          <div class="score__bar"><span class="score__fill" data-value="74"></span></div>
+          <span class="score__note">بند سيرة واحد مدعوم بدليل، وواحد ينتظر تقييمًا.</span>
+        </div>
+        <hr class="divider">
+        <div class="score">
+          <div class="score__head">
+            <span class="score__label">لينكدإن</span>
+            <span class="score__value num">68%</span>
+            <span class="delta num">+4</span>
+            <a class="link push" href="profile-linkedin.html">التفاصيل</a>
+          </div>
+          <div class="score__bar"><span class="score__fill" data-value="68"></span></div>
+          <span class="score__note">أضفتِ مشروعًا مُقيَّمًا وحدّثتِ الـ<span class="term" lang="en">Headline</span>.</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="next-action" aria-labelledby="pr-na">
+      <span class="next-action__kicker">خطوتك التالية · تحسينان مدعومان بدليل</span>
+      <h2 id="pr-na" class="next-action__title">حدّثي الـ<span class="term" lang="en">Headline</span> وأضيفي «لوحة مهام تفاعلية» إلى المشاريع</h2>
+      <p class="next-action__reason">لينكدإن سيصل إلى ٧٢٪ والسيرة إلى ٧٧٪. الصياغتان جاهزتان.</p>
+      <div class="next-action__actions">
+        <button class="btn btn--on-dark" type="button" data-toggle="#pv-two">معاينة التحسينين</button>
+      </div>
+      <p class="next-action__later">لا تُطبَّق أي صياغة مهنية قبل معاينتك واعتمادك.</p>
+    </section>
+
+    <section class="card drilldown" id="pv-two" aria-labelledby="pv-two-title">
+      <h2 id="pv-two-title" style="font-size:var(--fs-button);">معاينة · الحالي مقابل المقترح</h2>
+      <div class="grid-2e">
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">الحالي · <span class="term" lang="en">Headline</span></span>
+          <p class="body-sm muted">«خريجة علوم حاسب»</p>
+        </div>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">المقترح · مدعوم بدليل</span>
+          <p class="body-sm">«مطوّرة واجهات أمامية · إدارة حالة واجهة مُثبتة»</p>
+        </div>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">الحالي · قسم المشاريع في السيرة</span>
+          <p class="body-sm muted">«لوحة مهام تفاعلية» غير مذكورة.</p>
+        </div>
+        <div class="stack" style="gap:6px;">
+          <span class="kicker">المقترح · من التقييم</span>
+          <p class="body-sm">«صمّمتُ حالة واجهة موحّدة للوحة مهام تفاعلية مع اختبارات سلوكية؛ قُيّم على ٤ معايير.»</p>
+        </div>
+      </div>
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <button class="btn btn--primary btn--sm" type="button"
+                data-toast="تمّ باعتمادك. لينكدإن +٤ والسيرة +٣."
+                data-toast-type="improvement"
+                data-toast-action="إعادة العرض"
+                data-toast-href="profile-linkedin.html">اعتماد الصياغتين</button>
+        <button class="btn btn--secondary btn--sm" type="button">تعديل قبل الاعتماد</button>
+      </div>
+      <p class="disclaimer">الأرقام المتوقعة (لينكدإن ٧٢٪، السيرة ٧٧٪) تُعاد حسابها بعد الاعتماد، ثم يُخزَّن «قبل/بعد» كنسخة.</p>
+    </section>
+
+    <section class="card" aria-labelledby="pr-rev">
+      <div class="row" style="gap:10px; align-items:baseline; flex-wrap:wrap;">
+        <h2 id="pr-rev" style="font-size:var(--fs-button);">مراجعة بعين مسؤول توظيف</h2>
+        <span class="chip chip--info push"><span class="num">4</span> ملاحظات</span>
+      </div>
+      <div class="rows">
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <span class="chip num" aria-hidden="true">1</span>
+          <div class="grow stack" style="gap:2px;">
+            <span style="font-weight:500;">الـ<span class="term" lang="en">Headline</span> عام ولا يعكس هدفك</span>
+            <span class="body-sm muted">«خريجة علوم حاسب» لا تقول ما تبحثين عنه ولا ما تثبتينه.</span>
+          </div>
+          <span class="chip chip--success">لينكدإن <span class="num">+4</span></span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <span class="chip num" aria-hidden="true">2</span>
+          <div class="grow stack" style="gap:2px;">
+            <span style="font-weight:500;">أقوى مشروع لديك مخفي</span>
+            <span class="body-sm muted">قُيّم بدليل ولا يظهر في السيرة ولا في <span class="term" lang="en">Featured</span>.</span>
+          </div>
+          <span class="chip chip--success">السيرة <span class="num">+3</span></span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <span class="chip num" aria-hidden="true">3</span>
+          <div class="grow stack" style="gap:2px;">
+            <span style="font-weight:500;">الإنجازات تصف المسؤولية لا النتيجة</span>
+            <span class="body-sm muted">«عملتُ على الواجهة» → «بنيتُ مكوّن جدول مع حالات تحميل وخطأ».</span>
+          </div>
+          <span class="chip chip--success">السيرة <span class="num">+2</span></span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;">
+          <span class="chip num" aria-hidden="true">4</span>
+          <div class="grow stack" style="gap:2px;">
+            <span style="font-weight:500;">«خبيرة <span class="term" lang="en">CSS</span>» — ادعاء غير مدعوم</span>
+            <span class="body-sm muted">احذفيها أو انقليها إلى «أعمل عليها».</span>
+          </div>
+          <span class="chip chip--attention">يخفض الثقة</span>
+        </div>
+      </div>
+      <p class="disclaimer">المراجعة تُقارن ملفك بإعلانات الدور المستهدف؛ كل توصية تشير إلى معلومة أو دليل في حسابك، لا إلى تقدير عام.</p>
+    </section>
+
+    <div class="grid-2">
+      <section class="card" aria-labelledby="pr-assets">
+        <div class="row" style="gap:10px; align-items:baseline; flex-wrap:wrap;">
+          <h2 id="pr-assets" style="font-size:var(--fs-button);">أصولك المهنية</h2>
+          <span class="body-sm muted">مشتقة من مشاريعك وأدلتك</span>
+        </div>
+        <div class="rows">
+          <div class="stack" style="gap:4px;">
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <span class="chip chip--new">جديد</span>
+              <span style="font-weight:500;">بند سيرة · لوحة مهام تفاعلية</span>
+            </div>
+            <span class="body-sm muted">«صمّمتُ حالة واجهة موحّدة للوحة مهام تفاعلية مع اختبارات سلوكية؛ قُيّم على ٤ معايير.»</span>
+          </div>
+          <div class="stack" style="gap:4px;">
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <span class="chip chip--success">جاهز</span>
+              <span style="font-weight:500;">بند سيرة · مشروع التخرج</span>
+            </div>
+            <span class="body-sm muted">«بنيتُ مكوّن جدول قابل لإعادة الاستخدام مع حالات تحميل وخطأ.»</span>
+          </div>
+          <div class="stack" style="gap:4px;">
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <span class="chip chip--attention">مسودة</span>
+              <span style="font-weight:500;">دراسة حالة · لوحة مهام تفاعلية</span>
+            </div>
+            <span class="body-sm muted">من الموجز والتقييم · تصلح لـ<span class="term" lang="en">Featured</span></span>
+          </div>
+        </div>
+        <a class="link" href="profile-assets.html">كل الأصول ←</a>
+      </section>
+
+      <section class="card" aria-labelledby="pr-present">
+        <h2 id="pr-present" style="font-size:var(--fs-button);">المهارات وكيف تقدّمينها</h2>
+        <div class="rows">
+          <div class="row" style="gap:12px; flex-wrap:wrap;">
+            <span class="dot dot--demonstrated" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:2px;">
+              <span class="kicker">جاهزة للعرض</span>
+              <span class="body-sm">إدارة الحالة</span>
+            </div>
+            <span class="chip chip--success">سيرة + لينكدإن</span>
+          </div>
+          <div class="row" style="gap:12px; flex-wrap:wrap;">
+            <span class="dot dot--practiced" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:2px;">
+              <span class="kicker">بحذر</span>
+              <span class="body-sm">بناء المكونات · اختبار الواجهات</span>
+            </div>
+            <span class="chip">ضمن وصف المشروع</span>
+          </div>
+          <div class="row" style="gap:12px; flex-wrap:wrap;">
+            <span class="dot dot--self" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:2px;">
+              <span class="kicker">لا تُعرض كخبرة</span>
+              <span class="body-sm"><span class="term" lang="en">CSS</span> متقدم</span>
+            </div>
+            <span class="chip chip--attention">بلا دليل</span>
+          </div>
+          <div class="row" style="gap:12px; flex-wrap:wrap;">
+            <span class="dot dot--gap" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:2px;">
+              <span class="kicker">طوّريها بعد ذلك</span>
+              <span class="body-sm">الأداء وإمكانية الوصول</span>
+            </div>
+            <span class="chip">نشاط مقترح</span>
+          </div>
+        </div>
+        <a class="link" href="skills.html">المهارات والأدلة ←</a>
+      </section>
+    </div>
+
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">طبّقي التحسينين المدعومين بدليل.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">كلاهما يستند إلى مشروع مُقيَّم — لا إلى صياغة عامة.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">بعدها: احذفي الادعاء غير المدعوم لترتفع الثقة.</span></div>
+    <div class="pills"><button class="pill">لماذا هذا الترتيب؟</button><button class="pill">ماذا بعد؟</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

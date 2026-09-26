@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · الرئيسية</title>
+<meta name="description" content="نَقْلة — من المهارة إلى الدليل.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="home">
+
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+
+  <main class="main">
+
+    <!-- Header: goal · greeting · one sentence that answers "where am I" (§2) -->
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">
+          مساء الخير سارة · هدفك:
+          <span class="term" lang="en" style="color:var(--text); font-weight:500;">Frontend Developer</span>
+        </span>
+        <h1>أول دليل لكِ وصل أمس. اليوم خطوة واحدة صغيرة تجعل ملفك يقول ذلك.</h1>
+      </div>
+      <div class="row push" style="gap:10px; flex-shrink:0;">
+        <button class="icon-btn" title="التنبيهات" aria-label="التنبيهات — يوجد جديد">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M4 11V7a4 4 0 018 0v4l1 1.5H3z"/><path d="M6.5 14a1.5 1.5 0 003 0"/>
+          </svg>
+          <span class="badge-dot" style="top:8px; inset-inline-end:9px;"></span>
+        </button>
+        <a class="btn btn--ghost btn--sm" href="profile.html" style="background:var(--surface); box-shadow:var(--shadow-card); color:var(--primary);">
+          ملفي المهني <span class="term" aria-hidden="true">←</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Contextual banner — one per screen (§10) -->
+    <div class="banner banner--success" role="region" aria-label="تحديث جديد">
+      <span class="banner__icon" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5l3 3 7-7"/></svg>
+      </span>
+      <span class="banner__text grow">
+        تم إنشاء دليل جديد:
+        <strong style="font-weight:500;">إدارة الحالة · <span class="term" lang="en">Demonstrated</span></strong>.
+        لينكدإن تحسّن <span class="num">+4</span> وصار لديك بند سيرة جاهز.
+      </span>
+      <a class="link" href="skills.html">اعرضي ما تغيّر</a>
+      <button class="banner__close" title="إغلاق" aria-label="إغلاق التنبيه">×</button>
+    </div>
+
+    <!-- Next action (the only dark block) + last improvement -->
+    <div class="grid-2">
+      <section class="next-action" aria-labelledby="na-title">
+        <span class="next-action__kicker">خطوتك التالية جاهزة · ≈ ٥ دقائق</span>
+        <h2 id="na-title" class="next-action__title">حدّثي الـ<span class="term" lang="en">Headline</span> في لينكدإن — صار مدعومًا بدليل.</h2>
+        <p class="next-action__reason">«مطوّرة واجهات أمامية · إدارة حالة واجهة مُثبتة». الصياغة جاهزة، وهي التعديل الذي يرفع لينكدإن أكثر من أي شيء آخر.</p>
+        <div class="next-action__actions">
+          <a class="btn btn--on-dark" href="profile-linkedin.html">عرض الصياغة</a>
+          <a class="next-action__later" href="#">لاحقًا</a>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="li-title">
+        <div class="row" style="gap:8px;">
+          <span class="kicker">آخر تحسين</span>
+          <span class="chip chip--new push">أمس</span>
+        </div>
+        <h2 id="li-title" class="card__title">«لوحة مهام تفاعلية» قُيّمت ✓</h2>
+        <p class="body-sm muted">
+          إدارة الحالة انتقلت
+          <span class="transition">No evidence → Demonstrated</span>.
+          نتج عنها بند سيرة، ومهارة لينكدإن، ومسودة دراسة حالة.
+        </p>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-top:auto;">
+          <span class="chip">بند سيرة</span>
+          <span class="chip">مهارة لينكدإن</span>
+          <span class="chip">دراسة حالة</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- Skills toward the role + readiness strip -->
+    <div class="grid-2">
+      <section class="card" aria-labelledby="sk-title">
+        <div class="row" style="gap:10px; align-items:baseline; flex-wrap:wrap;">
+          <h2 id="sk-title" style="font-size:var(--fs-button);">مهاراتك نحو الدور</h2>
+          <span class="body-sm muted">أول مهارة مُثبتة ✓ · اثنتان تنتظران تحققًا قصيرًا</span>
+        </div>
+        <div class="grid-2e" style="gap:14px 24px;">
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span style="font-weight:500;">إدارة الحالة</span>
+              <span class="state-label state-label--demonstrated term" lang="en">Demonstrated</span>
+            </div>
+            <div class="cells" role="img" aria-label="مُثبتة بدليل — ٣ من ٤">
+              <span class="is-on"></span><span class="is-on"></span><span class="is-on"></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>بناء المكونات</span>
+              <span class="state-label state-label--practiced term" lang="en">Practiced</span>
+            </div>
+            <div class="cells" role="img" aria-label="ظهرت في مشروع — ٢ من ٤">
+              <span class="is-sage"></span><span class="is-sage"></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>اختبار الواجهات</span>
+              <span class="state-label state-label--practiced term" lang="en">Practiced</span>
+            </div>
+            <div class="cells" role="img" aria-label="ظهرت في مشروع، وقيد التحقق — ٢ من ٤">
+              <span class="is-sage"></span><span class="is-sage"></span><span class="is-proving"></span><span></span>
+            </div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-row__head">
+              <span>الأداء وإمكانية الوصول</span>
+              <span class="state-label state-label--gap">التالية</span>
+            </div>
+            <div class="cells" role="img" aria-label="لا دليل بعد">
+              <span class="is-gap"></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+        <a class="link" href="skills.html">كل المهارات والأدلة ←</a>
+      </section>
+
+      <section class="card" aria-labelledby="rd-title">
+        <h2 id="rd-title" style="font-size:var(--fs-button);">جاهزيتك الآن</h2>
+
+        <div class="score">
+          <div class="score__head">
+            <span class="score__label">الملف المهني</span>
+            <span class="score__value num">71%</span>
+            <a class="link push" href="profile.html">التفاصيل</a>
+          </div>
+          <div class="score__bar"><span class="score__fill score__fill--primary" data-value="71"></span></div>
+        </div>
+
+        <div class="grid-2e" style="gap:14px;">
+          <div class="score">
+            <div class="score__head">
+              <span class="score__label">السيرة</span>
+              <span class="score__value num" style="font-size:20px;">74%</span>
+            </div>
+            <div class="score__bar"><span class="score__fill" data-value="74"></span></div>
+          </div>
+          <div class="score">
+            <div class="score__head">
+              <span class="score__label">لينكدإن</span>
+              <span class="score__value num" style="font-size:20px;">68%</span>
+              <span class="delta num">+4</span>
+            </div>
+            <div class="score__bar"><span class="score__fill" data-value="68"></span></div>
+          </div>
+        </div>
+
+        <p class="disclaimer">مؤشر جاهزية داخلي من نقلة، وليس درجة توظيف أو ضمان قبول.</p>
+      </section>
+    </div>
+
+    <!-- Projects in progress -->
+    <section class="card" aria-labelledby="pr-title">
+      <div class="row" style="gap:10px;">
+        <h2 id="pr-title" style="font-size:var(--fs-button);">مشاريعك</h2>
+        <a class="link push" href="projects.html">الكل ←</a>
+      </div>
+      <div class="rows">
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="dot dot--demonstrated" aria-hidden="true"></span>
+          <span class="grow" style="font-weight:500;">لوحة مهام تفاعلية</span>
+          <span class="chip chip--success">أنتجت دليلًا</span>
+          <span class="body-sm muted">أمس</span>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="dot dot--practiced" aria-hidden="true"></span>
+          <span class="grow">متتبّع عادات</span>
+          <span class="chip chip--attention">متوقف منذ ٣ أيام</span>
+          <a class="link" href="projects.html">استئناف</a>
+        </div>
+        <div class="row" style="gap:12px; flex-wrap:wrap;">
+          <span class="dot dot--practiced" aria-hidden="true"></span>
+          <span class="grow">صفحة معطوبة — تشخيص وإصلاح</span>
+          <span class="body-sm muted"><span class="num">1/5</span> مخرجات</span>
+          <a class="link" href="mission.html">متابعة</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<nav data-shell="bottom-nav"></nav>
+
+<!-- Career Companion — one assistant, a layer over all sections (§11) -->
+<div class="companion" data-state="new-insight">
+  <button class="companion__mark" aria-label="الرفيق المهني — لديك ملاحظة جديدة">
+    <span class="companion__core" aria-hidden="true"></span>
+  </button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">خطوتك التالية جاهزة.</span>
+    <a class="link" href="profile-linkedin.html">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">حدّثي الـ<span class="term" lang="en">Headline</span> في لينكدإن.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">صار لديك دليل يدعم الصياغة الجديدة.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">التحقق القصير لمهارة «بناء المكونات».</span></div>
+    <div class="pills">
+      <button class="pill">ماذا ينقصني؟</button>
+      <button class="pill">اقترحي بديلًا</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

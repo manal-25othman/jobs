@@ -1,0 +1,146 @@
+/* NAQLA — base, typography, RTL/LTR
+   Handoff §5 (RTL/LTR) · §13 (accessibility) */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ar);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  letter-spacing: 0;
+}
+
+html[lang="en"] body { font-family: var(--font-en); }
+
+h1, h2, h3, p, span, a, button, li { letter-spacing: 0; }
+h1, h2, h3 { margin: 0; font-weight: 500; }
+h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); }
+h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
+p  { margin: 0; color: var(--text-body); }
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font-family: inherit; cursor: pointer; }
+
+/* Focus — visible everywhere (§13) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: var(--r-chip-lg);
+}
+
+/* Embedded English terms inside Arabic UI (§5).
+   Always wrapped as <span class="term" dir="ltr" lang="en">. */
+.term {
+  font-family: var(--font-en);
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+/* Numbers: percentages, deltas, counts → Western digits, tabular, isolated (§5) */
+.num {
+  font-family: var(--font-en);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+/* Transition arrows (Practiced → Demonstrated) must never reverse in RTL (§8) */
+.transition {
+  font-family: var(--font-en);
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Text boxes never fixed height; grid tracks always minmax(0,…) (§4) */
+.stack { display: flex; flex-direction: column; }
+.row   { display: flex; align-items: center; }
+.grow  { flex: 1 1 auto; min-width: 0; }
+.push  { margin-inline-start: auto; }
+
+.kicker {
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.muted    { color: var(--text-2); }
+.body-sm  { font-size: var(--fs-body-sm); line-height: var(--lh-body-sm); }
+.micro    { font-size: var(--fs-micro); }
+
+/* ---- App shell ---- */
+.app {
+  display: grid;
+  grid-template-columns: var(--nav-side-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-7);
+  padding: var(--page-pad-block) var(--page-pad-inline) 40px;
+  min-width: 0;
+}
+.page-header { display: flex; align-items: flex-start; gap: var(--s-6); }
+
+/* Two-column content grids (§4) */
+.grid-2   { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); gap: var(--card-gap); align-items: start; }
+.grid-2e  { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);    gap: var(--card-gap); align-items: start; }
+.grid-aside { display: grid; grid-template-columns: minmax(0,1fr) 400px; gap: var(--card-gap); align-items: start; }
+.grid-mission { display: grid; grid-template-columns: minmax(0,1.5fr) 380px; gap: var(--card-gap); align-items: start; }
+
+/* ---- Tablet 768–1199 (§4) ---- */
+@media (max-width: 1199px) {
+  .grid-2, .grid-2e, .grid-aside, .grid-mission { grid-template-columns: minmax(0, 1fr); }
+  .main { padding-inline: var(--s-7); }
+}
+
+/* ---- Mobile < 768 (§4 · §15) ---- */
+@media (max-width: 767px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .main {
+    padding: var(--page-pad-mobile) var(--page-pad-mobile)
+             calc(var(--nav-bottom-h) + env(safe-area-inset-bottom) + 18px);
+    gap: var(--s-5);
+  }
+  h1 { font-size: 21px; }
+}
+
+/* ---- Motion (§12) ---- */
+@keyframes rise   { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop    { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes pulse  { 0%, 100% { box-shadow: 0 0 0 0 rgba(31,90,78,.30); } 60% { box-shadow: 0 0 0 12px rgba(31,90,78,0); } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+.rise { animation: rise var(--t-rise) var(--ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 150ms !important;
+  }
+  .rise { animation: none; opacity: 1; transform: none; }
+  .companion__mark { animation: none !important; }
+  .skeleton { animation: none !important; background: var(--bg-2) !important; }
+}

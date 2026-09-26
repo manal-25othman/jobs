@@ -1,0 +1,93 @@
+/* NAQLA — Design tokens
+   Source: NAQLA-DESIGN-HANDOFF-FOR-CODE.md §3 + NAQLA-UI-DESIGN-SYSTEM.dc.html v1.0 (frozen)
+   Light theme only in v1. */
+
+:root {
+  /* ---- Color ---- */
+  --bg:                #F7F6F2;
+  --bg-2:              #F2F4EF;
+  --surface:           #FFFFFF;
+  --border:            #E3E7DF;
+
+  --text:              #1F2A24;
+  --text-body:         #3D4A43;
+  --text-2:            #5F6B63;
+  --text-muted:        #879089;
+
+  --primary:           #1F5A4E;
+  --primary-hover:     #18483F;
+  --primary-tint:      #E5F1ED;
+  --primary-tint-2:    #D6E8E1;   /* secondary button hover */
+  --primary-on:        #FFFFFF;
+  --primary-soft-text: #B9D6CC;   /* 12px kicker on primary block only */
+  --primary-soft-body: #D6E8E1;   /* body on primary block */
+
+  --mint:              #7FC8B4;   /* logo end-dot + companion "new" centre ONLY */
+  --mint-quiet:        #DDF2EA;   /* companion silent centre */
+
+  --sage:              #7BAA8B;   /* Practiced half-dot */
+  --sage-tint:         #EEF6F1;
+
+  --success:           #2F7D57;
+  --success-bg:        #EAF6EF;
+
+  --info:              #6C8799;
+  --info-bg:           #EEF4F8;
+  --info-text:         #3F5A6B;
+
+  --attention:         #B07A7A;   /* paused · unsupported claim · reminder */
+  --attention-bg:      #F7ECEC;
+  --attention-text:    #8A5252;
+
+  --critical:          #A94442;   /* failures only — never gaps or low scores */
+  --critical-bg:       #FCEEEE;
+
+  /* ---- Type ---- */
+  --font-ar: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, sans-serif;
+  --font-en: "IBM Plex Sans", system-ui, sans-serif;
+
+  --fs-display: 40px;  --lh-display: 1.2;
+  --fs-h1: 26px;       --lh-h1: 1.4;
+  --fs-h2: 19px;       --lh-h2: 1.45;
+  --fs-body: 15px;     --lh-body: 1.75;
+  --fs-body-sm: 13px;  --lh-body-sm: 1.65;
+  --fs-label: 12px;    --lh-label: 1.4;
+  --fs-micro: 11px;
+  --fs-button: 14px;
+
+  /* ---- Space ---- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 28px; --s-8: 32px; --s-9: 44px;
+
+  --page-pad-block: 30px;
+  --page-pad-inline: 44px;
+  --page-pad-mobile: 20px;
+  --card-pad: 24px;
+  --card-pad-mobile: 16px;
+  --card-gap: 20px;
+
+  /* ---- Radius ---- */
+  --r-card: 20px;
+  --r-card-sm: 16px;
+  --r-banner: 14px;
+  --r-control: 12px;
+  --r-chip-lg: 10px;
+  --r-chip: 8px;
+  --r-badge: 6px;
+  --r-pill: 999px;
+
+  /* ---- Elevation ---- */
+  --shadow-card:  0 0 0 1px var(--border), 0 1px 2px rgba(31,42,36,.04);
+  --shadow-float: 0 8px 24px rgba(31,42,36,.12), 0 0 0 1px var(--border);
+  --shadow-frame: 0 30px 70px rgba(31,42,36,.10);
+
+  /* ---- Layout ---- */
+  --nav-side-w: 88px;
+  --nav-bottom-h: 72px;
+  --control-h: 44px;
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --t-state: 180ms;
+  --t-rise: 300ms;
+}

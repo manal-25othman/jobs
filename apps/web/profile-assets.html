@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · الأصول المهنية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="profile">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">ملفي المهني · الأصول المهنية</span>
+        <h1>خمسة أصول جاهزة من مشروعَين. واحد جديد هذا الأسبوع.</h1>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="أقسام الملف المهني">
+      <a class="tab" role="tab" aria-selected="false" href="profile.html">نظرة عامة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-cv.html">السيرة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-linkedin.html">لينكدإن</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-case-studies.html">دراسات الحالة</a>
+      <a class="tab" role="tab" aria-selected="true" aria-current="page" href="profile-assets.html">الأصول</a>
+      </div>
+
+    <div class="pills" data-pills="#assets-list" role="group" aria-label="تصفية الأصول">
+      <button class="pill" data-filter="all" aria-pressed="true">الكل · ٥</button>
+      <button class="pill" data-filter="cv" aria-pressed="false">بنود سيرة · ٢</button>
+      <button class="pill" data-filter="skill" aria-pressed="false">مهارات للعرض · ١</button>
+      <button class="pill" data-filter="case" aria-pressed="false">دراسات حالة · ١</button>
+      <button class="pill" data-filter="proj" aria-pressed="false">مشاريع للعرض · ١</button>
+    </div>
+
+    <div class="grid-aside">
+      <section class="card" aria-label="قائمة الأصول">
+        <div class="rows" id="assets-list">
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;" data-tag="cv">
+          <span class="dot dot--demonstrated" aria-hidden="true"></span>
+          <div class="grow stack" style="gap:3px;">
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <span class="kicker">بند سيرة</span><span class="chip chip--new">جديد</span>
+            </div>
+            <span style="font-weight:500;">لوحة مهام تفاعلية — إنجاز مع نتيجة</span>
+            <span class="body-sm muted">من التقييم · أمس</span>
+          </div>
+          <span class="chip chip--success">أُضيف إلى السيرة ✓</span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;" data-tag="skill">
+          <span class="dot dot--demonstrated" aria-hidden="true"></span>
+          <div class="grow stack" style="gap:3px;">
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <span class="kicker">مهارة للعرض</span><span class="chip chip--new">جديد</span>
+            </div>
+            <span style="font-weight:500;"><span class="term" lang="en">UI state management · Demonstrated</span></span>
+            <span class="body-sm muted">من التقييم · أمس</span>
+          </div>
+          <span class="chip chip--success">جاهزة للينكدإن</span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;" data-tag="case">
+          <span class="dot dot--practiced" aria-hidden="true"></span>
+          <div class="grow stack" style="gap:3px;">
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <span class="kicker">دراسة حالة</span>
+            </div>
+            <span style="font-weight:500;">مصدر حقيقة واحد لثلاث واجهات عرض</span>
+            <span class="body-sm muted">مسودة · تنتظر اعتمادك</span>
+          </div>
+          <a class="btn btn--secondary btn--sm" href="profile-case-studies.html">اعتماد ←</a>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;" data-tag="cv">
+          <span class="dot dot--practiced" aria-hidden="true"></span>
+          <div class="grow stack" style="gap:3px;">
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <span class="kicker">بند سيرة</span>
+            </div>
+            <span style="font-weight:500;">مشروع التخرج — مكوّن جدول قابل لإعادة الاستخدام</span>
+            <span class="body-sm muted">من وصف المشروع · قبل ٣ أيام</span>
+          </div>
+          <span class="chip chip--success">أُضيف ✓</span>
+        </div>
+        <div class="row" style="gap:14px; align-items:flex-start; flex-wrap:wrap;" data-tag="proj">
+          <span class="dot dot--self" aria-hidden="true"></span>
+          <div class="grow stack" style="gap:3px;">
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <span class="kicker">مشروع للعرض</span>
+            </div>
+            <span style="font-weight:500;">متتبّع عادات يومية</span>
+            <span class="body-sm muted">مُعلن · يُعرض كمشروع لا كمهارة</span>
+          </div>
+          <span class="chip"><span class="term" lang="en">لينكدإن Projects</span></span>
+        </div>
+        </div>
+        <p class="disclaimer">كل أصل مشتق من عمل فعلي في حسابك؛ لا شيء هنا كُتب يدويًا، ولا شيء يُعرض قبل اعتمادك.</p>
+      </section>
+
+      <aside class="stack" style="gap:var(--card-gap);">
+        <section class="card" aria-labelledby="as-where">
+          <h2 id="as-where" style="font-size:var(--fs-button);">أين تذهب الأصول</h2>
+          <div class="rows">
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <span class="grow body-sm">السيرة</span>
+              <span class="chip chip--success">٢ بنود مُضافة</span>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <span class="grow body-sm">لينكدإن</span>
+              <span class="chip">١ مهارة + ٢ مشروع جاهزان</span>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <span class="grow body-sm term" lang="en">Featured</span>
+              <span class="chip chip--attention">١ دراسة حالة بعد الاعتماد</span>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <span class="grow body-sm">الملف العام</span>
+              <span class="chip">لاحقًا — يتغذّى من هنا تلقائيًا</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="as-week">
+          <h2 id="as-week" style="font-size:var(--fs-button);">ما تغيّر هذا الأسبوع</h2>
+          <div class="success-block">
+            <span class="success-block__icon" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+            </span>
+            <div class="grow stack" style="gap:2px;">
+              <span class="body-sm" style="font-weight:500;">دليل جديد: إدارة الحالة</span>
+              <span class="body-sm muted">بند سيرة + مهارة لينكدإن + دراسة حالة كمسودة</span>
+            </div>
+          </div>
+          <div class="row" style="gap:10px; flex-wrap:wrap;">
+            <span class="body-sm muted">الأثر: السيرة <span class="delta num">+3</span> · لينكدإن <span class="delta num">+4</span></span>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="insight">
+            <span class="insight__mark" aria-hidden="true"><span class="insight__core"></span></span>
+            <div class="stack" style="gap:6px;">
+              <span class="kicker">الرفيق المهني</span>
+              <p class="body-sm">أصولك كلها من عملك الفعلي؛ لا شيء هنا كُتب يدويًا. الأصل التالي سيأتي من التحقق القصير — ٢٠ دقيقة.</p>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">اعتمدي دراسة الحالة المعلَّقة.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">هي الأصل الوحيد الذي ينتظر قرارك.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">بعدها: الأصل التالي من التحقق القصير — ٢٠ دقيقة.</span></div>
+    <div class="pills"><button class="pill">ما هو الأصل المهني؟</button><button class="pill">ماذا بعد؟</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · دراسات الحالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="profile">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">ملفي المهني · دراسات الحالة</span>
+        <h1>دراسة حالة واحدة جاهزة كمسودة — من مشروعك المُقيَّم. الثانية بعد التحقق القصير.</h1>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="أقسام الملف المهني">
+      <a class="tab" role="tab" aria-selected="false" href="profile.html">نظرة عامة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-cv.html">السيرة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-linkedin.html">لينكدإن</a>
+      <a class="tab" role="tab" aria-selected="true" aria-current="page" href="profile-case-studies.html">دراسات الحالة</a>
+      <a class="tab" role="tab" aria-selected="false" href="profile-assets.html">الأصول</a>
+      </div>
+
+    <div class="grid-aside">
+      <section class="card" aria-labelledby="cs-title">
+        <div class="row" style="gap:10px; flex-wrap:wrap;">
+          <span class="chip chip--attention">مسودة · تراجع قبل النشر</span>
+          <span class="micro muted">أُنشئت من الموجز + التقييم + مقتطف الكود</span>
+        </div>
+        <h2 id="cs-title" style="font-size:var(--fs-h3);">لوحة مهام تفاعلية: مصدر حقيقة واحد لثلاث واجهات عرض</h2>
+
+        <div class="rows">
+          <div class="stack" style="gap:4px;">
+            <span class="kicker">السياق</span>
+            <p class="body-sm">فريق يريد لوحة مهام لا تفقد التزامن بين القائمة والعدّاد والتصفية.</p>
+          </div>
+          <div class="stack" style="gap:4px;">
+            <span class="kicker">المشكلة</span>
+            <p class="body-sm">كل واجهة عرض تحمل حالتها؛ التعديل في مكان لا ينعكس في الآخر.</p>
+          </div>
+          <div class="stack" style="gap:4px;">
+            <span class="kicker">ما بنيتُه</span>
+            <p class="body-sm">حالة واجهة موحّدة بتدفق أحادي، مع تحقق من النماذج ومعالجة أخطاء واختبارات سلوكية.</p>
+          </div>
+          <div class="stack" style="gap:4px;">
+            <span class="kicker">النتيجة</span>
+            <p class="body-sm">٤/٤ معايير في التقييم · صفر تعارض حالة في سيناريوهات الاختبار.</p>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="stack" style="gap:8px;">
+          <span class="kicker">المهارات المُثبتة فيها</span>
+          <div class="row" style="gap:10px; flex-wrap:wrap;">
+            <span class="chip chip--success">إدارة الحالة · <span class="term" lang="en">Demonstrated</span></span>
+            <span class="chip chip--attention">اختبار الواجهات · <span class="term" lang="en">Practiced</span></span>
+          </div>
+          <p class="disclaimer">كل مهارة مذكورة تحمل درجتها الفعلية؛ لا تُرفع بالصياغة.</p>
+        </div>
+
+        <div class="row" style="gap:10px; flex-wrap:wrap;">
+          <button class="btn btn--primary btn--sm" type="button"
+                  data-toast="اعتُمدت دراسة الحالة. صارت تصلح لـFeatured."
+                  data-toast-type="success">اعتماد المسودة</button>
+          <button class="btn btn--secondary btn--sm" type="button">تعديل النص</button>
+          <span class="body-sm muted">بعد الاعتماد: تصلح لـ<span class="term" lang="en">Featured</span> وللملف العام</span>
+        </div>
+      </section>
+
+      <aside class="stack" style="gap:var(--card-gap);">
+        <section class="card" aria-labelledby="cs-next">
+          <h2 id="cs-next" style="font-size:var(--fs-button);">التالية</h2>
+          <div class="empty">
+            <span class="empty__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            </span>
+            <span class="empty__title">متتبّع عادات — اختبار الواجهات</span>
+            <span class="body-sm muted">تُكتب تلقائيًا بعد تقييم التحقق القصير</span>
+            <a class="btn btn--secondary btn--sm" href="mission.html">متابعة التحقق</a>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="cs-rules">
+          <h2 id="cs-rules" style="font-size:var(--fs-button);">قواعد دراسة الحالة في نقلة</h2>
+          <div class="rows">
+            <span class="body-sm">تُكتب فقط من مشروع مُقيَّم، لا من وصف ذاتي.</span>
+            <span class="body-sm">أربعة أقسام ثابتة: السياق، المشكلة، ما بنيتُه، النتيجة.</span>
+            <span class="body-sm">كل مهارة مذكورة تحمل درجتها الفعلية.</span>
+            <span class="body-sm">المستخدم يعتمدها قبل أن تظهر في أي مكان.</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="insight">
+            <span class="insight__mark" aria-hidden="true"><span class="insight__core"></span></span>
+            <div class="stack" style="gap:6px;">
+              <span class="kicker">الرفيق المهني</span>
+              <p class="body-sm">اعتمدي المسودة كما هي أو بتعديل خفيف — الأرقام فيها من التقييم مباشرة، وهذا ما يعطيها وزنها.</p>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">اعتمدي مسودة دراسة الحالة.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">أرقامها من التقييم مباشرة، وهذا ما يعطيها وزنها.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">بعدها: تصلح لـ<span class="term" lang="en">Featured</span> وللملف العام.</span></div>
+    <div class="pills"><button class="pill">ماذا يتغيّر بعد الاعتماد؟</button><button class="pill">عدّلي النص</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

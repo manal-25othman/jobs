@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نَقْلة · المهارات والأدلة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body data-page="skills">
+<div class="app">
+  <nav data-shell="nav" aria-label="التنقّل الرئيسي"></nav>
+  <main class="main">
+    <header class="page-header">
+      <div class="stack" style="gap:6px;">
+        <span class="body-sm muted">المهارات والأدلة · الدور يطلب ٦</span>
+        <h1>أربع مهارات ظهرت في عملك؛ واحدة منها مُثبتة بدليل، والثانية على بُعد تحقق قصير.</h1>
+      </div>
+    </header>
+
+    <div class="pills" data-pills="#skills-list" role="group" aria-label="تصفية المهارات">
+      <button class="pill" data-filter="all" aria-pressed="true">الكل</button>
+      <button class="pill" data-filter="gap" aria-pressed="false">فجوة</button>
+      <button class="pill" data-filter="self" aria-pressed="false">مُعلنة ذاتيًا</button>
+      <button class="pill" data-filter="practiced" aria-pressed="false"><span class="term" lang="en">Practiced</span></button>
+      <button class="pill" data-filter="demonstrated" aria-pressed="false"><span class="term" lang="en">Demonstrated</span></button>
+    </div>
+
+    <div class="grid-aside">
+      <div class="stack" style="gap:var(--card-gap);" id="skills-list">
+
+        <section class="card" data-tag="demonstrated" aria-labelledby="sk-g1">
+          <div class="row" style="gap:10px; align-items:baseline;">
+            <h2 id="sk-g1" style="font-size:var(--fs-button);">مُثبتة · ١</h2>
+          </div>
+          <div class="row" style="gap:14px; flex-wrap:wrap;">
+            <span class="seal" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:4px;">
+              <div class="row" style="gap:10px; flex-wrap:wrap;">
+                <span style="font-weight:500;">إدارة حالة الواجهة</span>
+                <span class="state-label state-label--demonstrated term" lang="en">Demonstrated ✓</span>
+              </div>
+              <span class="body-sm muted">لوحة مهام تفاعلية · ٤/٤</span>
+              <span class="micro muted">سيرة ✓ · لينكدإن ✓</span>
+            </div>
+            <a class="btn btn--secondary btn--sm" href="profile-case-studies.html">عرض الدليل</a>
+          </div>
+        </section>
+
+        <section class="card" data-tag="practiced" aria-labelledby="sk-g2">
+          <div class="row" style="gap:10px; align-items:baseline;">
+            <h2 id="sk-g2" style="font-size:var(--fs-button);"><span class="term" lang="en">Practiced</span> · من مشاريعك · ٢</h2>
+          </div>
+          <div class="rows">
+            <div class="row" style="gap:14px; flex-wrap:wrap;">
+              <span class="dot dot--practiced" aria-hidden="true"></span>
+              <div class="grow stack" style="gap:4px;">
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:500;">اختبار الواجهات</span>
+                  <span class="state-label state-label--practiced term" lang="en">Practiced</span>
+                  <span class="chip chip--attention">قيد التحقق</span>
+                </div>
+                <span class="body-sm muted">متتبّع عادات · مخرج ١/٣</span>
+                <span class="micro muted">سيرة كمشروع · لينكدإن ✗</span>
+              </div>
+              <a class="btn btn--primary btn--sm" href="mission.html">متابعة التحقق</a>
+            </div>
+            <div class="row" style="gap:14px; flex-wrap:wrap;">
+              <span class="dot dot--practiced" aria-hidden="true"></span>
+              <div class="grow stack" style="gap:4px;">
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:500;">بناء المكونات</span>
+                  <span class="state-label state-label--practiced term" lang="en">Practiced</span>
+                </div>
+                <span class="body-sm muted">مشروع التخرج</span>
+                <span class="micro muted">سيرة كمشروع · لينكدإن ✗</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" data-tag="self" aria-labelledby="sk-g3">
+          <h2 id="sk-g3" style="font-size:var(--fs-button);">مُعلنة ذاتيًا بلا مشروع · ١</h2>
+          <div class="row" style="gap:14px; flex-wrap:wrap;">
+            <span class="dot dot--self" aria-hidden="true"></span>
+            <div class="grow stack" style="gap:4px;">
+              <div class="row" style="gap:10px; flex-wrap:wrap;">
+                <span style="font-weight:500;"><span class="term" lang="en">CSS</span> متقدم</span>
+                <span class="state-label">مُعلنة</span>
+              </div>
+              <span class="body-sm muted">لا مشروع يُظهرها</span>
+              <span class="micro muted">سيرة ✗ · لينكدإن ✗</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" data-tag="gap" aria-labelledby="sk-g4">
+          <h2 id="sk-g4" style="font-size:var(--fs-button);">فجوات يطلبها الدور · ٢</h2>
+          <div class="rows">
+            <div class="row" style="gap:14px; flex-wrap:wrap;">
+              <span class="dot dot--gap" aria-hidden="true"></span>
+              <div class="grow stack" style="gap:4px;">
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:500;">الأداء وإمكانية الوصول</span>
+                  <span class="state-label state-label--gap">فجوة · التالية</span>
+                </div>
+                <span class="body-sm muted">نشاط مقترح بعد التحقق</span>
+                <span class="micro muted">—</span>
+              </div>
+            </div>
+            <div class="row" style="gap:14px; flex-wrap:wrap;">
+              <span class="dot dot--gap" aria-hidden="true"></span>
+              <div class="grow stack" style="gap:4px;">
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:500;">العمل مع <span class="term" lang="en">API</span></span>
+                  <span class="state-label state-label--gap">فجوة</span>
+                  <span class="chip">لاحقًا</span>
+                </div>
+                <span class="micro muted">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack" style="gap:var(--card-gap);">
+        <section class="card" aria-labelledby="sel-title">
+          <div class="stack" style="gap:6px;">
+            <span class="kicker">المهارة المحددة</span>
+            <h2 id="sel-title" style="font-size:var(--fs-h3);">اختبار الواجهات</h2>
+            <span class="body-sm muted">مطلوبة في ٧ من ١٠ إعلانات</span>
+          </div>
+          <hr class="divider">
+          <div class="stack" style="gap:6px;">
+            <span class="kicker">المهارة · الآن</span>
+            <span class="body-sm"><span class="term" lang="en">Practiced</span> — من مشروعك الشخصي</span>
+          </div>
+          <div class="stack" style="gap:6px;">
+            <span class="kicker">الدليل · من أين يأتي</span>
+            <span class="body-sm">تقييم التحقق القصير · ٣ مخرجات</span>
+            <span class="body-sm muted">الحالة الفارغة، التحميل، الخطأ + رسالة للمستخدم.</span>
+          </div>
+          <div class="stack" style="gap:6px;">
+            <span class="kicker">الأصل المهني · ماذا يفتح</span>
+            <span class="body-sm">بند سيرة · مهارة لينكدإن</span>
+          </div>
+          <div class="stack" style="gap:6px;">
+            <span class="kicker">للدرجة التالية</span>
+            <span class="body-sm">أكملي المخرجين المتبقيين وسلّمي.</span>
+            <span class="disclaimer"><span class="term" lang="en">Verified</span> لاحقًا يحتاج مراجعة على مشروع ثانٍ.</span>
+          </div>
+          <a class="btn btn--primary" href="mission.html">متابعة التحقق</a>
+        </section>
+
+        <section class="card">
+          <div class="insight">
+            <span class="insight__mark" aria-hidden="true"><span class="insight__core"></span></span>
+            <div class="stack" style="gap:6px;">
+              <span class="kicker">الرفيق المهني</span>
+              <p class="body-sm">بعد هذا التحقق تصبح لديك مهارتان مُثبتتان — وهذا ما تطلبه معظم إعلانات الدور كحد أدنى.</p>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+  </main>
+</div>
+<nav data-shell="bottom-nav"></nav>
+<div class="companion" data-state="silent">
+  <button class="companion__mark" aria-label="الرفيق المهني"><span class="companion__core" aria-hidden="true"></span></button>
+  <div class="companion__nudge" role="status">
+    <span class="companion__mark--sm" aria-hidden="true"><span class="companion__core--sm"></span></span>
+    <span class="grow">لديك ملاحظة.</span><a class="link" href="#">أريني</a>
+  </div>
+  <div class="companion__panel" role="dialog" aria-label="الرفيق المهني">
+    <div class="row" style="gap:10px;">
+      <span class="companion__mark--sm" style="width:22px;height:22px;" aria-hidden="true"><span class="companion__core--sm" style="width:8px;height:8px;"></span></span>
+      <span class="grow" style="font-weight:500; font-size:var(--fs-body-sm);">الرفيق المهني</span>
+      <button class="banner__close" data-companion-min aria-label="تصغير">−</button>
+    </div>
+    <div class="companion__block"><span class="kicker">الخطوة</span><span class="body-sm">أكملي التحقق القصير لاختبار الواجهات.</span></div>
+    <div class="companion__block"><span class="kicker">لماذا</span><span class="body-sm muted">مهارة مُثبتة ثانية هي الحد الأدنى الذي تطلبه معظم إعلانات الدور.</span></div>
+    <div class="companion__block"><span class="kicker">بعدها</span><span class="body-sm muted">بعدها: الأداء وإمكانية الوصول عبر نشاط مقترح.</span></div>
+    <div class="pills"><button class="pill">ما فرق Practiced و Demonstrated؟</button><button class="pill">ماذا ينقصني؟</button></div>
+  </div>
+</div>
+<div class="toast-region" aria-live="polite" aria-label="التنبيهات"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
