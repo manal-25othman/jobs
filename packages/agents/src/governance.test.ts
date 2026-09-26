@@ -10,7 +10,8 @@ const ids = { n: 0, newId() { return `id-${++this.n}`; }, now() { return '2026-0
 const budget = { maxCallsPerWindow: 10, async callsUsed() { return 0; } };
 const facts: DomainFacts = {
   skillStates: { skl_testing: 'demonstrated', skl_css: 'self_reported', skl_comp: 'practiced' },
-  existingEvidence: new Set(['ev_1']), declaredTechnologies: new Set(),
+  existingEvidence: new Set(['ev_1']), approvedTechnologies: new Set(),
+  knownTechnologies: new Map([['React', ['ReactJS']], ['Vue', []], ['Next.js', ['NextJS']]]),
 };
 const evidenceCtx = { evidence: { id: 'ev_1', skillId: 'skl_testing', skillLabelAr: 'اختبار الواجهات', skillLabelEn: 'UI testing',
   state: 'demonstrated', projectTitle: 'متتبّع عادات', evaluationResultId: 'er_1', criteriaMet: ['a', 'b'], totalScore: 4, maxScore: 4 },
@@ -56,7 +57,8 @@ describe('3, 4, 5 — unsupported skill, invented metric, inferred framework are
   test('an undeclared framework is refused, whether named or written', () => {
     assert.throws(() => validateAgainstDomain(validateSchema('recruitment', wording({ namedTechnologies: ['React'] })), facts), ProposalRejected);
     assert.throws(() => validateAgainstDomain(validateSchema('recruitment', wording({ suggestedValueEn: 'Built it in React' })), facts), ProposalRejected);
-    const declared = { ...facts, declaredTechnologies: new Set(['React']) };
+    assert.throws(() => validateAgainstDomain(validateSchema('recruitment', wording({ suggestedValueEn: 'Built it with ReactJS' })), facts), ProposalRejected, 'aliases count');
+    const declared = { ...facts, approvedTechnologies: new Set(['React']) };
     assert.doesNotThrow(() => validateAgainstDomain(validateSchema('recruitment', wording({ namedTechnologies: ['React'], suggestedValueEn: 'Built it in React' })), declared));
   });
   test('mastery language is refused', () => {

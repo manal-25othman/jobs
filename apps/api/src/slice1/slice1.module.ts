@@ -8,6 +8,7 @@ import { AssetService } from './asset.service';
 import { ReportService } from './report.service';
 import { ShareService } from './share.service';
 import { UploadService } from './upload.service';
+import { WithdrawalService } from './withdrawal.service';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
 
 @Module({
@@ -15,7 +16,7 @@ import { UserProvisioningService } from '../auth/user-provisioning.service';
   controllers: [Slice1Controller, PublicReportController],
   providers: [
     UserProvisioningService, CareerService, SubmissionService,
-    EvaluationService, AssetService, ReportService, ShareService, UploadService,
+    EvaluationService, AssetService, ReportService, ShareService, UploadService, WithdrawalService,
   ],
 })
 export class Slice1Module {}

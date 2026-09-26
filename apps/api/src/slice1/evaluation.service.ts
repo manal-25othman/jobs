@@ -7,6 +7,7 @@ import {
   assertEvaluationResultValid, decideVerification, verificationApplies, assertStateAvailableInProduction,
   type PublishedRubric, type SubmissionArtifact, type IntegrityCheckSpec,
   type EvidenceState, type EvaluationRun,
+  reestablishmentAllowed,
 } from '@naqla/domain';
 
 /**
@@ -141,6 +142,7 @@ export class EvaluationService {
 
       /* ── 5. verification, then the transition — same transaction ── */
       let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
+      let reestablishedEvidenceId: string | null = null;
 
       if (run.proposedState && verificationApplies(run.outcome)) {
         const decision = decideVerification({
@@ -172,6 +174,16 @@ export class EvaluationService {
             reason: decision.reason,
           });
         }
+      } else if (run.outcome === 'passed' && !run.proposedState
+                 && reestablishmentAllowed({ currentState, proposedState: rubric.proposesState,
+                      primaryEvidenceStanding: await this.primaryEvidenceStanding(c, userId, primarySkillId) })) {
+        // D-077: the claim is already at this state but its evidence was
+        // withdrawn; this pass earns the same state again. New evidence, no
+        // transition, no state change — the ladder stays forward-only.
+        reestablishedEvidenceId = await this.reestablish(c, {
+          userId, skillId: primarySkillId, state: currentState, evaluationResultId: resultId,
+          projectId: s.project_id, reason: run.reason,
+        });
       }
 
       return {
@@ -187,6 +199,7 @@ export class EvaluationService {
           .filter((i) => i.classification === 'user_facing')
           .map((i) => ({ key: i.key, passed: i.passed, message: i.message })),
         transition,
+        reestablishedEvidenceId,
         evaluatedAt: resultRow.rows[0].evaluated_at,
       };
     });
@@ -250,6 +263,39 @@ export class EvaluationService {
     });
 
     return { from: p.from, to: p.to, evidenceId };
+  }
+
+  /** True while the claim's primary evidence exists and is not withdrawn. */
+  private async primaryEvidenceStanding(c: PoolClient, userId: string, skillId: string): Promise<boolean> {
+    const { rows } = await c.query(
+      `select e.id from skill_claim sc join evidence e on e.id = sc.primary_evidence_id
+        where sc.user_id = $1 and sc.skill_id = $2 and e.withdrawn_at is null`, [userId, skillId]);
+    return rows.length > 0;
+  }
+
+  /** D-077 re-establishment: evidence only. The state and the ladder are untouched. */
+  private async reestablish(c: PoolClient, p: {
+    userId: string; skillId: string; state: EvidenceState; evaluationResultId: string; projectId: string; reason: string;
+  }): Promise<string> {
+    const evidence = await c.query(
+      `insert into evidence
+         (user_id, skill_id, source_strength, evaluation_result_id, project_id,
+          provenance_class, provenance_source, confidence)
+       values ($1,$2,'platform_controlled',$3,$4,'system_derived',$5,1.0)
+       returning id`,
+      [p.userId, p.skillId, p.evaluationResultId, p.projectId, `evaluation_result:${p.evaluationResultId}`]);
+    const evidenceId: string = evidence.rows[0].id;
+    const claim = await c.query(
+      `update skill_claim set primary_evidence_id = $1, state_reason = $2
+        where user_id = $3 and skill_id = $4 and state = $5 returning id`,
+      [evidenceId, `evidence re-established after withdrawal: ${p.reason}`, p.userId, p.skillId, p.state]);
+    if (claim.rowCount === 0) throw new BadRequestException('no claim to re-establish evidence for');
+    await emitAuditEvent(c, {
+      eventType: 'evidence.reestablished', userId: p.userId, actorKind: 'system',
+      subjectTable: 'skill_claim', subjectId: claim.rows[0].id, reason: p.reason,
+      payload: { state: p.state, evidenceId, evaluationResultId: p.evaluationResultId },
+    });
+    return evidenceId;
   }
 
   private async currentClaimState(

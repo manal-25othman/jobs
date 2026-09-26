@@ -14,6 +14,7 @@ import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS,
   expectRejected, asAuthenticatedUser, uploadFile, COMPONENT_BYTES, TEST_BYTES, type TestUser,
+  approveCvBulletProposal,
 } from './helpers';
 
 let app: INestApplication;
@@ -291,25 +292,32 @@ describe('8 — evaluation history is immutable', () => {
 /* ═══════════════════ 9, 10 · CV bullet and approval ═════════════════════ */
 
 describe('9, 10 — CV bullet from supported evidence, approval required', () => {
-  test('a bullet is generated from demonstrated evidence and traces to it', async () => {
+  test('a bullet is PROPOSED from demonstrated evidence (D-074), traced, and never inferred', async () => {
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
     const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
     const evidenceId = ev.body.data.transition.evidenceId;
 
-    const asset = await http.post(`/v1/evidence/${evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
+    // D-074: no direct generation endpoint exists any more.
+    await http.post(`/v1/evidence/${evidenceId}/cv-bullet`)
+      .set('Authorization', `Bearer ${user.token}`).expect(404);
 
-    assert.equal(asset.body.data.lifecycleState, 'draft');
-    assert.equal(asset.body.data.draftingAidUsed, false, 'no model was involved');
-    assert.ok(asset.body.data.traces.length >= 4, 'every clause traces to a fact');
-    assert.deepEqual(asset.body.data.derivedFromEvidenceIds, [evidenceId]);
+    const list = await http.get('/v1/me/proposals').set('Authorization', `Bearer ${user.token}`).expect(200);
+    const cv = list.body.data.items.find((p: { proposalType: string }) => p.proposalType === 'cv_bullet');
+    assert.ok(cv, 'the Recruitment Agent proposed wording');
+    assert.equal(cv.lifecycle, 'awaiting_user');
+    assert.deepEqual(cv.evidenceRefs, [evidenceId]);
+    assert.ok(cv.structuredPayload.supportingSources.length >= 4, 'every clause traces to a fact');
 
-    // No framework is inferred. The platform runs on React; the user never
-    // said they used it, so it must not appear.
-    assert.ok(!/React|Next\.js|TypeScript/i.test(asset.body.data.bodyEn));
-    assert.ok(!/\d\s*%/.test(asset.body.data.bodyAr), 'no invented metric');
+    // No asset exists until the user approves.
+    const assets = await pool.query('select count(*)::int as n from professional_asset where user_id = $1', [user.id]);
+    assert.equal(assets.rows[0].n, 0);
+
+    // No framework is inferred (D-076). The platform runs on React; the user
+    // never declared it, so it must not appear.
+    assert.ok(!/React|Next\.js|TypeScript/i.test(cv.structuredPayload.suggestedValueEn));
+    assert.ok(!/\d\s*%/.test(cv.structuredPayload.suggestedValueAr), 'no invented metric');
   });
 
   test('NEGATIVE: a practiced claim produces no bullet', async () => {
@@ -326,31 +334,30 @@ describe('9, 10 — CV bullet from supported evidence, approval required', () =>
   test('an unapproved bullet is never active, and approval is explicit', async () => {
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
-    const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
+    await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
-    const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-    const assetId = asset.body.data.id;
+    const list = await http.get('/v1/me/proposals').set('Authorization', `Bearer ${user.token}`).expect(200);
+    const cv = list.body.data.items.find((p: { proposalType: string }) => p.proposalType === 'cv_bullet');
 
-    const preview = await http.post(`/v1/me/assets/${assetId}/preview`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
+    const preview = await http.get(`/v1/me/proposals/${cv.id}`)
+      .set('Authorization', `Bearer ${user.token}`).expect(200);
     assert.equal(preview.body.data.requiresApproval, true);
 
     // NEGATIVE: approval must be explicit.
-    const refused = await http.post(`/v1/me/assets/${assetId}/approve`)
+    const refused = await http.post(`/v1/me/proposals/${cv.id}/approve`)
       .set('Authorization', `Bearer ${user.token}`).send({ approved: false }).expect(201);
     assert.equal(refused.body.ok, false);
+    let n = await pool.query('select count(*)::int as n from professional_asset where user_id = $1', [user.id]);
+    assert.equal(n.rows[0].n, 0, 'nothing became an asset');
 
-    let row = await pool.query('select lifecycle_state, user_approved_at from professional_asset where id = $1', [assetId]);
-    assert.notEqual(row.rows[0].lifecycle_state, 'active');
-    assert.equal(row.rows[0].user_approved_at, null);
-
-    await http.post(`/v1/me/assets/${assetId}/approve`)
+    const ok = await http.post(`/v1/me/proposals/${cv.id}/approve`)
       .set('Authorization', `Bearer ${user.token}`).send({ approved: true }).expect(201);
-
-    row = await pool.query('select lifecycle_state, user_approved_at from professional_asset where id = $1', [assetId]);
+    const row = await pool.query('select lifecycle_state, user_approved_at, evidence_backed from professional_asset where id = $1', [ok.body.data.assetId]);
     assert.equal(row.rows[0].lifecycle_state, 'active');
     assert.ok(row.rows[0].user_approved_at);
+    assert.equal(row.rows[0].evidence_backed, true);
+    n = await pool.query('select count(*)::int as n from professional_asset where user_id = $1', [user.id]);
+    assert.equal(n.rows[0].n, 1);
   });
 
   test('NEGATIVE: the database refuses an active asset with no approval', async () => {
@@ -372,14 +379,9 @@ describe('11 — the report is built from allowed fields only', () => {
   test('it contains the contract fields and no private ones', async () => {
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
-    const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
+    await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
-    const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
-      .set('Authorization', `Bearer ${user.token}`).send({ approved: true }).expect(201);
+    await approveCvBulletProposal(http, user);
 
     const report = await http.post('/v1/me/evidence-report')
       .set('Authorization', `Bearer ${user.token}`).expect(201);
@@ -403,10 +405,11 @@ describe('11 — the report is built from allowed fields only', () => {
   test('NEGATIVE: an unapproved asset does not appear in the report', async () => {
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
-    const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
+    await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
+    // A cv_bullet proposal is awaiting the user; it is not approved.
+    const list = await http.get('/v1/me/proposals').set('Authorization', `Bearer ${user.token}`).expect(200);
+    assert.ok(list.body.data.items.some((p: { proposalType: string }) => p.proposalType === 'cv_bullet'));
 
     const report = await http.post('/v1/me/evidence-report')
       .set('Authorization', `Bearer ${user.token}`).expect(201);
@@ -431,12 +434,7 @@ describe('12 — a second user sees none of the first user’s work', () => {
     const { projectId, submissionId } = await upToSubmission(owner);
     const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${owner.token}`).expect(201);
-    const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${owner.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
-      .set('Authorization', `Bearer ${owner.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
-      .set('Authorization', `Bearer ${owner.token}`).send({ approved: true }).expect(201);
+    const asset = await approveCvBulletProposal(http, owner);
     const report = await http.post('/v1/me/evidence-report')
       .set('Authorization', `Bearer ${owner.token}`).expect(201);
 
@@ -450,12 +448,16 @@ describe('12 — a second user sees none of the first user’s work', () => {
       .set('Authorization', `Bearer ${intruder.token}`).expect(404);
     await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${intruder.token}`).expect(404);
-    await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
+    await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/withdraw`)
+      .set('Authorization', `Bearer ${intruder.token}`).send({ reason: 'x' }).expect(404);
+    await http.get(`/v1/me/proposals/${asset.proposalId}`)
       .set('Authorization', `Bearer ${intruder.token}`).expect(404);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
+    await http.post(`/v1/me/assets/${asset.assetId}/preview`)
       .set('Authorization', `Bearer ${intruder.token}`).expect(404);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
+    await http.post(`/v1/me/assets/${asset.assetId}/approve`)
       .set('Authorization', `Bearer ${intruder.token}`).send({ approved: true }).expect(404);
+    await http.post(`/v1/me/assets/${asset.assetId}/relink`)
+      .set('Authorization', `Bearer ${intruder.token}`).send({ evidenceId: ev.body.data.transition.evidenceId }).expect(404);
 
     const theirProjects = await http.get('/v1/projects')
       .set('Authorization', `Bearer ${intruder.token}`).expect(200);
@@ -482,14 +484,9 @@ describe('13 — a shared report reveals only the public projection', () => {
   test('the link opens the projection, and nothing beyond it', async () => {
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
-    const ev = await http.post(`/v1/submissions/${submissionId}/evaluate`)
+    await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
-    const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/preview`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/me/assets/${asset.body.data.id}/approve`)
-      .set('Authorization', `Bearer ${user.token}`).send({ approved: true }).expect(201);
+    await approveCvBulletProposal(http, user);
     const report = await http.post('/v1/me/evidence-report')
       .set('Authorization', `Bearer ${user.token}`).expect(201);
     const reportId = report.body.data.id;

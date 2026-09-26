@@ -84,9 +84,37 @@ export interface DomainFacts {
   readonly skillStates: Readonly<Record<string, EvidenceState>>;
   /** Evidence ids that exist and are not withdrawn. */
   readonly existingEvidence: ReadonlySet<string>;
-  /** Technologies the user has explicitly declared. */
-  readonly declaredTechnologies: ReadonlySet<string>;
+  /**
+   * D-076: technologies with an APPROVED source — user-declared, project
+   * metadata, project artifact, or evidence metadata. Anything else is
+   * unsupported, whatever the wording implies.
+   */
+  readonly approvedTechnologies: ReadonlySet<string>;
+  /** The technology vocabulary (data, seeded from track packs), with aliases. */
+  readonly knownTechnologies: ReadonlyMap<string, readonly string[]>;
 }
+
+/** Finds vocabulary terms present in the text, by term or alias, word-bounded. */
+export function technologiesMentioned(text: string, known: ReadonlyMap<string, readonly string[]>): string[] {
+  const found: string[] = [];
+  for (const [term, aliases] of known) {
+    for (const t of [term, ...aliases]) {
+      const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`(^|[^A-Za-z0-9])${esc}([^A-Za-z0-9]|$)`, 'i').test(text)) { found.push(term); break; }
+    }
+  }
+  return found;
+}
+
+const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
+  [/\b(at|for)\s+[A-Z][A-Za-z]+\s+(Inc|Ltd|LLC|Corp|Company|Bank|Group)\b/, 'an employer'],
+  [/\bcertif(ied|ication|icate)\b/i, 'a certification'],
+  [/\b(شهادة|معتمد|معتمدة)\b/, 'a certification'],
+  [/\b(senior|lead|principal|head of|manager)\b/i, 'seniority'],
+  [/\b(كبير|قائد|رئيس|مدير)\b/, 'seniority'],
+  [/\b\d+\+?\s*(years?|yrs)\b/i, 'years of experience'],
+  [/\bworked at\b/i, 'employment'],
+];
 
 export function validateAgainstDomain(
   p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'>,
@@ -109,9 +137,21 @@ export function validateAgainstDomain(
         throw new ProposalRejected('domain', `skill '${skillId}' is '${state}'; it cannot be presented as a supported claim`);
       }
     }
-    // No technology the user did not declare (no framework inference).
-    for (const t of payload.namedTechnologies) {
-      if (!facts.declaredTechnologies.has(t)) throw new ProposalRejected('domain', `technology '${t}' was not declared by the user; it may not be inferred`);
+    // D-076: a technology may appear only with an approved source. Named ones
+    // and ones merely written into the text are checked the same way, against
+    // the data-driven vocabulary — no hard-coded blacklist.
+    const mentioned = new Set([
+      ...payload.namedTechnologies,
+      ...technologiesMentioned(payload.suggestedValueAr, facts.knownTechnologies),
+      ...technologiesMentioned(payload.suggestedValueEn ?? '', facts.knownTechnologies),
+    ]);
+    for (const t of mentioned) {
+      if (!facts.approvedTechnologies.has(t)) throw new ProposalRejected('domain', `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`);
+    }
+    // Invented employer, title, years or certification: none of these has an
+    // evidence path in this product, so any such assertion is unsupported.
+    for (const [re, what] of INVENTED_PATTERNS) {
+      if (re.test(payload.suggestedValueAr) || re.test(payload.suggestedValueEn ?? '')) throw new ProposalRejected('domain', `the wording asserts ${what}, which no evidence records`);
     }
     // No invented metric, no mastery language — the domain's own guard.
     try {
@@ -119,11 +159,6 @@ export function validateAgainstDomain(
     } catch (e) {
       if (e instanceof InvariantViolation) throw new ProposalRejected('domain', e.message);
       throw e;
-    }
-    // Undeclared technology names appearing in the text itself.
-    for (const tech of ['React', 'Vue', 'Angular', 'Next.js', 'Django', 'Spring']) {
-      const inText = payload.suggestedValueAr.includes(tech) || (payload.suggestedValueEn ?? '').includes(tech);
-      if (inText && !facts.declaredTechnologies.has(tech)) throw new ProposalRejected('domain', `'${tech}' appears in the wording but was not declared`);
     }
   }
 

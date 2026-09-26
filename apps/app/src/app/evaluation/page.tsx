@@ -130,7 +130,7 @@ function EvaluationInner() {
           <div>
             <button
               className="btn btn--on-dark"
-              onClick={() => router.push(`/asset?evidence=${result.transition!.evidenceId}`)}
+              onClick={() => router.push(`/proposals?focus=${result.transition!.evidenceId}`)}
             >
               توليد بند السيرة
             </button>

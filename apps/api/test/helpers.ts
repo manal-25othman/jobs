@@ -146,3 +146,21 @@ export async function uploadFile(
 
 export const COMPONENT_BYTES = new TextEncoder().encode('export function HabitList() { /* ... */ }');
 export const TEST_BYTES = new TextEncoder().encode('test("empty state", () => {}); test("loading", () => {}); test("error message", () => {});');
+
+/**
+ * D-074 path to an active CV bullet: the Recruitment Agent proposed wording
+ * after evaluation; the user previews it (D-057), then approves it explicitly.
+ */
+export async function approveCvBulletProposal(
+  http: ReturnType<typeof import('supertest')>,
+  user: TestUser,
+  editedBody?: string,
+): Promise<{ proposalId: string; assetId: string; suggestedAr: string; suggestedEn: string | null }> {
+  const list = await http.get('/v1/me/proposals').set('Authorization', `Bearer ${user.token}`).expect(200);
+  const cv = (list.body.data.items as Array<{ id: string; proposalType: string }>).find((p) => p.proposalType === 'cv_bullet');
+  if (!cv) throw new Error('no cv_bullet proposal exists for this user');
+  const pv = await http.get(`/v1/me/proposals/${cv.id}`).set('Authorization', `Bearer ${user.token}`).expect(200);
+  const ok = await http.post(`/v1/me/proposals/${cv.id}/approve`).set('Authorization', `Bearer ${user.token}`)
+    .send({ approved: true, ...(editedBody ? { editedBody } : {}) }).expect(201);
+  return { proposalId: cv.id, assetId: ok.body.data.assetId as string, suggestedAr: pv.body.data.suggestedAr, suggestedEn: pv.body.data.suggestedEn };
+}

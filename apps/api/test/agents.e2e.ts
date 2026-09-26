@@ -27,6 +27,8 @@ async function evaluated(user: TestUser, artifacts = COMPLETE_ARTIFACTS) {
   return { submissionId: sub.body.data.id, ev: ev.body.data };
 }
 const proposals = async (u: TestUser) => (await http.get('/v1/me/proposals').set(auth(u)).expect(200)).body.data.items as Array<Record<string, unknown>>;
+/** D-057: a preview is a recorded step before any approval. */
+const previewed = async (u: TestUser, id: unknown) => { await http.get(`/v1/me/proposals/${id}`).set(auth(u)).expect(200); return id as string; };
 
 describe('FLOW A — demonstrated evidence → Recruitment Agent → proposal → approval → active asset', () => {
   test('the orchestrator produces a cv_bullet proposal awaiting the user, and no asset yet', async () => {
@@ -60,6 +62,7 @@ describe('FLOW A — demonstrated evidence → Recruitment Agent → proposal �
   test('approval runs domain validation, then creates an ACTIVE asset that appears in the report', async () => {
     const user = await newUser(); await evaluated(user);
     const cv = (await proposals(user)).find((p) => p.proposalType === 'cv_bullet')!;
+    await previewed(user, cv.id);
     const ok = await http.post(`/v1/me/proposals/${cv.id}/approve`).set(auth(user)).send({ approved: true }).expect(201);
     assert.equal(ok.body.data.lifecycle, 'approved');
     const asset = await pool.query('select lifecycle_state, provenance_class, drafting_aid_used, user_approved_at, provenance_source from professional_asset where id = $1', [ok.body.data.assetId]);
@@ -75,6 +78,7 @@ describe('FLOW A — demonstrated evidence → Recruitment Agent → proposal �
   test('13 — NEGATIVE: a proposal whose payload fails domain validation cannot become active', async () => {
     const user = await newUser(); await evaluated(user);
     const cv = (await proposals(user)).find((p) => p.proposalType === 'cv_bullet')!;
+    await previewed(user, cv.id);
     // Tamper as the service role: an invented metric slipped into the stored payload.
     await pool.query(`update agent_proposal set structured_payload = structured_payload || '{"suggestedValueAr":"رفعتُ الأداء بنسبة 40%"}'::jsonb where id = $1`, [cv.id]);
     const r = await http.post(`/v1/me/proposals/${cv.id}/approve`).set(auth(user)).send({ approved: true });

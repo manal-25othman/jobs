@@ -11,12 +11,15 @@
 
 import type { AgentProvider, ProviderRequest, ProviderResponse } from './provider.js';
 
-export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents';
+export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 'scripted';
+
+/** Mode B: candidates supplied verbatim by a scenario. The gateway must judge them. */
+export interface ScriptedOutput { readonly candidates: readonly unknown[]; }
 
 export class LocalTestProvider implements AgentProvider {
   readonly name = 'local-test';
   readonly testOnly = true;
-  constructor(private readonly mode: TestProviderMode = 'normal') {}
+  constructor(private readonly mode: TestProviderMode = 'normal', private readonly scripted: ScriptedOutput | null = null) {}
 
   async complete(req: ProviderRequest): Promise<ProviderResponse> {
     const started = Date.now();
@@ -26,7 +29,9 @@ export class LocalTestProvider implements AgentProvider {
     if (this.mode === 'error') throw new Error('local-test provider: injected failure');
 
     let candidates: unknown[];
-    if (this.mode === 'malformed') {
+    if (this.mode === 'scripted') {
+      candidates = [...(this.scripted?.candidates ?? [])];
+    } else if (this.mode === 'malformed') {
       candidates = [{ this_is: 'not a proposal' }, 'a string', 42];
     } else if (this.mode === 'invents') {
       // Fault injection: a provider that overclaims. The gateway must refuse it.
@@ -53,6 +58,23 @@ export class LocalTestProvider implements AgentProvider {
 /* The templates below copy context facts; they never add a fact. */
 
 function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  // Mode C — ambiguity: incomplete or conflicting input yields a limitation
+  // and a request for clarification, never wording.
+  const amb = ctx['ambiguity'] as { kind: string; detail: string } | undefined;
+  if (amb) {
+    return [{
+      proposalType: 'profile_gap', subjectType: 'career_goal', subjectId: String((ctx['targetRole'] as { id?: string } | undefined)?.id ?? 'unknown'),
+      summary: `لا يمكن اقتراح صياغة الآن: ${amb.detail}`,
+      structuredPayload: { kind: 'gap', skillId: String(ctx['skillId'] ?? 'unknown'), explanation: `limitation: ${amb.detail}. No wording is proposed until this is resolved.`, currentState: String(ctx['skillState'] ?? 'unknown') },
+      evidenceRefs: [], sourceRefs: [], rationale: 'the input is incomplete or conflicting; proposing wording would fabricate certainty',
+      warnings: [`clarification needed: ${amb.kind}`], requiresUserApproval: false,
+    }, {
+      proposalType: 'recruiter_next_action', subjectType: 'career_goal', subjectId: 'next',
+      summary: 'وضّحي المعلومة الناقصة قبل أي صياغة',
+      structuredPayload: { kind: 'action', action: `resolve: ${amb.kind}`, why: 'a professional claim needs an unambiguous support path', estimatedMinutes: 5 },
+      evidenceRefs: [], sourceRefs: [], rationale: 'conservative handling of ambiguity', warnings: [], requiresUserApproval: false,
+    }];
+  }
   const ev = ctx['evidence'] as { id: string; skillId: string; skillLabelAr: string; skillLabelEn: string; state: string;
     projectTitle: string; evaluationResultId: string; criteriaMet: string[]; totalScore: number; maxScore: number } | undefined;
   if (!ev) return [];
@@ -70,7 +92,7 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
       ],
       reason: 'the evaluation met every mandatory criterion; each clause maps to a recorded fact',
       unsupportedRisk: 'none', limitationNote: 'wording only; substance comes from the evaluation record',
-      namedSkillIds: [ev.skillId], namedTechnologies: [],
+      namedSkillIds: [ev.skillId], namedTechnologies: [...((ctx['approvedTechnologies'] as string[] | undefined) ?? [])],
     },
     evidenceRefs: [ev.id],
     sourceRefs: [{ kind: 'evidence', id: ev.id }, { kind: 'evaluation_result', id: ev.evaluationResultId }],
@@ -98,6 +120,32 @@ function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] 
     evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
     rationale: 'each line restates the recorded rationale of the deterministic evaluator', warnings: [], requiresUserApproval: false,
   }];
+  const amb = ctx['ambiguity'] as { kind: string; detail: string } | undefined;
+  if (amb) {
+    out.push({
+      proposalType: 'followup_question', subjectType: 'submission', subjectId: r.evaluationResultId,
+      summary: `سؤال متابعة: ${amb.detail}`,
+      structuredPayload: { kind: 'followup_question', questions: [`Can you explain: ${amb.detail}?`], purpose: `limitation: ${amb.kind}; confidence is insufficient to conclude` },
+      evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
+      rationale: 'the explanation and the output do not line up; a question is safer than a judgement', warnings: [`clarification needed: ${amb.kind}`], requiresUserApproval: false,
+    });
+  }
+  if (failed.length > 0 && passed.length > 0 && !r.blockingCheck) {
+    // Partial: say what is missing and how to prove it — never a professional claim.
+    out.push({
+      proposalType: 'missing_evidence', subjectType: 'skill_claim', subjectId: r.skillId,
+      summary: `دليل ناقص: ${failed.map((c) => c.key).join('، ')}`,
+      structuredPayload: { kind: 'missing_evidence', skillId: r.skillId, whatIsMissing: failed.map((c) => c.key).join(', '), howToProvide: 'cover the unmet criteria in a new submission' },
+      evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
+      rationale: 'distinguishes failed criteria from missing evidence', warnings: [], requiresUserApproval: false,
+    }, {
+      proposalType: 'validation_activity', subjectType: 'skill_claim', subjectId: r.skillId,
+      summary: 'تحقق قصير يغطّي المعايير الناقصة',
+      structuredPayload: { kind: 'validation_activity', skillId: r.skillId, description: `a short check covering ${failed.map((c) => c.key).join(', ')}`, wouldPropose: { from: 'practiced', to: 'demonstrated' } },
+      evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
+      rationale: 'a recommendation only; the domain decides any transition', warnings: [], requiresUserApproval: false,
+    });
+  }
   if (failed.length > 0 || r.blockingCheck) {
     out.push({
       proposalType: 'technical_feedback', subjectType: 'evaluation_result', subjectId: r.evaluationResultId,

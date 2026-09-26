@@ -49,6 +49,7 @@ export const AGENTS: readonly AgentDefinition[] = [
     allowedContext: [
       'targetRole', 'skills', 'evidence', 'evidenceStates', 'professionalAssets',
       'supportedClaims', 'unsupportedClaims', 'projects.title', 'projects.kind', 'cv', 'linkedin',
+      'approvedTechnologies', 'ambiguity', 'skillId', 'skillState',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },
@@ -56,7 +57,7 @@ export const AGENTS: readonly AgentDefinition[] = [
     agentId: 'A-TECH', agentType: 'technical', implemented: true,
     allowedContext: [
       'targetRole', 'project', 'submission', 'rubric', 'rubricCriteria', 'artifacts',
-      'deterministicResults', 'userExplanation', 'aiDisclosure', 'existingEvidence',
+      'deterministicResults', 'userExplanation', 'aiDisclosure', 'existingEvidence', 'ambiguity',
     ],
     proposalTypes: TECHNICAL_PROPOSAL_TYPES,
   },

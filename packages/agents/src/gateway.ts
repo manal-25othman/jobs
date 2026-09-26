@@ -7,6 +7,7 @@
  * proposals. The domain never sees the provider; the provider never sees a
  * write path.
  */
+import { MissingPrerequisite } from '@naqla/domain';
 import type { AgentProvider } from './provider.js';
 import { agentDefinition, type AgentInvocation, type AgentProposal, type AgentType, type Trigger, type UsageRecord, type InputReference } from './contracts.js';
 import { redactForAgent } from './redaction.js';
@@ -117,4 +118,14 @@ export const LIFECYCLE_TRANSITIONS: Readonly<Record<string, readonly string[]>> 
 };
 export function assertLifecycle(from: string, to: string): void {
   if (!LIFECYCLE_TRANSITIONS[from]?.includes(to)) throw new Error(`proposal lifecycle: ${from} → ${to} is not permitted`);
+}
+
+/**
+ * D-057 applied to proposals: preview → optional edit → explicit approval.
+ * A wording proposal the user never opened cannot be approved, whatever the
+ * client sent. The rule is named here, once, and the API only calls it.
+ */
+export function assertReadyForApproval(p: { readonly lifecycle: string; readonly previewedAt: string | null }): void {
+  assertLifecycle(p.lifecycle, 'approved');
+  if (!p.previewedAt) throw new MissingPrerequisite('preview', 'D-057: a proposal must be previewed before it can be approved');
 }

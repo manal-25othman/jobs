@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  runDeterministicEvaluation, assertRubricProposalSane, generateCvBullet,
+  runDeterministicEvaluation, assertRubricProposalSane, prepareCvBulletFacts, assertNoUnsupportedLanguage,
   assertAssetTransition, buildCareerEvidenceReport, toPublicReport,
   assertReportLeaksNothing, NO_AI_DISCLOSURE, REPORT_ALLOWED_FIELDS,
   decideVerification, verificationApplies, verificationSafeState,
@@ -231,67 +231,37 @@ const bulletSource: CvBulletSource = {
     { criterionId: 'empty_state_test', score: 1, maxScore: 1, rationale: 'r', supportingExcerpt: null, skillId: SKILL, confidence: 1 },
     { criterionId: 'loading_state_test', score: 1, maxScore: 1, rationale: 'r', supportingExcerpt: null, skillId: SKILL, confidence: 1 },
   ],
-  declaredTechnologies: [],
+  approvedTechnologies: [],
 };
 
-describe('CV bullet is generated only from supported evidence', () => {
-  test('a demonstrated claim produces a traced bullet', () => {
-    const b = generateCvBullet(bulletSource);
-    assert.equal(b.status, 'draft');
-    assert.equal(b.draftingAidUsed, false);
-    assert.deepEqual([...b.derivedFromEvidenceIds], ['ev_1']);
-    assert.ok(b.traces.length >= 4, 'every clause traces to something');
-    assert.ok(b.bodyAr.includes('متتبّع عادات'));
-    assert.ok(b.bodyEn.includes('UI testing'));
+describe('CV bullet FACTS are prepared only from supported evidence (D-074)', () => {
+  test('a demonstrated claim yields traced facts and constraints, never a sentence', () => {
+    const f = prepareCvBulletFacts(bulletSource);
+    assert.equal(f.provenanceClass, 'system_derived');
+    assert.ok(f.facts.some((x) => x.kind === 'project') && f.facts.some((x) => x.kind === 'skill') && f.facts.some((x) => x.kind === 'score'));
+    assert.equal(f.facts.filter((x) => x.kind === 'criterion').length, 2);
+    assert.ok(!('bodyAr' in f), 'the domain prepares facts; the agent proposes wording');
+    assert.ok(f.constraints.some((c) => /metric/.test(c)));
   });
-
-  test('a practiced claim cannot produce a bullet', () => {
-    assert.throws(
-      () => generateCvBullet({ ...bulletSource, evidenceState: 'practiced' }),
-      InvariantViolation,
-    );
+  test('practiced and self-reported yield no facts', () => {
+    assert.throws(() => prepareCvBulletFacts({ ...bulletSource, evidenceState: 'practiced' }), InvariantViolation);
+    assert.throws(() => prepareCvBulletFacts({ ...bulletSource, evidenceState: 'self_reported' }), InvariantViolation);
   });
-
-  test('a self-reported claim cannot produce a bullet', () => {
-    assert.throws(
-      () => generateCvBullet({ ...bulletSource, evidenceState: 'self_reported' }),
-      InvariantViolation,
-    );
+  test('no facts without an evidence record or a met criterion', () => {
+    assert.throws(() => prepareCvBulletFacts({ ...bulletSource, evidenceId: '' }), InvariantViolation);
+    assert.throws(() => prepareCvBulletFacts({ ...bulletSource, criteria: [{ criterionId: 'x', score: 0, maxScore: 1, rationale: 'r', supportingExcerpt: null, skillId: SKILL, confidence: 1 }] }), MissingPrerequisite);
   });
-
-  test('no bullet without an evidence record', () => {
-    assert.throws(() => generateCvBullet({ ...bulletSource, evidenceId: '' }), InvariantViolation);
+  test('technology facts appear only with an approved source (D-076)', () => {
+    assert.ok(!prepareCvBulletFacts(bulletSource).facts.some((x) => x.kind === 'technology'));
+    const f = prepareCvBulletFacts({ ...bulletSource, approvedTechnologies: [{ term: 'React', source: 'user_declared' }] });
+    assert.ok(f.facts.some((x) => x.kind === 'technology' && x.ref === 'user_declared:React'));
   });
-
-  test('no bullet when no criterion was actually met', () => {
-    assert.throws(
-      () => generateCvBullet({
-        ...bulletSource,
-        criteria: [{ criterionId: 'x', score: 0, maxScore: 1, rationale: 'r', supportingExcerpt: null, skillId: SKILL, confidence: 1 }],
-      }),
-      MissingPrerequisite,
-    );
-  });
-
-  test('no framework is inferred: technologies appear only when declared', () => {
-    const without = generateCvBullet(bulletSource);
-    assert.ok(!/React|JavaScript|Next\.js|TypeScript/i.test(without.bodyEn),
-      'the platform is built with React; that says nothing about the user');
-    const withTech = generateCvBullet({ ...bulletSource, declaredTechnologies: ['React'] });
-    assert.ok(withTech.bodyEn.includes('React'));
-    assert.ok(withTech.traces.some((t) => t.ref === 'user_declared_technologies'));
-  });
-
-  test('no invented metric: the template never emits a percentage', () => {
-    const b = generateCvBullet(bulletSource);
-    assert.ok(!/\d\s*%/.test(b.bodyAr) && !/\d\s*%/.test(b.bodyEn));
-  });
-
-  test('mastery language is refused', () => {
-    // The template cannot produce it; the guard proves the rule holds anyway.
-    const { assertNoUnsupportedLanguage } = require('./cv-bullet.js') as typeof import('./cv-bullet.js');
-    assert.throws(() => assertNoUnsupportedLanguage('أتقنت اختبار الواجهات', 'ok'), InvariantViolation);
-    assert.throws(() => assertNoUnsupportedLanguage('ok', 'Expert in UI testing'), InvariantViolation);
+  test('language guard: mastery, seniority, percentage, years are refused', () => {
+    assert.throws(() => assertNoUnsupportedLanguage('أتقنت الاختبار', 'ok'), InvariantViolation);
+    assert.throws(() => assertNoUnsupportedLanguage('ok', 'Senior engineer'), InvariantViolation);
+    assert.throws(() => assertNoUnsupportedLanguage('رفعتُ الأداء 40%', 'ok'), InvariantViolation);
+    assert.throws(() => assertNoUnsupportedLanguage('ok', '5 years of experience'), InvariantViolation);
+    assert.doesNotThrow(() => assertNoUnsupportedLanguage('عملتُ على المشروع', 'Built an interactive task board with shared UI state.'));
   });
 });
 
@@ -331,7 +301,7 @@ describe('career evidence report', () => {
     const r = buildCareerEvidenceReport({
       targetRole: { label: 'Frontend Developer', reviewStatus: 'reviewed' },
       skills: [skillEntry],
-      approvedAssets: [{ kind: 'cv_bullet', body: 'Worked on ...', approvedAt: '2026-09-26T11:00:00.000Z' }],
+      approvedAssets: [{ kind: 'cv_bullet', body: 'Worked on ...', approvedAt: '2026-09-26T11:00:00.000Z', evidenceBacked: true }],
       generatedAt: '2026-09-26T12:00:00.000Z',
     });
     for (const key of Object.keys(r)) {
@@ -343,12 +313,17 @@ describe('career evidence report', () => {
     assert.equal(r.aiDisclosure, NO_AI_DISCLOSURE);
   });
 
+  test('an asset whose evidence was withdrawn never appears as supported (D-077)', () => {
+    assert.throws(() => buildCareerEvidenceReport({ targetRole: { label: 'x', reviewStatus: 'reviewed' }, skills: [skillEntry],
+      approvedAssets: [{ kind: 'cv_bullet', body: 'b', approvedAt: 'now', evidenceBacked: false as unknown as true }], generatedAt: 'now' }), InvariantViolation);
+  });
+
   test('an unapproved asset never appears', () => {
     assert.throws(
       () => buildCareerEvidenceReport({
         targetRole: { label: 'x', reviewStatus: 'reviewed' },
         skills: [skillEntry],
-        approvedAssets: [{ kind: 'cv_bullet', body: 'b', approvedAt: '' }],
+        approvedAssets: [{ kind: 'cv_bullet', body: 'b', approvedAt: '', evidenceBacked: true }],
         generatedAt: 'now',
       }),
       InvariantViolation,
@@ -384,7 +359,7 @@ describe('career evidence report', () => {
     const r = buildCareerEvidenceReport({
       targetRole: { label: 'Frontend Developer', reviewStatus: 'reviewed' },
       skills: [skillEntry, { ...skillEntry, skillLabel: 'Component building', evidenceState: 'practiced' }],
-      approvedAssets: [{ kind: 'cv_bullet', body: 'b', approvedAt: '2026-09-26T11:00:00.000Z' }],
+      approvedAssets: [{ kind: 'cv_bullet', body: 'b', approvedAt: '2026-09-26T11:00:00.000Z', evidenceBacked: true }],
       generatedAt: '2026-09-26T12:00:00.000Z',
     });
     const pub = toPublicReport(r);

@@ -11,6 +11,7 @@ import { AssetService } from './asset.service';
 import { ReportService } from './report.service';
 import { ShareService } from './share.service';
 import { UploadService } from './upload.service';
+import { WithdrawalService } from './withdrawal.service';
 import { AgentService } from '../agents/agent.service';
 import { Delete } from '@nestjs/common';
 
@@ -33,6 +34,7 @@ export class Slice1Controller {
     private readonly share: ShareService,
     private readonly uploads: UploadService,
     private readonly agents: AgentService,
+    private readonly withdrawal: WithdrawalService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -165,9 +167,19 @@ export class Slice1Controller {
 
   /* ─────────────────────────── assets ───────────────────────────── */
 
-  @Post('evidence/:id/cv-bullet')
-  async generateBullet(@CurrentUser() user: AuthenticatedUser, @Param('id') evidenceId: string) {
-    return { ok: true, data: await this.assets.generateCvBulletForEvidence(user.id, evidenceId) };
+  // D-074: there is no direct "generate a CV bullet" endpoint. Wording comes
+  // from a Recruitment Agent proposal (/v1/me/proposals) and user approval.
+
+  /** D-077: withdraw own evidence. Nothing is deleted; derived assets need review. */
+  @Post('evidence/:id/withdraw')
+  async withdraw(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: { reason: string }) {
+    return { ok: true, data: await this.withdrawal.withdraw(user.id, id, body?.reason) };
+  }
+
+  /** D-077: explicit re-link of a needs_review asset to evidence that qualifies alone. */
+  @Post('me/assets/:id/relink')
+  async relink(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: { evidenceId: string }) {
+    return { ok: true, data: await this.withdrawal.relink(user.id, id, body?.evidenceId) };
   }
 
   @Get('me/assets')
@@ -219,9 +231,9 @@ export class Slice1Controller {
 /**
  * The only unauthenticated route in the slice.
  *
- * It serves the stored public projection and nothing else — the row itself
- * holds only what `toPublicReport` produced, so there is no private field to
- * accidentally include.
+ * It serves the public projection rebuilt from current state (D-077) through
+ * `toPublicReport`, so there is no private field to accidentally include and
+ * withdrawn evidence is gone from a live link at once.
  */
 @Controller('public')
 export class PublicReportController {

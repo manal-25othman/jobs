@@ -74,6 +74,13 @@ describe('config validation', () => {
     }
   });
 
+  test('D-073: the agent budget has no production default', () => {
+    try {
+      loadEnv({ scope: 'api', env: { ...base, NODE_ENV: 'production', SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z' } });
+      assert.fail('expected ConfigError');
+    } catch (e) { assert.ok(e instanceof ConfigError); assert.ok(e.problems.some((p) => p.includes('AGENT_BUDGET_CALLS_PER_DAY'))); }
+  });
+
   test('.env.example renders every variable in the spec', () => {
     const rendered = renderEnvExample();
     for (const v of ENV_SPEC) assert.ok(rendered.includes(v.name), `${v.name} missing from .env.example`);

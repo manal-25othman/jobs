@@ -103,7 +103,7 @@ export const ENV_SPEC: readonly VarSpec[] = [
     example: 'local-test', validate: oneOf('local-test') },
 
   { name: 'AGENT_BUDGET_CALLS_PER_DAY', scope: 'api', required: false, secret: false,
-    description: 'Per-user daily cap on agent invocations. Defaults to 50.', example: '50',
+    description: 'Per-user daily cap on agent invocations. Development default 50. REQUIRED in production: the real value is TBD until a provider is connected and cost is measured (D-073).', example: '50',
     validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
 
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
@@ -152,6 +152,9 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
     }
   }
 
+  if (env['NODE_ENV'] === 'production' && !env['AGENT_BUDGET_CALLS_PER_DAY']) {
+    problems.push('AGENT_BUDGET_CALLS_PER_DAY is required in production; 50/day is a development default, not a product value (D-073)');
+  }
   if (env['NODE_ENV'] === 'production' && env['AGENT_PROVIDER'] === 'local-test') {
     problems.push('AGENT_PROVIDER=local-test is TEST/NON-PRODUCTION and is refused in production (OPEN-023 unresolved)');
   }

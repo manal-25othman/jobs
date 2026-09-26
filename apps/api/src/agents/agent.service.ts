@@ -4,19 +4,28 @@ import { randomUUID } from 'node:crypto';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import {
-  AgentGateway, LocalTestProvider, route, nudgesFor, validateAgainstDomain, assertLifecycle, ProposalRejected,
+  AgentGateway, LocalTestProvider, route, nudgesFor, validateAgainstDomain, assertLifecycle, assertReadyForApproval, ProposalRejected,
   WORDING_PROPOSAL_TYPES, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
   type ProposalLifecycle, type InputReference, type WordingPayload, type TestProviderMode,
 } from '@naqla/agents';
-import { assertNoUnsupportedLanguage, InvariantViolation, type EvidenceState } from '@naqla/domain';
+import { assertNoUnsupportedLanguage, InvariantViolation } from '@naqla/domain';
+import { loadDomainFacts, approvedTechnologiesForEvidence } from './domain-facts';
 
 export const AGENT_GATEWAY = Symbol('AGENT_GATEWAY');
+/** Development convenience only — refused as a production value (D-073). */
+const DEVELOPMENT_ONLY_BUDGET = 50;
 
 export function buildGateway(db: DbService): AgentGateway {
   const providerName = process.env['AGENT_PROVIDER'] ?? 'local-test';
   if (providerName !== 'local-test') throw new Error(`no provider '${providerName}' exists; OPEN-023 is unresolved`);
   const mode = (process.env['AGENT_TEST_PROVIDER_MODE'] ?? 'normal') as TestProviderMode;
-  const max = Number(process.env['AGENT_BUDGET_CALLS_PER_DAY'] ?? 50);
+  const production = process.env['NODE_ENV'] === 'production';
+  // D-073: the budget is configuration. There is no production value in code;
+  // the number below exists only so a developer machine runs without .env.
+  const raw = process.env['AGENT_BUDGET_CALLS_PER_DAY'];
+  if (production && !raw) throw new Error('AGENT_BUDGET_CALLS_PER_DAY is required in production; no default exists (D-073)');
+  const max = raw ? Number(raw) : DEVELOPMENT_ONLY_BUDGET;
+  if (!Number.isInteger(max) || max <= 0) throw new Error('AGENT_BUDGET_CALLS_PER_DAY must be a positive integer');
   return new AgentGateway(
     new LocalTestProvider(mode),
     { maxCallsPerWindow: max, callsUsed: (userId) => db.asService(async (c) => {
@@ -79,6 +88,8 @@ export class AgentService {
         }
         const assets = await c.query('select id, kind, lifecycle_state from professional_asset where user_id = $1', [userId]);
         ctx['professionalAssets'] = assets.rows;
+        // D-076: only technologies with an approved source reach the agent as facts.
+        ctx['approvedTechnologies'] = await approvedTechnologiesForEvidence(c, userId, String(facts['evidenceId']));
       }
       if (facts['evaluationResultId']) {
         const crit = await c.query(`select criterion_key, score, max_score, rationale, skill_id from evaluation_criterion_score where evaluation_result_id = $1 order by criterion_key`, [facts['evaluationResultId']]);
@@ -98,12 +109,7 @@ export class AgentService {
   }
 
   private async domainFacts(userId: string): Promise<DomainFacts> {
-    return this.db.asService(async (c) => {
-      const claims = await c.query('select skill_id, state from skill_claim where user_id = $1', [userId]);
-      const ev = await c.query('select id from evidence where user_id = $1 and withdrawn_at is null', [userId]);
-      return { skillStates: Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state as EvidenceState])),
-        existingEvidence: new Set<string>(ev.rows.map((r) => r.id)), declaredTechnologies: new Set<string>() };
-    });
+    return this.db.asService((c) => loadDomainFacts(c, userId));
   }
 
   private async persist(userId: string, r: GatewayResult, ruleId: string): Promise<void> {
@@ -142,7 +148,7 @@ export class AgentService {
   async list(userId: string) {
     return this.db.asUser(userId, async (c) => {
       const { rows } = await c.query(`select id, agent_type, proposal_type, subject_type, subject_id, summary, structured_payload, evidence_refs, source_refs,
-        rationale, warnings, requires_user_approval, lifecycle, version, approved_at, approved_body, rejected_at, rejection_reason, superseded_by, resulting_asset_id, created_at
+        rationale, warnings, requires_user_approval, lifecycle, version, previewed_at, approved_at, approved_body, rejected_at, rejection_reason, superseded_by, resulting_asset_id, created_at
         from agent_proposal order by created_at desc`);
       return rows.map(this.row);
     });
@@ -159,6 +165,8 @@ export class AgentService {
   /** Preview: current, suggested, why, evidence, warnings. Nothing changes. */
   async preview(userId: string, id: string) {
     const p = await this.get(userId, id);
+    // D-057: the preview is a recorded step, not a page view. First open wins.
+    await this.db.asService((c) => c.query('update agent_proposal set previewed_at = coalesce(previewed_at, now()) where id = $1 and user_id = $2', [id, userId]));
     const payload = p.structuredPayload as WordingPayload;
     return { proposalId: p.id, proposalType: p.proposalType, lifecycle: p.lifecycle,
       current: payload.kind === 'wording' ? payload.currentValue : null,
@@ -177,7 +185,7 @@ export class AgentService {
       const cur = await c.query('select * from agent_proposal where id = $1', [id]);
       if (cur.rowCount === 0 || cur.rows[0].user_id !== userId) throw new NotFoundException('proposal not found');
       const p = cur.rows[0];
-      assertLifecycle(p.lifecycle, 'approved');
+      assertReadyForApproval({ lifecycle: p.lifecycle, previewedAt: p.previewed_at ? String(p.previewed_at) : null });
       if (!WORDING_PROPOSAL_TYPES.has(p.proposal_type)) throw new BadRequestException('only a wording proposal is approved into an asset');
 
       // Domain validation runs AGAIN at approval, against current facts: a
@@ -195,8 +203,8 @@ export class AgentService {
       }
 
       const evidenceId = p.evidence_refs[0];
-      const skill = await c.query('select skill_id, project_id, evaluation_result_id from evidence where id = $1 and user_id = $2', [evidenceId, userId]);
-      if (skill.rowCount === 0) throw new BadRequestException('the evidence behind this proposal no longer exists');
+      const skill = await c.query('select skill_id, project_id, evaluation_result_id from evidence where id = $1 and user_id = $2 and withdrawn_at is null', [evidenceId, userId]);
+      if (skill.rowCount === 0) throw new BadRequestException('the evidence behind this proposal was withdrawn or no longer exists');
       const userEdited = !!editedBody && editedBody.trim() !== payload.suggestedValueAr.trim();
       const approvedAt = new Date().toISOString();
 
@@ -234,23 +242,18 @@ export class AgentService {
     return nudgesFor(all.map((p) => ({ ...this.toProposal(p), lifecycle: p.lifecycle as ProposalLifecycle })));
   }
 
-  private async domainFactsIn(c: PoolClient, userId: string): Promise<DomainFacts> {
-    const claims = await c.query('select skill_id, state from skill_claim where user_id = $1', [userId]);
-    const ev = await c.query('select id from evidence where user_id = $1 and withdrawn_at is null', [userId]);
-    return { skillStates: Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state as EvidenceState])),
-      existingEvidence: new Set<string>(ev.rows.map((r) => r.id)), declaredTechnologies: new Set<string>() };
-  }
+  private domainFactsIn(c: PoolClient, userId: string): Promise<DomainFacts> { return loadDomainFacts(c, userId); }
 
   private row = (r: Record<string, unknown>) => ({
     id: r['id'], agentType: r['agent_type'], proposalType: r['proposal_type'], subjectType: r['subject_type'], subjectId: r['subject_id'],
     summary: r['summary'], structuredPayload: r['structured_payload'], evidenceRefs: r['evidence_refs'], sourceRefs: r['source_refs'],
     rationale: r['rationale'], warnings: r['warnings'], requiresUserApproval: r['requires_user_approval'], lifecycle: r['lifecycle'], version: r['version'],
-    approvedAt: r['approved_at'], approvedBody: r['approved_body'], rejectedAt: r['rejected_at'], rejectionReason: r['rejection_reason'],
+    previewedAt: r['previewed_at'] ?? null, approvedAt: r['approved_at'], approvedBody: r['approved_body'], rejectedAt: r['rejected_at'], rejectionReason: r['rejection_reason'],
     supersededBy: r['superseded_by'], resultingAssetId: r['resulting_asset_id'], createdAt: r['created_at'],
   }) as {
     id: string; agentType: AgentType; proposalType: AgentProposal['proposalType']; subjectType: AgentProposal['subjectType']; subjectId: string; summary: string;
     structuredPayload: AgentProposal['structuredPayload']; evidenceRefs: string[]; sourceRefs: InputReference[]; rationale: string; warnings: string[];
-    requiresUserApproval: boolean; lifecycle: string; version: number; approvedAt: string | null; approvedBody: string | null; rejectedAt: string | null;
+    requiresUserApproval: boolean; lifecycle: string; version: number; previewedAt: string | null; approvedAt: string | null; approvedBody: string | null; rejectedAt: string | null;
     rejectionReason: string | null; supersededBy: string | null; resultingAssetId: string | null; createdAt: string;
   };
 

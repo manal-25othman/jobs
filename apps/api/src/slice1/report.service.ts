@@ -20,6 +20,30 @@ export class ReportService {
 
   async generate(userId: string) {
     return this.db.asService(async (c) => {
+      const { report, goalId, skillCount, assetCount } = await this.build(c, userId);
+      const stored = await c.query(
+        `insert into evidence_report (user_id, career_goal_id, projection, ai_disclosure)
+         values ($1,$2,$3,$4) returning id, generated_at`,
+        [userId, goalId, JSON.stringify(toPublicReport(report)), NO_AI_DISCLOSURE],
+      );
+
+      await emitAuditEvent(c, {
+        eventType: 'evidence_report.generated',
+        userId, actorKind: 'user', actorId: userId,
+        subjectTable: 'evidence_report', subjectId: stored.rows[0].id,
+        reason: 'the user generated a career evidence report',
+        payload: { skillCount, assetCount, modelUsed: false },
+      });
+
+      return { id: stored.rows[0].id, ...report };
+    });
+  }
+
+  /**
+   * Builds the report from CURRENT state. Used both to generate a private
+   * report and to serve a public link, so a withdrawal is visible at once.
+   */
+  private async build(c: import('pg').PoolClient, userId: string) {
       const goal = await c.query(
         `select cg.id, tr.label_en, tr.label_ar, tr.review_status
            from career_goal cg
@@ -48,6 +72,9 @@ export class ReportService {
            left join rubric_version rv on rv.id = er.rubric_version_id
           where sc.user_id = $1
             and evidence_ordinal(sc.state) >= evidence_ordinal('practiced')
+            -- D-077: a claim whose primary evidence was withdrawn is not shown
+            -- as supported. The claim row itself is untouched (OPEN-025).
+            and (e.id is null or e.withdrawn_at is null)
           order by evidence_ordinal(sc.state) desc, sk.label_en`,
         [userId],
       );
@@ -100,10 +127,12 @@ export class ReportService {
         });
       }
 
-      // Only ACTIVE (approved) assets. A draft is not a claim yet.
+      // Only ACTIVE, approved, evidence-backed assets. A draft is not a claim
+      // yet, and a `needs_review` asset is kept but never presented (D-077).
       const assets = await c.query(
         `select body, user_approved_at from professional_asset
-          where user_id = $1 and lifecycle_state = 'active' and user_approved_at is not null
+          where user_id = $1 and lifecycle_state = 'active' and evidence_backed = true
+            and user_approved_at is not null
           order by created_at`,
         [userId],
       );
@@ -118,40 +147,36 @@ export class ReportService {
           kind: 'cv_bullet' as const,
           body: a.body,
           approvedAt: new Date(a.user_approved_at).toISOString(),
+          evidenceBacked: true as const,
         })),
         generatedAt: new Date().toISOString(),
       });
 
-      const stored = await c.query(
-        `insert into evidence_report (user_id, career_goal_id, projection, ai_disclosure)
-         values ($1,$2,$3,$4) returning id, generated_at`,
-        [userId, g.id, JSON.stringify(toPublicReport(report)), NO_AI_DISCLOSURE],
-      );
-
-      await emitAuditEvent(c, {
-        eventType: 'evidence_report.generated',
-        userId, actorKind: 'user', actorId: userId,
-        subjectTable: 'evidence_report', subjectId: stored.rows[0].id,
-        reason: 'the user generated a career evidence report',
-        payload: { skillCount: skills.length, assetCount: assets.rowCount, modelUsed: false },
-      });
-
-      return { id: stored.rows[0].id, ...report };
-    });
+      return { report, goalId: g.id as string, skillCount: skills.length, assetCount: assets.rowCount ?? 0 };
   }
 
-  /** What a share link exposes: strictly narrower than the private report. */
+  /**
+   * What a share link exposes: strictly narrower than the private report, and
+   * rebuilt from CURRENT state on every read (D-077): withdrawn evidence
+   * disappears from a live link immediately, with no regeneration step.
+   */
   async getPublicProjection(reportId: string) {
     return this.db.asService(async (c) => {
       const { rows } = await c.query(
-        `select er.projection, er.ai_disclosure, er.generated_at
+        `select er.user_id
            from evidence_report er
           where er.id = $1
             and public.share_link_opens('recruiter_report', er.id)`,
         [reportId],
       );
       if (rows.length === 0) return null;
-      return rows[0].projection;
+      try {
+        const { report } = await this.build(c, rows[0].user_id);
+        return toPublicReport(report);
+      } catch (e) {
+        if (e instanceof BadRequestException) return null; // no current goal any more
+        throw e;
+      }
     });
   }
 }

@@ -13,7 +13,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, memoryStorage,
-  expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser,
+  expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser, approveCvBulletProposal,
 } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
@@ -38,12 +38,10 @@ async function fullFlow(user: TestUser) {
     .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2],
             externalUrls: ['https://example.com/repo'], aiDisclosure: { declaredUse: [] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
-  const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`).set(auth(user)).expect(201);
-  await http.post(`/v1/me/assets/${asset.body.data.id}/preview`).set(auth(user)).expect(201);
-  await http.post(`/v1/me/assets/${asset.body.data.id}/approve`).set(auth(user)).send({ approved: true }).expect(201);
+  const asset = await approveCvBulletProposal(http, user);
   const report = await http.post('/v1/me/evidence-report').set(auth(user)).expect(201);
-  return { projectId: project.body.data.id, submissionId: sub.body.data.id, uploadIds: [u1, u2],
-           assetId: asset.body.data.id, reportId: report.body.data.id as string, report: report.body.data };
+  return { projectId: project.body.data.id, submissionId: sub.body.data.id, uploadIds: [u1, u2], evidenceId: ev.body.data.transition.evidenceId as string,
+           assetId: asset.assetId, reportId: report.body.data.id as string, report: report.body.data };
 }
 
 /* ─────────────────────────── uploads: provenance ───────────────────────── */
@@ -204,13 +202,18 @@ describe('D-057 — no approval without preview; D-059 — Verified stays blocke
     const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
     const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
       .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
-    const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
-    const asset = await http.post(`/v1/evidence/${ev.body.data.transition.evidenceId}/cv-bullet`).set(auth(user)).expect(201);
-    const refused = await http.post(`/v1/me/assets/${asset.body.data.id}/approve`).set(auth(user)).send({ approved: true });
+    await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
+    const list = await http.get('/v1/me/proposals').set(auth(user)).expect(200);
+    const cv = list.body.data.items.find((p: { proposalType: string }) => p.proposalType === 'cv_bullet');
+    assert.ok(cv); assert.equal(cv.previewedAt, null);
+    const refused = await http.post(`/v1/me/proposals/${cv.id}/approve`).set(auth(user)).send({ approved: true });
     assert.equal(refused.status, 422);
     assert.equal(refused.body.error.code, 'missing_prerequisite');
-    const { rows } = await pool.query('select lifecycle_state from professional_asset where id = $1', [asset.body.data.id]);
-    assert.equal(rows[0].lifecycle_state, 'draft');
+    assert.match(refused.body.error.message, /D-057/);
+    const { rows } = await pool.query('select lifecycle, resulting_asset_id from agent_proposal where id = $1', [cv.id]);
+    assert.equal(rows[0].lifecycle, 'awaiting_user'); assert.equal(rows[0].resulting_asset_id, null);
+    const n = await pool.query('select count(*)::int as n from professional_asset where user_id = $1', [user.id]);
+    assert.equal(n.rows[0].n, 0);
   });
 
   test('NEGATIVE: the database refuses a transition to verified even with a reviewer (D-059)', async () => {

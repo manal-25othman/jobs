@@ -84,6 +84,8 @@ export interface ReportAsset {
   readonly kind: 'cv_bullet';
   readonly body: string;
   readonly approvedAt: string;
+  /** Only assets whose evidence still stands appear. `needs_review` never does. */
+  readonly evidenceBacked: true;
 }
 
 export interface CareerEvidenceReport {
@@ -127,6 +129,9 @@ export function buildCareerEvidenceReport(input: ReportInput): CareerEvidenceRep
   }
 
   for (const a of input.approvedAssets) {
+    if (a.evidenceBacked !== true) {
+      throw new InvariantViolation('INV-1', 'an asset whose evidence was withdrawn may not be presented as supported', { kind: a.kind });
+    }
     if (!a.approvedAt) {
       throw new InvariantViolation(
         'INV-1', 'an unapproved asset may not appear in a report', { kind: a.kind },
