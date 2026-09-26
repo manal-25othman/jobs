@@ -1,4 +1,4 @@
-# Career OS — Product Roadmap (v0.1)
+# نَقْلة / NAQLA — Product Roadmap (v0.1)
 > يحوّل كل ما استُبعد من Phase 1 إلى **تأجيل مجدول بمعايير فتح**، لا إلغاء.
 > يُقرأ مع: `docs/vision/00-vision-registry.md` (ماذا) و`docs/architecture/03-architecture-foundations.md` (كيف نفتحه بلا هدم).
 > **تعديل على الوثيقة 01:** القسم 10 "ما يجب استبعاده" يُقرأ من الآن بوصفه **جدول تسلسل**، وهذه الوثيقة تنسخه رسميًا.

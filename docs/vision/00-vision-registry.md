@@ -1,4 +1,4 @@
-# Career OS — Vision Registry (سجل الرؤية الكامل)
+# نَقْلة / NAQLA — Vision Registry (سجل الرؤية الكامل)
 > **قاعدة حاكمة: لا يُحذف عنصر من الرؤية أبدًا.** العنصر إمّا يُنفَّذ، أو يُنفَّذ بحدّه الأدنى خلف عقد كامل، أو يُعرَّف كعقد بلا تنفيذ، أو يُسجَّل هنا محفوظًا بهويته ومرحلته ونقطة تمديده.
 > هذا السجل هو المصدر الوحيد للحقيقة بخصوص "ما هو المنتج الكامل". خريطة الطريق تقول *متى*، والأسس المعمارية تقول *كيف نفتحه بلا هدم*.
 
@@ -101,7 +101,7 @@
 ## هـ. المسارات المهنية (Career Tracks) — *(D-027 · D-028)*
 
 > **مبدأ هوية معتمد:**
-> **`Career OS is multi-discipline by design.` — `Data Analyst / BI` مسار تحقق أول (validation beachhead)، وليس هوية المنتج.**
+> **`NAQLA is multi-discipline by design.` — `Data Analyst / BI` مسار تحقق أول (validation beachhead)، وليس هوية المنتج.**
 >
 > **قيد ملزم على كل عمل لاحق:** يُمنع على أي Requirement أو Entity أو Agent Contract أو State Machine أو Activity Model أو Evidence Model أن يفترض أن المنتج خاص بتحليل البيانات. المسار **معطى محتوى (content parameter)**، لا افتراض بنيوي.
 
