@@ -1,0 +1,46 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "_note": "Initial values for CALIBRATION only (D-023). Not approved facts.",
+  "records": [
+    {
+      "code": "rp_web_standards",
+      "applies_to": "skill_family:web_foundations",
+      "current_window_months": 36,
+      "aging_window_months": 48,
+      "stale_after_months": 72,
+      "refresh_method": "new evaluated evidence",
+      "rationale": "Web standards change slowly; fundamentals age slowly.",
+      "policy_version": "0.1.0"
+    },
+    {
+      "code": "rp_practice",
+      "applies_to": "skill_family:ui_engineering",
+      "current_window_months": 24,
+      "aging_window_months": 36,
+      "stale_after_months": 48,
+      "refresh_method": "new evaluated evidence",
+      "rationale": "Practice skills age slower than tools, faster than behaviour.",
+      "policy_version": "0.1.0"
+    },
+    {
+      "code": "rp_tools",
+      "applies_to": "skill_type:tool",
+      "current_window_months": 12,
+      "aging_window_months": 24,
+      "stale_after_months": 36,
+      "refresh_method": "new evaluated evidence or validation activity",
+      "rationale": "Tools change fastest.",
+      "policy_version": "0.1.0"
+    },
+    {
+      "code": "rp_behavioral",
+      "applies_to": "skill_type:behavioral",
+      "current_window_months": 60,
+      "aging_window_months": 84,
+      "stale_after_months": 120,
+      "refresh_method": "new evaluated evidence",
+      "rationale": "Behavioural skills age slowest.",
+      "policy_version": "0.1.0"
+    }
+  ]
+}

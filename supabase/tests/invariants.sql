@@ -47,13 +47,14 @@ insert into target_role (id, slug, label_ar, label_en, track_id, source_label,
           'Frontend Developer', 'trk_frontend_junior', 'reviewed role definition',
           'curated', 'role pack v0.2.0');
 
-insert into activity_spec (id, slug, version, status, title_ar, ai_usage_mode, spec, published_at)
+-- Test fixtures are DEMO content: only a demo fixture may be born published (non-production).
+insert into activity_spec (id, slug, version, status, title_ar, ai_usage_mode, spec, published_at, is_demo_fixture)
   values ('55555555-5555-4555-8555-555555555555', 'act_fe_003', '0.2.0', 'published',
-          'اختبار الواجهات', 'ai_assisted', '{}'::jsonb, now());
+          'اختبار الواجهات', 'ai_assisted', '{}'::jsonb, now(), true);
 
-insert into rubric_version (id, activity_spec_id, version, status, criteria, published_at)
+insert into rubric_version (id, activity_spec_id, version, status, criteria, published_at, is_demo_fixture)
   values ('66666666-6666-4666-8666-666666666666', '55555555-5555-4555-8555-555555555555',
-          '0.2.0', 'published', '[]'::jsonb, now());
+          '0.2.0', 'published', '[]'::jsonb, now(), true);
 
 insert into project (id, user_id, title, kind, activity_spec_id, activity_spec_version)
   values ('77777777-7777-4777-8777-777777777777', '11111111-1111-4111-8111-111111111111',
@@ -265,3 +266,67 @@ $$, 'a learning resource marked verified with no URL');
 
 \echo ''
 \echo 'All database-level invariant checks passed.'
+
+-- ──────────────────── Career Data Foundation review guards ─────────────────
+
+select must_fail($$
+  insert into activity_spec (slug, version, status, title_ar, ai_usage_mode, published_at)
+  values ('act_real', '1.0.0', 'published', 'نشاط', 'ai_assisted', now())
+$$, 'CDF: real content cannot be born published');
+
+select must_fail($$
+  update skill set review_status = 'approved' where id = '33333333-3333-4333-8333-333333333333'
+$$, 'CDF: draft → approved skips review');
+
+select must_succeed($$
+  update skill set review_status = 'curated' where id = '33333333-3333-4333-8333-333333333333'
+$$, 'CDF: draft → curated by the content author');
+
+select must_fail($$
+  update skill set review_status = 'sme_reviewed' where id = '33333333-3333-4333-8333-333333333333'
+$$, 'CDF: sme_reviewed without a named reviewer');
+
+select must_fail($$
+  update skill set review_status = 'published' where id = '33333333-3333-4333-8333-333333333333'
+$$, 'CDF: curated → published on real content');
+
+select must_fail($$
+  delete from skill where id = '33333333-3333-4333-8333-333333333333'
+$$, 'CDF: a skill is never deleted (canonical ids are never reused)');
+
+select must_fail($$
+  insert into skill_synonym (skill_id, relation, surface_form, language, related_skill_id)
+  values ('33333333-3333-4333-8333-333333333333', 'equivalent', 'state handling', 'en', '33333333-3333-4333-8333-333333333333')
+$$, 'CDF: an equivalent synonym pointing at another skill is a merge');
+
+select must_succeed($$
+  insert into skill_family (id, code, name_ar, name_en, is_demo_fixture, review_status)
+  values ('33333333-3333-4333-8333-333333333334', 'demo_family', 'عائلة تجريبية', 'Demo family', true, 'curated')
+$$, 'CDF: a DEMO fixture may be seeded as curated');
+select must_fail($$
+  update skill_family set review_status = 'sme_reviewed', reviewed_by = '22222222-2222-4222-8222-222222222222', reviewed_at = now()
+   where id = '33333333-3333-4333-8333-333333333334'
+$$, 'CDF: a DEMO fixture is never SME reviewed, even with a reviewer named');
+select must_fail($$
+  update skill_family set review_status = 'approved', reviewed_by = '22222222-2222-4222-8222-222222222222', reviewed_at = now()
+   where id = '33333333-3333-4333-8333-333333333334'
+$$, 'CDF: a DEMO fixture is never approved');
+
+select must_fail($$
+  insert into rubric_criterion (rubric_version_id, key, name_ar, name_en, dimension, linked_skill_id, source, weight, max_score,
+    evaluator_type, human_review_required, check_type, description_ar, description_en, expected_evidence_ar, expected_evidence_en,
+    rationale_when_met_ar, rationale_when_unmet_ar)
+  values ('66666666-6666-4666-8666-666666666666', 'x', 'x', 'x', 'correctness', '33333333-3333-4333-8333-333333333333', 'activity', 1, 1,
+    'human', true, 'none', 'x', 'x', 'x', 'x', 'x', 'x')
+$$, 'CDF: criteria of a published rubric are frozen');
+
+select must_fail($$
+  insert into career_presentation_rule (asset_type, evidence_level, allowed, allowed_claim_verbs_en, must_cite_evidence)
+  values ('cv_bullet', 'demonstrated', true, '{built}', false)
+$$, 'CDF: a presentation rule must always cite evidence');
+
+select must_fail($$
+  insert into learning_resource (skill_id, title, url, provenance_class, provenance_source, quality_status)
+  values ('33333333-3333-4333-8333-333333333333', 'x', null, 'curated', 'x', 'approved')
+$$, 'CDF: a resource without a URL cannot be approved');
+

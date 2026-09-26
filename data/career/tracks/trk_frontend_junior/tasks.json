@@ -1,0 +1,457 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "code": "tsk_fe_build_from_brief",
+      "title_ar": "بناء واجهة من وصف قصير",
+      "title_en": "Build an interface from a brief",
+      "description_ar": "تحويل وصف من صاحب المنتج (فقرة وصورة تقريبية) إلى صفحة أو مكوّن يعمل.",
+      "description_en": "Turn a product owner's brief (a paragraph and a rough sketch) into a working page or component.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "صفحة/مكوّن يعمل في المتصفح مع بنية دلالية",
+      "expected_output_en": "A working page/component in the browser with semantic structure",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "one-paragraph brief",
+        "rough sketch",
+        "list of fields"
+      ],
+      "common_tools": [
+        "code editor",
+        "browser devtools"
+      ],
+      "common_failure_modes_ar": [
+        "بناء ميزات لم تُطلب",
+        "افتراض ما لم يُذكر"
+      ],
+      "common_failure_modes_en": [
+        "building unrequested features",
+        "assuming what was not stated"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_html_semantic",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_css_responsive",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_requirements_reading",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_form_validation",
+      "title_ar": "التحقق من مدخلات نموذج",
+      "title_en": "Handle form validation",
+      "description_ar": "بناء نموذج بحقول مسمّاة والتحقق من المدخلات مع رسائل خطأ بجانب كل حقل.",
+      "description_en": "Build a form with labelled fields and validate input with an error message beside each field.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "نموذج يرفض المدخل غير الصالح ويخبر المستخدم بما يصحّحه",
+      "expected_output_en": "A form that rejects invalid input and tells the user what to fix",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "field list with rules"
+      ],
+      "common_tools": [
+        "code editor"
+      ],
+      "common_failure_modes_ar": [
+        "رسالة عامة واحدة",
+        "تحقق يعتمد على alert",
+        "تعطيل الزر بلا سبب ظاهر"
+      ],
+      "common_failure_modes_en": [
+        "one generic message",
+        "validation via alert()",
+        "disabling the button with no visible reason"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_forms_validation",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_html_semantic",
+          "involvement": "secondary"
+        },
+        {
+          "skill": "skl_js_fundamentals",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_fetch_api",
+      "title_ar": "جلب بيانات من API",
+      "title_en": "Fetch data from an API",
+      "description_ar": "طلب قائمة من نقطة نهاية HTTP وعرضها.",
+      "description_en": "Request a list from an HTTP endpoint and render it.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "قائمة معروضة من بيانات حقيقية",
+      "expected_output_en": "A list rendered from real data",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "endpoint URL",
+        "sample response"
+      ],
+      "common_tools": [
+        "HTTP client",
+        "browser devtools"
+      ],
+      "common_failure_modes_ar": [
+        "الوثوق بشكل الاستجابة",
+        "تجاهل الرفض"
+      ],
+      "common_failure_modes_en": [
+        "trusting the response shape",
+        "ignoring rejection"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_api_data_states",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_js_fundamentals",
+          "involvement": "primary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_data_states",
+      "title_ar": "معالجة حالات التحميل والخطأ والفراغ",
+      "title_en": "Handle loading, error and empty states",
+      "description_ar": "عرض كل حالة من حالات البيانات للمستخدم بوضوح.",
+      "description_en": "Show each data state clearly to the user.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "واجهة لا تفرغ ولا تتجمّد",
+      "expected_output_en": "An interface that never goes blank or hangs",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "endpoint that can fail",
+        "empty dataset"
+      ],
+      "common_tools": [
+        "browser devtools"
+      ],
+      "common_failure_modes_ar": [
+        "شاشة فارغة عند الخطأ",
+        "تحميل لا ينتهي"
+      ],
+      "common_failure_modes_en": [
+        "blank screen on error",
+        "a spinner that never ends"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_api_data_states",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_ui_state_interaction",
+          "involvement": "primary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_responsive_page",
+      "title_ar": "جعل صفحة متجاوبة",
+      "title_en": "Make a page responsive",
+      "description_ar": "تعديل صفحة ثابتة العرض لتصمد على الجوال والحاسوب.",
+      "description_en": "Adapt a fixed-width page so it holds on mobile and desktop.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "صفحة تعمل عند 360px و1024px بلا تمرير أفقي",
+      "expected_output_en": "A page that works at 360px and 1024px without horizontal scroll",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "fixed-width page",
+        "target widths"
+      ],
+      "common_tools": [
+        "browser devtools device mode"
+      ],
+      "common_failure_modes_ar": [
+        "استعلام وسائط لكل جهاز",
+        "عرض ثابت بالبكسل"
+      ],
+      "common_failure_modes_en": [
+        "a media query per device",
+        "fixed pixel widths"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_css_responsive",
+          "involvement": "primary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_fix_ui_bug",
+      "title_ar": "إصلاح عطل في الواجهة",
+      "title_en": "Fix a UI bug",
+      "description_ar": "إعادة إنتاج عطل مُبلَّغ عنه وإصلاحه في سببه.",
+      "description_en": "Reproduce a reported defect and fix it at its cause.",
+      "frequency": "daily",
+      "complexity": "medium",
+      "expected_output_ar": "إصلاح مع ملاحظة تسمّي السبب الجذري",
+      "expected_output_en": "A fix with a note naming the root cause",
+      "expected_output_kind": "code+note",
+      "typical_inputs_en": [
+        "bug report",
+        "steps to reproduce"
+      ],
+      "common_tools": [
+        "browser devtools",
+        "Git"
+      ],
+      "common_failure_modes_ar": [
+        "إخفاء العرض",
+        "الإصلاح بالتجربة"
+      ],
+      "common_failure_modes_en": [
+        "hiding the symptom",
+        "fixing by trial"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_frontend_debugging",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_js_fundamentals",
+          "involvement": "secondary"
+        },
+        {
+          "skill": "skl_code_reading",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_improve_semantics",
+      "title_ar": "تحسين البنية الدلالية",
+      "title_en": "Improve semantic HTML",
+      "description_ar": "إحلال عناصر دلالية محل div عامة في صفحة قائمة دون تغيير المظهر.",
+      "description_en": "Replace generic containers with semantic elements in an existing page without changing its appearance.",
+      "frequency": "monthly",
+      "complexity": "low",
+      "expected_output_ar": "صفحة بعناوين ومعالم ونماذج دلالية",
+      "expected_output_en": "A page with semantic headings, landmarks and forms",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "existing page"
+      ],
+      "common_tools": [
+        "code editor",
+        "accessibility checker"
+      ],
+      "common_failure_modes_ar": [
+        "عناوين للحجم لا للبنية"
+      ],
+      "common_failure_modes_en": [
+        "headings for size, not structure"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_html_semantic",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_accessibility_basics",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_accessibility_basics",
+      "title_ar": "تحسين أساسيات إتاحة الوصول",
+      "title_en": "Improve accessibility basics",
+      "description_ar": "إضافة alt وlabel وأسماء للعناصر التفاعلية وتركيز ظاهر.",
+      "description_en": "Add alt text, labels, names on interactive elements and visible focus.",
+      "frequency": "monthly",
+      "complexity": "low",
+      "expected_output_ar": "صفحة قابلة للاستخدام بلوحة المفاتيح وقارئ الشاشة على مستوى الأساسيات",
+      "expected_output_en": "A page usable by keyboard and screen reader at a basic level",
+      "expected_output_kind": "code",
+      "typical_inputs_en": [
+        "existing page",
+        "checker report"
+      ],
+      "common_tools": [
+        "accessibility checker"
+      ],
+      "common_failure_modes_ar": [
+        "outline:none بلا بديل",
+        "أيقونة بلا اسم"
+      ],
+      "common_failure_modes_en": [
+        "outline:none with no alternative",
+        "an icon with no name"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_accessibility_basics",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_html_semantic",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_debug_interaction",
+      "title_ar": "تصحيح تفاعل معطوب",
+      "title_en": "Debug a broken interaction",
+      "description_ar": "تحديد سبب عدم استجابة زر أو قائمة وإصلاحه.",
+      "description_en": "Find why a button or menu does not respond and fix it.",
+      "frequency": "daily",
+      "complexity": "medium",
+      "expected_output_ar": "تفاعل يعمل مع شرح السبب",
+      "expected_output_en": "A working interaction with the cause explained",
+      "expected_output_kind": "code+note",
+      "typical_inputs_en": [
+        "steps to reproduce"
+      ],
+      "common_tools": [
+        "browser devtools"
+      ],
+      "common_failure_modes_ar": [
+        "إعادة كتابة المكوّن بدل فهمه"
+      ],
+      "common_failure_modes_en": [
+        "rewriting the component instead of understanding it"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_frontend_debugging",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_ui_state_interaction",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_js_fundamentals",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_explain_data_flow",
+      "title_ar": "شرح تدفق البيانات",
+      "title_en": "Explain the data flow",
+      "description_ar": "شرح كيف تصل البيانات من الطلب إلى الشاشة وأين تُحفظ الحالة.",
+      "description_en": "Explain how data travels from request to screen and where state lives.",
+      "frequency": "weekly",
+      "complexity": "low",
+      "expected_output_ar": "ملاحظة أو رسم من فقرة يفهمه زميل",
+      "expected_output_en": "A one-paragraph note or sketch a peer can follow",
+      "expected_output_kind": "note",
+      "typical_inputs_en": [
+        "existing feature"
+      ],
+      "common_tools": [
+        "none"
+      ],
+      "common_failure_modes_ar": [
+        "سرد الكود سطرًا سطرًا"
+      ],
+      "common_failure_modes_en": [
+        "narrating the code line by line"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_technical_explanation",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_ui_state_interaction",
+          "involvement": "secondary"
+        },
+        {
+          "skill": "skl_code_reading",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "tsk_fe_inspect_codebase",
+      "title_ar": "استكشاف مشروع قائم",
+      "title_en": "Inspect an existing codebase",
+      "description_ar": "قراءة مشروع صغير لم يكتبه وتحديد أين يُجرى تغيير مطلوب.",
+      "description_en": "Read a small project one did not write and locate where a requested change belongs.",
+      "frequency": "weekly",
+      "complexity": "medium",
+      "expected_output_ar": "خريطة قصيرة للملفات المعنية والموضع الصحيح للتغيير",
+      "expected_output_en": "A short map of the relevant files and the right place for the change",
+      "expected_output_kind": "note",
+      "typical_inputs_en": [
+        "repository",
+        "change request"
+      ],
+      "common_tools": [
+        "code editor",
+        "Git"
+      ],
+      "common_failure_modes_ar": [
+        "تعديل عرَضي في ملفات غير معنية"
+      ],
+      "common_failure_modes_en": [
+        "incidental edits in unrelated files"
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_code_reading",
+          "involvement": "primary"
+        },
+        {
+          "skill": "skl_version_control_basics",
+          "involvement": "secondary"
+        }
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    }
+  ]
+}

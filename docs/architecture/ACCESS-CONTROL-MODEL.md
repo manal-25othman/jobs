@@ -29,6 +29,10 @@ RLS مُفعَّلة على **كل** جدول قبل وجود أي ميزة. ج�
 | **بيانات المستخدم الخاصة** | ⛔ | ✅ قراءة/تعديل | ⛔ | ✅ | ✅ |
 | **الملفات المرفوعة** (`submission_file`) | ⛔ | ✅ قراءة · ✅ إدراج | ⛔ | ✅ | ✅ |
 | **الأدلة** (`evidence`) | ⛔ | ✅ قراءة · **سحب ذاتي فقط** (`evidence_withdraw_own`: `withdrawn_at` + سبب، لا حقل آخر — D-077) | ⛔ | ✅ | ✅ |
+| **بيانات المهن — مرجعية** (`skill_family` · `proficiency_*` · `recency_policy` · `skill_synonym` · `role_tool`) | ✅ قراءة | ✅ قراءة | ⛔ | ✅ | ✅ |
+| **بيانات المهن — محتوى** (`task` · `activity_input/deliverable/skill/task` · `career_presentation_rule`) | ✅ **المنشور فقط** | ✅ **المنشور فقط** | ⛔ | ✅ | ✅ |
+| **مادة التقييم** (`rubric_criterion` · `rubric_criterion_level` · `criterion_library`) | ⛔ | ⛔ (لا grant أصلًا) | ⛔ | ✅ | ✅ |
+| **الإسناد والمراجعة والخط** (`data_source` · `source_ref` · `review_log` · `raw_snapshot` · `normalized_record` · `dedup_candidate`) | ⛔ | ⛔ | ⛔ | ✅ | ✅ |
 | **الادعاءات** (`skill_claim`) | ⛔ | ✅ **قراءة فقط** | ⛔ | ✅ | ✅ |
 | **انتقالات السلّم** | ⛔ | ✅ **قراءة فقط** · لا حذف | ⛔ | ✅ إضافة فقط | ✅ |
 | **نتائج التقييم** | ⛔ | ✅ **قراءة فقط** · لا تعديل | ⛔ | ✅ إضافة فقط | ✅ |

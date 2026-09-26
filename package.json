@@ -26,7 +26,10 @@
     "verify:tokens": "node scripts/verify-tokens.mjs",
     "verify": "npm run verify:boundaries && npm run verify:prototype && npm run verify:tokens",
     "live:supabase": "node scripts/supabase-live-check.mjs",
-    "eval:agents": "npm run build -w @naqla/domain -w @naqla/agents && node scripts/run-agent-harness.mjs"
+    "eval:agents": "npm run build -w @naqla/domain -w @naqla/agents && node scripts/run-agent-harness.mjs",
+    "career:import": "npm run build -w @naqla/api && node scripts/career-data.mjs import trk_frontend_junior",
+    "career:validate": "node scripts/career-data.mjs validate",
+    "career:near-duplicates": "node scripts/career-data.mjs near-duplicates trk_frontend_junior"
   },
   "devDependencies": {
     "typescript": "5.9.3"

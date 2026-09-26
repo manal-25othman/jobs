@@ -1,0 +1,61 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "code": "web_foundations",
+      "name_ar": "أسس الويب",
+      "name_en": "Web foundations",
+      "description_ar": "HTML وCSS وJavaScript كما تعرّفها المعايير",
+      "description_en": "HTML, CSS and JavaScript as the standards define them"
+    },
+    {
+      "code": "ui_engineering",
+      "name_ar": "هندسة الواجهات",
+      "name_en": "UI engineering",
+      "description_ar": "بناء الواجهات وحالتها وتفاعلها",
+      "description_en": "Building interfaces, their state and their interaction"
+    },
+    {
+      "code": "data_integration",
+      "name_ar": "تكامل البيانات",
+      "name_en": "Data integration",
+      "description_ar": "جلب البيانات من الخدمات ومعالجة حالاتها",
+      "description_en": "Fetching data from services and handling its states"
+    },
+    {
+      "code": "quality_engineering",
+      "name_ar": "جودة البرمجيات",
+      "name_en": "Quality engineering",
+      "description_ar": "الاختبار والتصحيح والتحقق",
+      "description_en": "Testing, debugging and verification"
+    },
+    {
+      "code": "accessibility_ux",
+      "name_ar": "إتاحة الوصول وتجربة الاستخدام",
+      "name_en": "Accessibility & UX",
+      "description_ar": "واجهات يستخدمها الجميع",
+      "description_en": "Interfaces everyone can use"
+    },
+    {
+      "code": "engineering_practice",
+      "name_ar": "ممارسات الهندسة",
+      "name_en": "Engineering practice",
+      "description_ar": "قراءة الكود وإدارة الإصدارات والعمل في مشروع قائم",
+      "description_en": "Reading code, version control, working inside an existing project"
+    },
+    {
+      "code": "communication",
+      "name_ar": "التواصل المهني",
+      "name_en": "Professional communication",
+      "description_ar": "شرح القرارات التقنية لغير المتخصصين وللزملاء",
+      "description_en": "Explaining technical decisions to peers and non-specialists"
+    },
+    {
+      "code": "analysis",
+      "name_ar": "التحليل",
+      "name_en": "Analysis",
+      "description_ar": "فهم المتطلبات وتفكيكها",
+      "description_en": "Understanding and decomposing requirements"
+    }
+  ]
+}

@@ -1,0 +1,639 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "asset_type": "cv_bullet",
+      "evidence_level": "practiced",
+      "allowed": true,
+      "minimum_source_strength": "self_reported",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "عملتُ على",
+        "شاركتُ في"
+      ],
+      "allowed_claim_verbs_en": [
+        "worked on",
+        "contributed to"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "cv_bullet",
+      "evidence_level": "demonstrated",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "أنجزتُ",
+        "بنيتُ",
+        "غطّيتُ"
+      ],
+      "allowed_claim_verbs_en": [
+        "built",
+        "delivered",
+        "covered"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "cv_bullet",
+      "evidence_level": "verified",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": true,
+      "allowed_claim_verbs_ar": [
+        "أثبتُّ (موثّق)"
+      ],
+      "allowed_claim_verbs_en": [
+        "demonstrated (verified)"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_skill",
+      "evidence_level": "practiced",
+      "allowed": false,
+      "minimum_source_strength": "self_reported",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [],
+      "allowed_claim_verbs_en": [],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_skill",
+      "evidence_level": "demonstrated",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "أنجزتُ",
+        "بنيتُ",
+        "غطّيتُ"
+      ],
+      "allowed_claim_verbs_en": [
+        "built",
+        "delivered",
+        "covered"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_skill",
+      "evidence_level": "verified",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": true,
+      "allowed_claim_verbs_ar": [
+        "أثبتُّ (موثّق)"
+      ],
+      "allowed_claim_verbs_en": [
+        "demonstrated (verified)"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_project",
+      "evidence_level": "practiced",
+      "allowed": true,
+      "minimum_source_strength": "self_reported",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "عملتُ على",
+        "شاركتُ في"
+      ],
+      "allowed_claim_verbs_en": [
+        "worked on",
+        "contributed to"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_project",
+      "evidence_level": "demonstrated",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "أنجزتُ",
+        "بنيتُ",
+        "غطّيتُ"
+      ],
+      "allowed_claim_verbs_en": [
+        "built",
+        "delivered",
+        "covered"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "linkedin_project",
+      "evidence_level": "verified",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": true,
+      "allowed_claim_verbs_ar": [
+        "أثبتُّ (موثّق)"
+      ],
+      "allowed_claim_verbs_en": [
+        "demonstrated (verified)"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "case_study",
+      "evidence_level": "practiced",
+      "allowed": false,
+      "minimum_source_strength": "self_reported",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [],
+      "allowed_claim_verbs_en": [],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "case_study",
+      "evidence_level": "demonstrated",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [
+        "أنجزتُ",
+        "بنيتُ",
+        "غطّيتُ"
+      ],
+      "allowed_claim_verbs_en": [
+        "built",
+        "delivered",
+        "covered"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "case_study",
+      "evidence_level": "verified",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": true,
+      "allowed_claim_verbs_ar": [
+        "أثبتُّ (موثّق)"
+      ],
+      "allowed_claim_verbs_en": [
+        "demonstrated (verified)"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "professional_profile",
+      "evidence_level": "practiced",
+      "allowed": false,
+      "minimum_source_strength": "self_reported",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [],
+      "allowed_claim_verbs_en": [],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "professional_profile",
+      "evidence_level": "demonstrated",
+      "allowed": false,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": false,
+      "allowed_claim_verbs_ar": [],
+      "allowed_claim_verbs_en": [],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "asset_type": "professional_profile",
+      "evidence_level": "verified",
+      "allowed": true,
+      "minimum_source_strength": "platform_controlled",
+      "minimum_evidence_count": 1,
+      "requires_verified": true,
+      "allowed_claim_verbs_ar": [
+        "أثبتُّ (موثّق)"
+      ],
+      "allowed_claim_verbs_en": [
+        "demonstrated (verified)"
+      ],
+      "forbidden_phrases_ar": [
+        "خبير",
+        "خبيرة",
+        "محترف",
+        "متقدم",
+        "أتقنت",
+        "كبير",
+        "قائد"
+      ],
+      "forbidden_phrases_en": [
+        "expert",
+        "professional",
+        "advanced",
+        "mastered",
+        "senior",
+        "lead",
+        "guru",
+        "ninja"
+      ],
+      "template_pattern_en": "[verb] + [output] + [context] + [effect only if present in the evidence]",
+      "numeric_claims_policy_en": "no number unless it appears in the submission itself (INV-4)",
+      "ai_disclosure_handling_en": "disclosed AI assistance is stated as assistance; the claim describes the user's judgement, not the tool's output",
+      "recency_handling_en": "aging evidence keeps the verb but adds the year; historical evidence is presented under a past-work heading",
+      "language_target": "en",
+      "on_user_edit_en": "an edit outside the evidence drops the verified tag",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    }
+  ]
+}

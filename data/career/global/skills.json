@@ -1,0 +1,490 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "_note": "Global registry. `code` is the stable ASCII key chosen at creation (never renamed). The canonical id is the database uuid.",
+  "records": [
+    {
+      "code": "skl_html_semantic",
+      "name_ar": "بنية HTML الدلالية",
+      "name_en": "Semantic HTML & document structure",
+      "family": "web_foundations",
+      "skill_type": "supporting",
+      "description_ar": "اختيار العناصر الدلالية المناسبة (عناوين، أقسام، قوائم، نماذج) بحيث تعكس بنية الصفحة معناها دون الاعتماد على div عام لكل شيء.",
+      "description_en": "Choosing semantic elements (headings, sections, lists, forms) so the document structure reflects meaning rather than generic containers.",
+      "observable_indicators_ar": [
+        "ترتيب عناوين منطقي (h1→h2→h3)",
+        "استخدام landmarks (header/nav/main/footer)",
+        "النماذج مبنية بعناصر form/label/button لا div",
+        "القوائم قوائم فعلًا"
+      ],
+      "observable_indicators_en": [
+        "logical heading order (h1→h2→h3)",
+        "landmarks used (header/nav/main/footer)",
+        "forms built from form/label/button, not div",
+        "lists are lists"
+      ],
+      "common_failure_modes_ar": [
+        "div لكل شيء",
+        "عناوين تُختار لحجم الخط لا للبنية",
+        "زر مصنوع من div بلا دور"
+      ],
+      "common_failure_modes_en": [
+        "div for everything",
+        "headings chosen for font size, not structure",
+        "a button made of a div with no role"
+      ],
+      "ai_substitutability": "high",
+      "recency_policy": "rp_web_standards",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1",
+        "src_whatwg_html_living_standard"
+      ]
+    },
+    {
+      "code": "skl_css_responsive",
+      "name_ar": "تنسيق CSS والتصميم المتجاوب",
+      "name_en": "CSS layout & responsive design",
+      "family": "web_foundations",
+      "skill_type": "supporting",
+      "description_ar": "بناء تخطيط يصمد على عروض شاشة مختلفة باستخدام Flexbox/Grid ووحدات نسبية وقواعد استعلام الوسائط.",
+      "description_en": "Building layouts that hold across viewport widths using Flexbox/Grid, relative units and media queries.",
+      "observable_indicators_ar": [
+        "التخطيط لا ينكسر عند 360px و1024px",
+        "لا تمرير أفقي غير مقصود",
+        "وحدات نسبية حيث يلزم",
+        "نقاط التوقف مبرَّرة بالمحتوى"
+      ],
+      "observable_indicators_en": [
+        "the layout holds at 360px and 1024px",
+        "no unintended horizontal scroll",
+        "relative units where appropriate",
+        "breakpoints justified by content"
+      ],
+      "common_failure_modes_ar": [
+        "عرض ثابت بالبكسل",
+        "تمرير أفقي على الجوال",
+        "استعلام وسائط لكل جهاز بدل المحتوى"
+      ],
+      "common_failure_modes_en": [
+        "fixed pixel widths",
+        "horizontal scroll on mobile",
+        "a media query per device instead of per content"
+      ],
+      "ai_substitutability": "high",
+      "recency_policy": "rp_web_standards",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1",
+        "src_w3c_css"
+      ]
+    },
+    {
+      "code": "skl_js_fundamentals",
+      "name_ar": "أساسيات JavaScript",
+      "name_en": "JavaScript fundamentals",
+      "family": "web_foundations",
+      "skill_type": "supporting",
+      "description_ar": "كتابة JavaScript صحيح للتعامل مع الأحداث والبيانات والأخطاء: الدوال، المصفوفات والكائنات، الوعود/async، معالجة الأخطاء.",
+      "description_en": "Writing correct JavaScript for events, data and errors: functions, arrays/objects, promises/async, error handling.",
+      "observable_indicators_ar": [
+        "يميّز بين المرجع والقيمة",
+        "يستخدم async/await مع معالجة الرفض",
+        "لا متغيرات عامة غير مقصودة",
+        "يقرأ رسالة الخطأ ويصلح سببها"
+      ],
+      "observable_indicators_en": [
+        "distinguishes reference from value",
+        "uses async/await with rejection handling",
+        "no accidental globals",
+        "reads the error message and fixes its cause"
+      ],
+      "common_failure_modes_ar": [
+        "وعد بلا catch",
+        "تعديل حالة مشتركة من أماكن متفرقة",
+        "نسخ كود لا يفهمه"
+      ],
+      "common_failure_modes_en": [
+        "a promise without catch",
+        "mutating shared state from scattered places",
+        "copying code one does not understand"
+      ],
+      "ai_substitutability": "high",
+      "recency_policy": "rp_web_standards",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale",
+        "live_defense"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1",
+        "src_ecma262"
+      ]
+    },
+    {
+      "code": "skl_ui_state_interaction",
+      "name_ar": "إدارة حالة الواجهة والتفاعل",
+      "name_en": "UI state & interaction handling",
+      "family": "ui_engineering",
+      "skill_type": "supporting",
+      "description_ar": "تمثيل حالة الواجهة صراحةً (فارغ/تحميل/خطأ/بيانات، مفتوح/مغلق، محدد) وربط التفاعلات بتحوّلات حالة متوقعة.",
+      "description_en": "Representing UI state explicitly (empty/loading/error/data, open/closed, selected) and wiring interactions to predictable state transitions.",
+      "observable_indicators_ar": [
+        "كل حالة مرئية لها تمثيل واحد",
+        "التفاعل يغيّر الحالة ثم العرض يتبعها",
+        "لا تناقض بين ما يُعرض وما هو محفوظ"
+      ],
+      "observable_indicators_en": [
+        "every visible state has one representation",
+        "interaction changes state, rendering follows",
+        "no mismatch between shown and stored"
+      ],
+      "common_failure_modes_ar": [
+        "حالة مخفية في DOM",
+        "حالتان متناقضتان معروضتان معًا",
+        "تحميل لا ينتهي عند الخطأ"
+      ],
+      "common_failure_modes_en": [
+        "state hidden in the DOM",
+        "two contradictory states shown at once",
+        "a spinner that never ends on error"
+      ],
+      "ai_substitutability": "medium",
+      "recency_policy": "rp_practice",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale",
+        "live_defense"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_api_data_states",
+      "name_ar": "جلب البيانات من واجهة API ومعالجة حالاتها",
+      "name_en": "Fetching API data & handling its states",
+      "family": "data_integration",
+      "skill_type": "supporting",
+      "description_ar": "طلب بيانات من نقطة نهاية HTTP، وعرض حالات التحميل والخطأ والفراغ للمستخدم، ومعالجة الاستجابات غير المتوقعة.",
+      "description_en": "Requesting data from an HTTP endpoint, showing loading, error and empty states to the user, and handling unexpected responses.",
+      "observable_indicators_ar": [
+        "حالة تحميل ظاهرة",
+        "رسالة خطأ يفهمها المستخدم",
+        "استجابة فارغة تُعرض كحالة لا كعطل",
+        "لا افتراض على شكل الاستجابة بلا فحص"
+      ],
+      "observable_indicators_en": [
+        "a visible loading state",
+        "an error message the user understands",
+        "an empty response shown as a state, not a crash",
+        "no assumption about response shape without a check"
+      ],
+      "common_failure_modes_ar": [
+        "شاشة فارغة عند الخطأ",
+        "الوثوق بشكل الاستجابة",
+        "تجاهل حالة الشبكة"
+      ],
+      "common_failure_modes_en": [
+        "a blank screen on error",
+        "trusting the response shape",
+        "ignoring network failure"
+      ],
+      "ai_substitutability": "medium",
+      "recency_policy": "rp_practice",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_frontend_debugging",
+      "name_ar": "تصحيح أخطاء الواجهة",
+      "name_en": "Frontend debugging",
+      "family": "quality_engineering",
+      "skill_type": "supporting",
+      "description_ar": "تحديد السبب الجذري لعطل في الواجهة بأدوات المتصفح والقراءة المنهجية بدل إخفاء العرض.",
+      "description_en": "Finding the root cause of a UI defect with browser tooling and systematic reading, rather than hiding the symptom.",
+      "observable_indicators_ar": [
+        "يعيد إنتاج العطل قبل إصلاحه",
+        "يسمّي السبب الجذري",
+        "الإصلاح في موضع السبب لا في موضع الظهور"
+      ],
+      "observable_indicators_en": [
+        "reproduces before fixing",
+        "names the root cause",
+        "fixes at the cause, not where the symptom appears"
+      ],
+      "common_failure_modes_ar": [
+        "try/catch يبتلع الخطأ",
+        "إصلاح بالتجربة والخطأ",
+        "تعطيل الميزة بدل إصلاحها"
+      ],
+      "common_failure_modes_en": [
+        "try/catch that swallows the error",
+        "fixing by trial and error",
+        "disabling the feature instead of fixing it"
+      ],
+      "ai_substitutability": "medium",
+      "recency_policy": "rp_practice",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact",
+        "decision_rationale",
+        "live_defense"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_forms_validation",
+      "name_ar": "النماذج والتحقق من المدخلات",
+      "name_en": "Forms & input validation",
+      "family": "ui_engineering",
+      "skill_type": "supporting",
+      "description_ar": "بناء نماذج بحقول مسمّاة، والتحقق من المدخلات في العميل بطريقة تخبر المستخدم بما يجب تصحيحه، دون الاعتماد على التحقق في العميل وحده.",
+      "description_en": "Building forms with labelled fields and client-side validation that tells the user what to fix, without treating client validation as the only guard.",
+      "observable_indicators_ar": [
+        "كل حقل له label مرتبط",
+        "رسالة خطأ بجانب الحقل",
+        "لا إرسال لبيانات غير صالحة",
+        "التحقق لا يمنع المستخدم من التصحيح"
+      ],
+      "observable_indicators_en": [
+        "every field has an associated label",
+        "an error message beside the field",
+        "invalid data is not submitted",
+        "validation never blocks correction"
+      ],
+      "common_failure_modes_ar": [
+        "رسالة خطأ واحدة عامة",
+        "تعطيل زر الإرسال بلا سبب مرئي",
+        "تحقق يعتمد على alert"
+      ],
+      "common_failure_modes_en": [
+        "one generic error message",
+        "a disabled submit with no visible reason",
+        "validation via alert()"
+      ],
+      "ai_substitutability": "high",
+      "recency_policy": "rp_practice",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1",
+        "src_whatwg_html_living_standard"
+      ]
+    },
+    {
+      "code": "skl_accessibility_basics",
+      "name_ar": "أساسيات إتاحة الوصول",
+      "name_en": "Accessibility basics",
+      "family": "accessibility_ux",
+      "skill_type": "supporting",
+      "description_ar": "الأساسيات التي تجعل الواجهة قابلة للاستخدام بلوحة المفاتيح وقارئ الشاشة: نص بديل، تباين، ترتيب تركيز، أسماء للعناصر التفاعلية.",
+      "description_en": "The basics that make an interface usable by keyboard and screen reader: alt text, contrast, focus order, names on interactive elements.",
+      "observable_indicators_ar": [
+        "كل صورة ذات معنى لها alt",
+        "كل عنصر تفاعلي قابل للوصول بلوحة المفاتيح",
+        "التركيز ظاهر",
+        "الأزرار لها أسماء"
+      ],
+      "observable_indicators_en": [
+        "every meaningful image has alt",
+        "every interactive element is reachable by keyboard",
+        "focus is visible",
+        "buttons have names"
+      ],
+      "common_failure_modes_ar": [
+        "outline: none بلا بديل",
+        "أيقونة بلا اسم",
+        "div قابل للنقر بلا دور ولا tabindex"
+      ],
+      "common_failure_modes_en": [
+        "outline: none with no alternative",
+        "an icon with no name",
+        "a clickable div with no role and no tabindex"
+      ],
+      "ai_substitutability": "medium",
+      "recency_policy": "rp_web_standards",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "artifact"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1",
+        "src_w3c_wcag22"
+      ]
+    },
+    {
+      "code": "skl_code_reading",
+      "name_ar": "قراءة كود قائم وفهمه",
+      "name_en": "Reading and understanding existing code",
+      "family": "engineering_practice",
+      "skill_type": "supporting",
+      "description_ar": "تتبّع تدفق البيانات والأحداث في مشروع لم يكتبه، وتحديد أين يُجرى التغيير بأقل أثر.",
+      "description_en": "Tracing data and event flow in a project one did not write, and finding where a change belongs with the least impact.",
+      "observable_indicators_ar": [
+        "يشرح تدفق البيانات قبل التعديل",
+        "يعدّل في الموضع الصحيح",
+        "لا يعيد كتابة ما لا يلزم"
+      ],
+      "observable_indicators_en": [
+        "explains the data flow before changing it",
+        "changes the right place",
+        "does not rewrite what need not change"
+      ],
+      "common_failure_modes_ar": [
+        "إعادة كتابة شاملة لتغيير صغير",
+        "تعديل عرَضي في ملفات غير معنية"
+      ],
+      "common_failure_modes_en": [
+        "a wholesale rewrite for a small change",
+        "incidental edits in unrelated files"
+      ],
+      "ai_substitutability": "medium",
+      "recency_policy": "rp_practice",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "decision_rationale",
+        "live_defense",
+        "process_trace"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_version_control_basics",
+      "name_ar": "أساسيات إدارة الإصدارات",
+      "name_en": "Version control basics",
+      "family": "engineering_practice",
+      "skill_type": "tool",
+      "description_ar": "استخدام Git للعمل على فرع، وتقديم تغييرات صغيرة برسائل واضحة، وقراءة الفرق.",
+      "description_en": "Using Git to work on a branch, commit small changes with clear messages, and read a diff.",
+      "observable_indicators_ar": [
+        "تغييرات صغيرة مترابطة",
+        "رسائل تصف السبب",
+        "يقرأ diff قبل التقديم"
+      ],
+      "observable_indicators_en": [
+        "small cohesive commits",
+        "messages that state why",
+        "reads the diff before committing"
+      ],
+      "common_failure_modes_ar": [
+        "commit واحد ضخم",
+        "رسائل عامة",
+        "ملفات مولَّدة في المستودع"
+      ],
+      "common_failure_modes_en": [
+        "one giant commit",
+        "generic messages",
+        "generated files committed"
+      ],
+      "ai_substitutability": "high",
+      "recency_policy": "rp_tools",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "process_trace"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_technical_explanation",
+      "name_ar": "شرح القرار التقني",
+      "name_en": "Explaining a technical decision",
+      "family": "communication",
+      "skill_type": "behavioral",
+      "description_ar": "وصف ما بُني ولماذا، والبدائل التي رُفضت، بلغة يفهمها زميل أو صاحب منتج.",
+      "description_en": "Describing what was built and why, and the alternatives rejected, in language a peer or a product owner understands.",
+      "observable_indicators_ar": [
+        "يذكر البديل المرفوض وسبب رفضه",
+        "يفصل الحقيقة عن الرأي",
+        "يجيب عن سؤال الاستيضاح مباشرة"
+      ],
+      "observable_indicators_en": [
+        "names the rejected alternative and why",
+        "separates fact from opinion",
+        "answers a clarification question directly"
+      ],
+      "common_failure_modes_ar": [
+        "شرح يعيد سرد الكود",
+        "لا ذكر للمقايضات",
+        "تجاهل السؤال المطروح"
+      ],
+      "common_failure_modes_en": [
+        "an explanation that narrates the code",
+        "no trade-offs mentioned",
+        "ignoring the question asked"
+      ],
+      "ai_substitutability": "low",
+      "recency_policy": "rp_behavioral",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "decision_rationale",
+        "live_defense"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "skl_requirements_reading",
+      "name_ar": "قراءة المتطلبات وتفكيكها",
+      "name_en": "Reading and decomposing requirements",
+      "family": "analysis",
+      "skill_type": "behavioral",
+      "description_ar": "تحويل وصف قصير من صاحب المنتج إلى قائمة سلوكيات قابلة للتحقق، مع تحديد ما هو ناقص وطرح سؤال بدل الافتراض.",
+      "description_en": "Turning a short product brief into a list of checkable behaviours, spotting what is missing and asking instead of assuming.",
+      "observable_indicators_ar": [
+        "قائمة سلوكيات لا قائمة ميزات",
+        "يسمّي المعلومة الناقصة",
+        "يسأل قبل أن يفترض"
+      ],
+      "observable_indicators_en": [
+        "a list of behaviours, not features",
+        "names the missing information",
+        "asks before assuming"
+      ],
+      "common_failure_modes_ar": [
+        "افتراض صامت",
+        "بناء ما لم يُطلب",
+        "تجاهل التناقض في الوصف"
+      ],
+      "common_failure_modes_en": [
+        "a silent assumption",
+        "building what was not asked",
+        "ignoring a contradiction in the brief"
+      ],
+      "ai_substitutability": "low",
+      "recency_policy": "rp_behavioral",
+      "proficiency_scale": "scale_default",
+      "evidence_types_possible": [
+        "decision_rationale",
+        "live_defense"
+      ],
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    }
+  ]
+}

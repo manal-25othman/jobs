@@ -1,0 +1,237 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "_note": "Role requirement ≠ user skill. Never copied into evidence. Core = 5.",
+  "records": [
+    {
+      "skill": "skl_html_semantic",
+      "is_core_for_role": true,
+      "importance": "critical",
+      "target_proficiency": "working",
+      "why_required_ar": "بنية الصفحة هي ما يبنى عليه كل شيء آخر: الإتاحة والتنسيق والاختبار",
+      "why_required_en": "Page structure is what everything else rests on: accessibility, styling, testing",
+      "evidence_type_expected": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "minimum_evidence_count": 2,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_css_responsive",
+      "is_core_for_role": true,
+      "importance": "critical",
+      "target_proficiency": "working",
+      "why_required_ar": "معظم الاستخدام من الجوال؛ صفحة لا تتجاوب لا تُستخدم",
+      "why_required_en": "Most usage is mobile; a page that does not respond is not used",
+      "evidence_type_expected": [
+        "artifact"
+      ],
+      "minimum_evidence_count": 2,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_js_fundamentals",
+      "is_core_for_role": true,
+      "importance": "critical",
+      "target_proficiency": "working",
+      "why_required_ar": "كل تفاعل وكل جلب بيانات يمر بـJavaScript صحيح",
+      "why_required_en": "Every interaction and every data fetch passes through correct JavaScript",
+      "evidence_type_expected": [
+        "artifact",
+        "decision_rationale",
+        "live_defense"
+      ],
+      "minimum_evidence_count": 2,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_ui_state_interaction",
+      "is_core_for_role": true,
+      "importance": "high",
+      "target_proficiency": "working",
+      "why_required_ar": "الأعطال الأكثر شيوعًا للمبتدئ حالات متناقضة أو مفقودة",
+      "why_required_en": "The junior's most common defects are contradictory or missing states",
+      "evidence_type_expected": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "minimum_evidence_count": 2,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_api_data_states",
+      "is_core_for_role": true,
+      "importance": "high",
+      "target_proficiency": "working",
+      "why_required_ar": "واجهة بلا بيانات حقيقية ليست منتجًا؛ حالات التحميل والخطأ هي الفرق بين نموذج وواجهة",
+      "why_required_en": "An interface without real data is not a product; loading and error states separate a mock-up from an interface",
+      "evidence_type_expected": [
+        "artifact",
+        "decision_rationale"
+      ],
+      "minimum_evidence_count": 2,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_forms_validation",
+      "is_core_for_role": false,
+      "importance": "high",
+      "target_proficiency": "working",
+      "why_required_ar": "النماذج هي معظم ما يُطلب من المبتدئ فعلًا",
+      "why_required_en": "Forms are most of what a junior is actually asked for",
+      "evidence_type_expected": [
+        "artifact"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_frontend_debugging",
+      "is_core_for_role": false,
+      "importance": "high",
+      "target_proficiency": "foundation",
+      "why_required_ar": "نصف عمل المبتدئ إصلاح لا بناء",
+      "why_required_en": "Half of a junior's work is fixing, not building",
+      "evidence_type_expected": [
+        "artifact",
+        "decision_rationale",
+        "live_defense"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": false,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_accessibility_basics",
+      "is_core_for_role": false,
+      "importance": "medium",
+      "target_proficiency": "foundation",
+      "why_required_ar": "الأساسيات فقط: label وalt والتركيز — تُطلب في أي فريق جاد",
+      "why_required_en": "Basics only: labels, alt, focus — expected in any serious team",
+      "evidence_type_expected": [
+        "artifact"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_code_reading",
+      "is_core_for_role": false,
+      "importance": "high",
+      "target_proficiency": "foundation",
+      "why_required_ar": "المبتدئ يدخل مشروعًا قائمًا لا صفحة فارغة",
+      "why_required_en": "The junior joins an existing project, not a blank page",
+      "evidence_type_expected": [
+        "decision_rationale",
+        "live_defense",
+        "process_trace"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": false,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_version_control_basics",
+      "is_core_for_role": false,
+      "importance": "medium",
+      "target_proficiency": "foundation",
+      "why_required_ar": "شرط العمل في فريق",
+      "why_required_en": "The precondition of working in a team",
+      "evidence_type_expected": [
+        "process_trace"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": false,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_technical_explanation",
+      "is_core_for_role": false,
+      "importance": "medium",
+      "target_proficiency": "foundation",
+      "why_required_ar": "القرار غير المشروح لا يُراجَع ولا يُتعلَّم منه",
+      "why_required_en": "An unexplained decision cannot be reviewed or learned from",
+      "evidence_type_expected": [
+        "decision_rationale",
+        "live_defense"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": false,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "skl_requirements_reading",
+      "is_core_for_role": false,
+      "importance": "medium",
+      "target_proficiency": "foundation",
+      "why_required_ar": "بناء الشيء الخطأ أغلى من بنائه ببطء",
+      "why_required_en": "Building the wrong thing costs more than building slowly",
+      "evidence_type_expected": [
+        "decision_rationale"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": false,
+      "human_review_required": true,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "skill": "ui-testing",
+      "is_core_for_role": false,
+      "importance": "medium",
+      "target_proficiency": "foundation",
+      "why_required_ar": "اختبار حالات المكوّن هو ما يجعل الإصلاح آمنًا — (مهارة قائمة من سجل الشريحة ١)",
+      "why_required_en": "Testing component states is what makes a fix safe — (existing registry skill from Slice 1)",
+      "evidence_type_expected": [
+        "artifact"
+      ],
+      "minimum_evidence_count": 1,
+      "can_be_partially_auto_evaluated": true,
+      "human_review_required": false,
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    }
+  ]
+}

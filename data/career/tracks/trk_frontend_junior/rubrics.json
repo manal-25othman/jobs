@@ -1,0 +1,1009 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "_note": "Structured criteria, skill-linked, per-criterion levels. Evaluation is criterion by criterion, never one total score. Human-evaluated criteria cannot run in the deterministic evaluator; these rubrics are DRAFT.",
+  "records": [
+    {
+      "code": "rub_fe_build_interface@0.1.0",
+      "activity": "act_fe_build_interface",
+      "pass_threshold": 0.75,
+      "proposes_state": "demonstrated",
+      "scoring_policy_version": "0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ],
+      "criteria": [
+        {
+          "key": "semantic_structure",
+          "name_ar": "بنية دلالية",
+          "name_en": "Semantic structure",
+          "dimension": "correctness",
+          "linked_skill": "skl_html_semantic",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "عناوين مرتبة ومعالم ونموذج بعناصر form/label/button",
+          "description_en": "Ordered headings, landmarks, and a form built from form/label/button",
+          "expected_evidence_ar": "ملف HTML",
+          "expected_evidence_en": "The HTML file",
+          "excerpt_guidance_en": "quote the form markup and the heading sequence",
+          "rationale_when_met_ar": "البنية دلالية.",
+          "rationale_when_unmet_ar": "البنية غير دلالية.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "div لكل شيء",
+              "descriptor_en": "div for everything",
+              "observable_evidence_en": "no landmarks, headings by size"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "بعض العناصر الدلالية",
+              "descriptor_en": "some semantic elements",
+              "observable_evidence_en": "landmarks present, form partly labelled"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "بنية دلالية كاملة",
+              "descriptor_en": "fully semantic",
+              "observable_evidence_en": "landmarks, ordered headings, labelled form"
+            }
+          ]
+        },
+        {
+          "key": "form_validation",
+          "name_ar": "التحقق من النموذج",
+          "name_en": "Form validation",
+          "dimension": "correctness",
+          "linked_skill": "skl_forms_validation",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "كل حقل له label ورسالة خطأ بجانبه ولا يُرسل غير الصالح",
+          "description_en": "Every field labelled, an error beside it, invalid data not submitted",
+          "expected_evidence_ar": "ملفات HTML وJS",
+          "expected_evidence_en": "HTML and JS files",
+          "excerpt_guidance_en": "quote the validation branch",
+          "rationale_when_met_ar": "التحقق يخبر المستخدم بما يصحّحه.",
+          "rationale_when_unmet_ar": "التحقق ناقص أو عام.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "لا تحقق",
+              "descriptor_en": "no validation",
+              "observable_evidence_en": "invalid data submitted"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "تحقق عام",
+              "descriptor_en": "generic validation",
+              "observable_evidence_en": "one message for all fields"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "تحقق لكل حقل",
+              "descriptor_en": "per-field validation",
+              "observable_evidence_en": "message beside each field, submission blocked"
+            }
+          ]
+        },
+        {
+          "key": "data_states",
+          "name_ar": "حالات البيانات",
+          "name_en": "Data states",
+          "dimension": "correctness",
+          "linked_skill": "skl_api_data_states",
+          "source": "activity",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "حالات التحميل والخطأ والفراغ ظاهرة ومفهومة",
+          "description_en": "Loading, error and empty states are visible and understandable",
+          "expected_evidence_ar": "ملف JS والصفحة",
+          "expected_evidence_en": "JS file and the page",
+          "excerpt_guidance_en": "quote the three state branches",
+          "rationale_when_met_ar": "الحالات الثلاث معالَجة.",
+          "rationale_when_unmet_ar": "حالة أو أكثر مفقودة.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "شاشة فارغة عند الخطأ",
+              "descriptor_en": "blank on error",
+              "observable_evidence_en": "no state handling"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "حالتان من ثلاث",
+              "descriptor_en": "two of three",
+              "observable_evidence_en": "one state missing"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "الثلاث ظاهرة",
+              "descriptor_en": "all three visible",
+              "observable_evidence_en": "loading, error and empty each shown"
+            }
+          ]
+        },
+        {
+          "key": "state_transitions",
+          "name_ar": "تحوّلات الحالة",
+          "name_en": "State transitions",
+          "dimension": "correctness",
+          "linked_skill": "skl_ui_state_interaction",
+          "source": "activity",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "الحالة ممثَّلة صراحةً والعرض يتبعها؛ لا حالتان متناقضتان",
+          "description_en": "State is explicit and rendering follows it; no two contradictory states",
+          "expected_evidence_ar": "ملف JS",
+          "expected_evidence_en": "JS file",
+          "excerpt_guidance_en": "quote where state is held and rendered",
+          "rationale_when_met_ar": "الحالة صريحة ومتسقة.",
+          "rationale_when_unmet_ar": "الحالة مخفية أو متناقضة.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "حالة في DOM",
+              "descriptor_en": "state in the DOM",
+              "observable_evidence_en": "contradictory states shown"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "حالة جزئية",
+              "descriptor_en": "partial state",
+              "observable_evidence_en": "mostly consistent"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "حالة صريحة",
+              "descriptor_en": "explicit state",
+              "observable_evidence_en": "one representation, rendering follows"
+            }
+          ]
+        },
+        {
+          "key": "responsive_layout",
+          "name_ar": "تخطيط متجاوب",
+          "name_en": "Responsive layout",
+          "dimension": "correctness",
+          "linked_skill": "skl_css_responsive",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": false,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "التخطيط يصمد عند 360px و1024px بلا تمرير أفقي",
+          "description_en": "Layout holds at 360px and 1024px with no horizontal scroll",
+          "expected_evidence_ar": "ملف CSS",
+          "expected_evidence_en": "CSS file",
+          "excerpt_guidance_en": "quote the layout rules and breakpoints",
+          "rationale_when_met_ar": "التخطيط متجاوب.",
+          "rationale_when_unmet_ar": "التخطيط ينكسر.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "ينكسر",
+              "descriptor_en": "breaks",
+              "observable_evidence_en": "horizontal scroll on mobile"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "يصمد بجزء",
+              "descriptor_en": "mostly holds",
+              "observable_evidence_en": "one width fails"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "يصمد",
+              "descriptor_en": "holds",
+              "observable_evidence_en": "both widths fine"
+            }
+          ]
+        },
+        {
+          "key": "explanation_clarity",
+          "name_ar": "وضوح شرح تدفق البيانات",
+          "name_en": "Clarity of the data-flow explanation",
+          "dimension": "communication",
+          "linked_skill": "skl_technical_explanation",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 2,
+          "mandatory": false,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "الملاحظة تشرح أين تُحفظ الحالة وكيف تصل البيانات",
+          "description_en": "The note explains where state lives and how data arrives",
+          "expected_evidence_ar": "note.data_flow",
+          "expected_evidence_en": "note.data_flow",
+          "excerpt_guidance_en": "quote the note",
+          "rationale_when_met_ar": "الشرح واضح.",
+          "rationale_when_unmet_ar": "الشرح يسرد الكود.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "سرد كود",
+              "descriptor_en": "code narration",
+              "observable_evidence_en": "no flow explained"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "جزئي",
+              "descriptor_en": "partial",
+              "observable_evidence_en": "flow explained, state location missing"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "واضح",
+              "descriptor_en": "clear",
+              "observable_evidence_en": "flow and state location explained"
+            }
+          ],
+          "library_criterion": "core.communication.clarity"
+        },
+        {
+          "key": "judgment_assumption_check",
+          "name_ar": "فحص الافتراض (تناقض الحقول)",
+          "name_en": "Assumption check (field conflict)",
+          "dimension": "judgment",
+          "linked_skill": "skl_requirements_reading",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 1,
+          "mandatory": false,
+          "threshold_for_skill": 1.0,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "التناقض بين الوصف وقائمة الحقول مُسمّى ومُقرَّر",
+          "description_en": "The brief/spec conflict is named and decided",
+          "expected_evidence_ar": "answer.clarification",
+          "expected_evidence_en": "answer.clarification",
+          "excerpt_guidance_en": "quote the answer",
+          "rationale_when_met_ar": "الافتراض مُسمّى.",
+          "rationale_when_unmet_ar": "افتراض صامت.",
+          "levels": [
+            {
+              "level_key": "unmet",
+              "score": 0,
+              "descriptor_ar": "غير مستوفى",
+              "descriptor_en": "Unmet",
+              "observable_evidence_en": "the required artifact or behaviour is absent"
+            },
+            {
+              "level_key": "met",
+              "score": 1,
+              "descriptor_ar": "مستوفى",
+              "descriptor_en": "Met",
+              "observable_evidence_en": "the required artifact or behaviour is present"
+            }
+          ],
+          "library_criterion": "core.judgment.assumption_check"
+        },
+        {
+          "key": "deliverables_complete",
+          "name_ar": "اكتمال المخرجات",
+          "name_en": "Deliverables complete",
+          "dimension": "completeness",
+          "linked_skill": "skl_html_semantic",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 1,
+          "mandatory": true,
+          "threshold_for_skill": null,
+          "evaluator_type": "rule",
+          "human_review_required": false,
+          "description_ar": "الملفات الثلاثة موجودة",
+          "description_en": "All three files present",
+          "expected_evidence_ar": "الملفات",
+          "expected_evidence_en": "The files",
+          "excerpt_guidance_en": "n/a",
+          "rationale_when_met_ar": "المخرجات مكتملة.",
+          "rationale_when_unmet_ar": "مخرَج ناقص.",
+          "levels": [
+            {
+              "level_key": "unmet",
+              "score": 0,
+              "descriptor_ar": "غير مستوفى",
+              "descriptor_en": "Unmet",
+              "observable_evidence_en": "the required artifact or behaviour is absent"
+            },
+            {
+              "level_key": "met",
+              "score": 1,
+              "descriptor_ar": "مستوفى",
+              "descriptor_en": "Met",
+              "observable_evidence_en": "the required artifact or behaviour is present"
+            }
+          ],
+          "check": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.index_html",
+              "file.styles_css",
+              "file.app_js"
+            ]
+          },
+          "library_criterion": "core.completeness.deliverables"
+        }
+      ]
+    },
+    {
+      "code": "rub_fe_debug_improve@0.1.0",
+      "activity": "act_fe_debug_improve",
+      "pass_threshold": 0.75,
+      "proposes_state": "demonstrated",
+      "scoring_policy_version": "0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ],
+      "criteria": [
+        {
+          "key": "responsive_fixed",
+          "name_ar": "السلوك المتجاوب مُصلَح",
+          "name_en": "Responsive behaviour fixed",
+          "dimension": "correctness",
+          "linked_skill": "skl_css_responsive",
+          "source": "activity",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "لا تمرير أفقي عند 360px والعمود الجانبي يظهر عند 1024px",
+          "description_en": "No horizontal scroll at 360px; sidebar shows at 1024px",
+          "expected_evidence_ar": "ملف CSS",
+          "expected_evidence_en": "CSS file",
+          "excerpt_guidance_en": "quote the fixed rules",
+          "rationale_when_met_ar": "التخطيط متجاوب.",
+          "rationale_when_unmet_ar": "التخطيط لا يزال ينكسر.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "ينكسر",
+              "descriptor_en": "breaks",
+              "observable_evidence_en": "scroll remains"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "مُقنَّع",
+              "descriptor_en": "masked",
+              "observable_evidence_en": "overflow hidden instead of fixed"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "مُصلَح",
+              "descriptor_en": "fixed",
+              "observable_evidence_en": "width cause fixed"
+            }
+          ]
+        },
+        {
+          "key": "semantic_fixed",
+          "name_ar": "البنية الدلالية مُصلَحة",
+          "name_en": "Semantic structure fixed",
+          "dimension": "correctness",
+          "linked_skill": "skl_html_semantic",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "الأزرار أزرار، العناوين مرتبة، النموذج بعناصر form/label",
+          "description_en": "Buttons are buttons, headings ordered, form uses form/label",
+          "expected_evidence_ar": "ملف HTML",
+          "expected_evidence_en": "HTML file",
+          "excerpt_guidance_en": "quote the changed elements",
+          "rationale_when_met_ar": "البنية مُصلَحة.",
+          "rationale_when_unmet_ar": "البنية ما زالت غير دلالية.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "لم تُصلَح",
+              "descriptor_en": "unfixed",
+              "observable_evidence_en": "clickable divs remain"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "جزئي",
+              "descriptor_en": "partial",
+              "observable_evidence_en": "some elements fixed"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "مُصلَحة",
+              "descriptor_en": "fixed",
+              "observable_evidence_en": "all planted structure defects fixed"
+            }
+          ]
+        },
+        {
+          "key": "a11y_basics_fixed",
+          "name_ar": "أساسيات الإتاحة مُصلَحة",
+          "name_en": "Accessibility basics fixed",
+          "dimension": "correctness",
+          "linked_skill": "skl_accessibility_basics",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": false,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "التركيز ظاهر، الحقول مسمّاة، العناصر تعمل بلوحة المفاتيح",
+          "description_en": "Focus visible, fields labelled, keyboard operable",
+          "expected_evidence_ar": "HTML وCSS",
+          "expected_evidence_en": "HTML and CSS",
+          "excerpt_guidance_en": "quote focus styles and labels",
+          "rationale_when_met_ar": "الأساسيات مُصلَحة.",
+          "rationale_when_unmet_ar": "الأساسيات ناقصة.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "لا",
+              "descriptor_en": "no",
+              "observable_evidence_en": "outline:none remains"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "جزئي",
+              "descriptor_en": "partial",
+              "observable_evidence_en": "labels fixed, focus not"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "نعم",
+              "descriptor_en": "yes",
+              "observable_evidence_en": "all basics fixed"
+            }
+          ]
+        },
+        {
+          "key": "validation_fixed",
+          "name_ar": "التحقق وحالات الخطأ مُصلَحة",
+          "name_en": "Validation and error states fixed",
+          "dimension": "correctness",
+          "linked_skill": "skl_js_fundamentals",
+          "source": "activity",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "بريد غير صالح يُرفض برسالة بجانب الحقل؛ الخطأ لا يُبتلع",
+          "description_en": "Invalid email rejected with a per-field message; errors not swallowed",
+          "expected_evidence_ar": "ملف JS",
+          "expected_evidence_en": "JS file",
+          "excerpt_guidance_en": "quote the validation and error handling",
+          "rationale_when_met_ar": "التحقق يعمل.",
+          "rationale_when_unmet_ar": "التحقق ناقص.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "لا تحقق",
+              "descriptor_en": "none",
+              "observable_evidence_en": "invalid accepted"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "صارم أو عام",
+              "descriptor_en": "too strict or generic",
+              "observable_evidence_en": "valid addresses rejected"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "صحيح",
+              "descriptor_en": "correct",
+              "observable_evidence_en": "reasonable check, per-field message"
+            }
+          ]
+        },
+        {
+          "key": "root_cause_note",
+          "name_ar": "ملاحظة السبب الجذري",
+          "name_en": "Root-cause note",
+          "dimension": "judgment",
+          "linked_skill": "skl_frontend_debugging",
+          "source": "core",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "لكل عطل سطر يسمّي السبب لا العرض",
+          "description_en": "One line per defect naming the cause, not the symptom",
+          "expected_evidence_ar": "note.root_causes",
+          "expected_evidence_en": "note.root_causes",
+          "excerpt_guidance_en": "quote the note",
+          "rationale_when_met_ar": "الأسباب مُسمّاة.",
+          "rationale_when_unmet_ar": "الأعراض مُعادة.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "أعراض",
+              "descriptor_en": "symptoms",
+              "observable_evidence_en": "restates complaints"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "بعض الأسباب",
+              "descriptor_en": "some causes",
+              "observable_evidence_en": "two of four"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "كل الأسباب",
+              "descriptor_en": "all causes",
+              "observable_evidence_en": "four of four named"
+            }
+          ],
+          "library_criterion": "core.correctness.root_cause"
+        },
+        {
+          "key": "scope_discipline",
+          "name_ar": "الانضباط في النطاق",
+          "name_en": "Scope discipline",
+          "dimension": "judgment",
+          "linked_skill": "skl_code_reading",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 1,
+          "mandatory": false,
+          "threshold_for_skill": 1.0,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "الصفحة لم تُعاد كتابتها؛ التغييرات في مواضع الأعطال",
+          "description_en": "The page was not rewritten; changes sit at the defects",
+          "expected_evidence_ar": "الفروق",
+          "expected_evidence_en": "The diff",
+          "excerpt_guidance_en": "summarise the diff size",
+          "rationale_when_met_ar": "التغيير منضبط.",
+          "rationale_when_unmet_ar": "إعادة كتابة.",
+          "levels": [
+            {
+              "level_key": "unmet",
+              "score": 0,
+              "descriptor_ar": "غير مستوفى",
+              "descriptor_en": "Unmet",
+              "observable_evidence_en": "the required artifact or behaviour is absent"
+            },
+            {
+              "level_key": "met",
+              "score": 1,
+              "descriptor_ar": "مستوفى",
+              "descriptor_en": "Met",
+              "observable_evidence_en": "the required artifact or behaviour is present"
+            }
+          ],
+          "library_criterion": "core.judgment.scope_discipline"
+        },
+        {
+          "key": "deliverables_complete",
+          "name_ar": "اكتمال المخرجات",
+          "name_en": "Deliverables complete",
+          "dimension": "completeness",
+          "linked_skill": "skl_html_semantic",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 1,
+          "mandatory": true,
+          "threshold_for_skill": null,
+          "evaluator_type": "rule",
+          "human_review_required": false,
+          "description_ar": "الملفات والملاحظة موجودة",
+          "description_en": "Files and note present",
+          "expected_evidence_ar": "الملفات",
+          "expected_evidence_en": "The files",
+          "excerpt_guidance_en": "n/a",
+          "rationale_when_met_ar": "المخرجات مكتملة.",
+          "rationale_when_unmet_ar": "مخرَج ناقص.",
+          "levels": [
+            {
+              "level_key": "unmet",
+              "score": 0,
+              "descriptor_ar": "غير مستوفى",
+              "descriptor_en": "Unmet",
+              "observable_evidence_en": "the required artifact or behaviour is absent"
+            },
+            {
+              "level_key": "met",
+              "score": 1,
+              "descriptor_ar": "مستوفى",
+              "descriptor_en": "Met",
+              "observable_evidence_en": "the required artifact or behaviour is present"
+            }
+          ],
+          "check": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.index_html",
+              "file.styles_css",
+              "file.app_js",
+              "note.root_causes"
+            ]
+          },
+          "library_criterion": "core.completeness.deliverables"
+        }
+      ]
+    },
+    {
+      "code": "rub_fe_change_request@0.1.0",
+      "activity": "act_fe_change_request",
+      "pass_threshold": 0.75,
+      "proposes_state": "demonstrated",
+      "scoring_policy_version": "0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ],
+      "criteria": [
+        {
+          "key": "root_cause_fixed",
+          "name_ar": "السبب الجذري مُصلَح",
+          "name_en": "Root cause fixed",
+          "dimension": "correctness",
+          "linked_skill": "skl_frontend_debugging",
+          "source": "core",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "شرط «القائمة فارغة» مُصلَح في سببه لا مُخفى",
+          "description_en": "The empty-list condition is fixed at its cause, not hidden",
+          "expected_evidence_ar": "ملف JS",
+          "expected_evidence_en": "JS file",
+          "excerpt_guidance_en": "quote the fixed condition",
+          "rationale_when_met_ar": "السبب مُصلَح.",
+          "rationale_when_unmet_ar": "العرض مُخفى.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "مُخفى",
+              "descriptor_en": "hidden",
+              "observable_evidence_en": "try/catch swallows"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "جزئي",
+              "descriptor_en": "partial",
+              "observable_evidence_en": "fixed in one place"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "مُصلَح",
+              "descriptor_en": "fixed",
+              "observable_evidence_en": "condition corrected at cause"
+            }
+          ],
+          "library_criterion": "core.correctness.root_cause"
+        },
+        {
+          "key": "filter_in_state",
+          "name_ar": "التصفية عبر الحالة",
+          "name_en": "Filter implemented through state",
+          "dimension": "correctness",
+          "linked_skill": "skl_ui_state_interaction",
+          "source": "activity",
+          "weight": 1.5,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "التصفية تغيّر الحالة والعرض يتبعها؛ مصدر حقيقة واحد",
+          "description_en": "Filtering changes state; rendering follows; one source of truth",
+          "expected_evidence_ar": "ملف JS",
+          "expected_evidence_en": "JS file",
+          "excerpt_guidance_en": "quote the filter and render",
+          "rationale_when_met_ar": "التصفية عبر الحالة.",
+          "rationale_when_unmet_ar": "تصفية في DOM.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "DOM",
+              "descriptor_en": "DOM",
+              "observable_evidence_en": "two copies of the list"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "مختلط",
+              "descriptor_en": "mixed",
+              "observable_evidence_en": "state plus DOM tweaks"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "حالة",
+              "descriptor_en": "state",
+              "observable_evidence_en": "single source of truth"
+            }
+          ]
+        },
+        {
+          "key": "js_correctness",
+          "name_ar": "صحة JavaScript",
+          "name_en": "JavaScript correctness",
+          "dimension": "correctness",
+          "linked_skill": "skl_js_fundamentals",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "لا متغيرات عامة عرَضية، معالجة الرفض، لا تحوّر مشترك مبعثر",
+          "description_en": "No accidental globals, rejection handled, no scattered shared mutation",
+          "expected_evidence_ar": "ملف JS",
+          "expected_evidence_en": "JS file",
+          "excerpt_guidance_en": "quote async handling",
+          "rationale_when_met_ar": "الكود صحيح.",
+          "rationale_when_unmet_ar": "أخطاء أساسية.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "أخطاء",
+              "descriptor_en": "errors",
+              "observable_evidence_en": "unhandled rejection"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "مقبول",
+              "descriptor_en": "acceptable",
+              "observable_evidence_en": "minor issues"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "صحيح",
+              "descriptor_en": "correct",
+              "observable_evidence_en": "clean"
+            }
+          ]
+        },
+        {
+          "key": "empty_state_correct",
+          "name_ar": "حالة الفراغ صحيحة",
+          "name_en": "Empty state correct",
+          "dimension": "correctness",
+          "linked_skill": "skl_api_data_states",
+          "source": "activity",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": true,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "القائمة الفارغة والفلتر الفارغ يعرضان رسالة حالة لا خطأ",
+          "description_en": "Empty list and empty filter show a state message, not an error",
+          "expected_evidence_ar": "الصفحة",
+          "expected_evidence_en": "The page",
+          "excerpt_guidance_en": "quote the empty branch",
+          "rationale_when_met_ar": "حالة الفراغ صحيحة.",
+          "rationale_when_unmet_ar": "الفراغ يُعرض كخطأ.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "خطأ",
+              "descriptor_en": "error",
+              "observable_evidence_en": "[] shown as error"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "أحدهما",
+              "descriptor_en": "one of two",
+              "observable_evidence_en": "list ok, filter not"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "كلاهما",
+              "descriptor_en": "both",
+              "observable_evidence_en": "both empty cases shown as state"
+            }
+          ]
+        },
+        {
+          "key": "code_reading",
+          "name_ar": "فهم الكود القائم",
+          "name_en": "Understanding the existing code",
+          "dimension": "judgment",
+          "linked_skill": "skl_code_reading",
+          "source": "core",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": false,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "التغيير في الموضع الصحيح ضمن البنية القائمة؛ لا إعادة كتابة",
+          "description_en": "The change sits in the right place within the existing structure; no rewrite",
+          "expected_evidence_ar": "الفروق",
+          "expected_evidence_en": "The diff",
+          "excerpt_guidance_en": "summarise where changes landed",
+          "rationale_when_met_ar": "التغيير في موضعه.",
+          "rationale_when_unmet_ar": "إعادة كتابة أو موضع خاطئ.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "إعادة كتابة",
+              "descriptor_en": "rewrite",
+              "observable_evidence_en": "structure replaced"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "موضع مقبول",
+              "descriptor_en": "acceptable place",
+              "observable_evidence_en": "some incidental edits"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "الموضع الصحيح",
+              "descriptor_en": "right place",
+              "observable_evidence_en": "minimal, well-placed change"
+            }
+          ],
+          "library_criterion": "core.judgment.scope_discipline"
+        },
+        {
+          "key": "decision_explained",
+          "name_ar": "القرار مشروح مع البديل",
+          "name_en": "Decision explained with the rejected alternative",
+          "dimension": "communication",
+          "linked_skill": "skl_technical_explanation",
+          "source": "core",
+          "weight": 1,
+          "max_score": 2,
+          "mandatory": false,
+          "threshold_for_skill": 0.5,
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "ملاحظة القرار تسمّي السبب الجذري وما تغيّر والبديل المرفوض",
+          "description_en": "The decision note names the root cause, the change, and the rejected alternative",
+          "expected_evidence_ar": "note.decision",
+          "expected_evidence_en": "note.decision",
+          "excerpt_guidance_en": "quote the note",
+          "rationale_when_met_ar": "القرار مشروح.",
+          "rationale_when_unmet_ar": "سرد بلا قرار.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "سرد",
+              "descriptor_en": "narration",
+              "observable_evidence_en": "no alternative"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "جزئي",
+              "descriptor_en": "partial",
+              "observable_evidence_en": "alternative named, no reason"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "كامل",
+              "descriptor_en": "complete",
+              "observable_evidence_en": "cause, change, alternative and reason"
+            }
+          ],
+          "library_criterion": "core.communication.clarity"
+        },
+        {
+          "key": "deliverables_complete",
+          "name_ar": "اكتمال المخرجات",
+          "name_en": "Deliverables complete",
+          "dimension": "completeness",
+          "linked_skill": "skl_js_fundamentals",
+          "source": "core",
+          "weight": 0.5,
+          "max_score": 1,
+          "mandatory": true,
+          "threshold_for_skill": null,
+          "evaluator_type": "rule",
+          "human_review_required": false,
+          "description_ar": "السكربت والملاحظة موجودان",
+          "description_en": "Script and note present",
+          "expected_evidence_ar": "الملفات",
+          "expected_evidence_en": "The files",
+          "excerpt_guidance_en": "n/a",
+          "rationale_when_met_ar": "المخرجات مكتملة.",
+          "rationale_when_unmet_ar": "مخرَج ناقص.",
+          "levels": [
+            {
+              "level_key": "unmet",
+              "score": 0,
+              "descriptor_ar": "غير مستوفى",
+              "descriptor_en": "Unmet",
+              "observable_evidence_en": "the required artifact or behaviour is absent"
+            },
+            {
+              "level_key": "met",
+              "score": 1,
+              "descriptor_ar": "مستوفى",
+              "descriptor_en": "Met",
+              "observable_evidence_en": "the required artifact or behaviour is present"
+            }
+          ],
+          "check": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.app_js",
+              "note.decision"
+            ]
+          },
+          "library_criterion": "core.completeness.deliverables"
+        }
+      ]
+    }
+  ]
+}

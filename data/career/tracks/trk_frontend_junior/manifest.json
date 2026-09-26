@@ -1,0 +1,44 @@
+{
+  "pack_id": "trk_frontend_junior",
+  "track_id": "TRK-01",
+  "pack_version": "0.1.0",
+  "status": "draft",
+  "dataset_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "is_demo_fixture": true,
+  "drafting_aid": "ai_assisted",
+  "levels_included": [
+    "junior"
+  ],
+  "language_coverage": [
+    "ar",
+    "en"
+  ],
+  "region_scope": "sa",
+  "primary_source": "src_naqla_frontend_pack_v0_1",
+  "sources": [
+    "src_naqla_frontend_pack_v0_1",
+    "src_whatwg_html_living_standard",
+    "src_w3c_wcag22",
+    "src_ecma262",
+    "src_w3c_css",
+    "src_mdn_web_docs"
+  ],
+  "global_registry_versions": {
+    "skills": "0.1.0",
+    "skill_families": "0.1.0",
+    "proficiency_scale": "1.0.0",
+    "recency_policies": "0.1.0",
+    "criteria_library": "0.1.0",
+    "presentation_rules": "0.1.0",
+    "learning_resources": "0.1.0",
+    "sources": "0.1.0"
+  },
+  "framework_policy": "This is a general Web/Frontend track. No framework (React, Vue, Angular, Next.js, …) is a skill, a requirement or an assumption. A framework may appear only from approved role data, project metadata or verified evidence (D-076).",
+  "contents": {
+    "role": 1,
+    "role_skill_map": 13,
+    "tasks": 11,
+    "activities": 3,
+    "rubrics": 3
+  }
+}

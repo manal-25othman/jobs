@@ -1,0 +1,103 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "code": "src_naqla_frontend_pack_v0_1",
+      "source_type": "curated",
+      "source_name": "NAQLA Frontend Junior track pack v0.1 (platform-authored draft)",
+      "publisher": "NAQLA",
+      "jurisdiction": "sa",
+      "language": "ar",
+      "url": null,
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "0.1.0",
+      "reliability": "low",
+      "license_or_usage_notes": "Platform-authored draft content. Drafted with AI assistance (drafting_aid = ai_assisted). DEMO / DRAFT / NOT SME APPROVED. Requires content-author curation and SME review before any publication."
+    },
+    {
+      "code": "src_whatwg_html_living_standard",
+      "source_type": "official",
+      "source_name": "HTML Living Standard",
+      "publisher": "WHATWG",
+      "jurisdiction": "global",
+      "language": "en",
+      "url": "https://html.spec.whatwg.org/",
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "living (undated — not yet retrieved)",
+      "reliability": "high",
+      "license_or_usage_notes": "CC BY 4.0 (to confirm at retrieval). Referenced as the normative source for semantic HTML. No L0 snapshot captured yet: no network access in this phase."
+    },
+    {
+      "code": "src_w3c_wcag22",
+      "source_type": "official",
+      "source_name": "Web Content Accessibility Guidelines (WCAG) 2.2",
+      "publisher": "W3C",
+      "jurisdiction": "global",
+      "language": "en",
+      "url": "https://www.w3.org/TR/WCAG22/",
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "W3C Recommendation 2023 (to confirm at retrieval)",
+      "reliability": "high",
+      "license_or_usage_notes": "W3C Document License (to confirm). Referenced for accessibility basics. No L0 snapshot captured yet."
+    },
+    {
+      "code": "src_ecma262",
+      "source_type": "official",
+      "source_name": "ECMAScript Language Specification (ECMA-262)",
+      "publisher": "Ecma International / TC39",
+      "jurisdiction": "global",
+      "language": "en",
+      "url": "https://tc39.es/ecma262/",
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "living draft (to confirm at retrieval)",
+      "reliability": "high",
+      "license_or_usage_notes": "Ecma document license (to confirm). Referenced for JavaScript fundamentals. No L0 snapshot captured yet."
+    },
+    {
+      "code": "src_w3c_css",
+      "source_type": "official",
+      "source_name": "CSS Specifications (CSS Working Group)",
+      "publisher": "W3C",
+      "jurisdiction": "global",
+      "language": "en",
+      "url": "https://www.w3.org/Style/CSS/",
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "index page (to confirm at retrieval)",
+      "reliability": "high",
+      "license_or_usage_notes": "W3C Document License (to confirm). Referenced for CSS layout and responsive design. No L0 snapshot captured yet."
+    },
+    {
+      "code": "src_mdn_web_docs",
+      "source_type": "curated",
+      "source_name": "MDN Web Docs",
+      "publisher": "Mozilla / Open Web Docs",
+      "jurisdiction": "global",
+      "language": "en",
+      "url": "https://developer.mozilla.org/",
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "living (undated — not yet retrieved)",
+      "reliability": "high",
+      "license_or_usage_notes": "Prose CC-BY-SA 2.5, code samples CC0 (to confirm at retrieval). Referenced as learning-resource provider metadata only; no content extracted, no URLs to specific pages recorded."
+    },
+    {
+      "code": "src_platform_generated_placeholder",
+      "source_type": "platform_generated",
+      "source_name": "NAQLA platform performance signals (none yet)",
+      "publisher": "NAQLA",
+      "jurisdiction": "sa",
+      "language": "ar",
+      "url": null,
+      "url_verified": false,
+      "retrieved_at": null,
+      "version": "0",
+      "reliability": "low",
+      "license_or_usage_notes": "Placeholder. Platform-generated signals are not used before a declared sample size exists. Zero records."
+    }
+  ]
+}

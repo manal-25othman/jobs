@@ -1,0 +1,176 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "skill": "skl_html_semantic",
+      "relation": "equivalent",
+      "surface_form": "HTML5 semantics",
+      "language": "en",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_html_semantic",
+      "relation": "translation_variant",
+      "surface_form": "HTML الدلالي",
+      "language": "ar",
+      "form_type": "exact",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_css_responsive",
+      "relation": "equivalent",
+      "surface_form": "Responsive web design",
+      "language": "en",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_css_responsive",
+      "relation": "equivalent",
+      "surface_form": "RWD",
+      "language": "en",
+      "form_type": "abbreviation",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "low"
+    },
+    {
+      "skill": "skl_css_responsive",
+      "relation": "translation_variant",
+      "surface_form": "تصميم متجاوب",
+      "language": "ar",
+      "form_type": "exact",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_js_fundamentals",
+      "relation": "equivalent",
+      "surface_form": "JS",
+      "language": "en",
+      "form_type": "abbreviation",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "high"
+    },
+    {
+      "skill": "skl_js_fundamentals",
+      "relation": "equivalent",
+      "surface_form": "Vanilla JavaScript",
+      "language": "en",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_js_fundamentals",
+      "relation": "translation_variant",
+      "surface_form": "جافاسكريبت",
+      "language": "ar",
+      "form_type": "transliteration",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_api_data_states",
+      "relation": "equivalent",
+      "surface_form": "Consuming REST APIs",
+      "language": "en",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_api_data_states",
+      "relation": "translation_variant",
+      "surface_form": "التعامل مع API",
+      "language": "ar",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_accessibility_basics",
+      "relation": "equivalent",
+      "surface_form": "a11y",
+      "language": "en",
+      "form_type": "abbreviation",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "high"
+    },
+    {
+      "skill": "skl_forms_validation",
+      "relation": "equivalent",
+      "surface_form": "Input validation",
+      "language": "en",
+      "form_type": "descriptive_phrase",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_version_control_basics",
+      "relation": "equivalent",
+      "surface_form": "Git basics",
+      "language": "en",
+      "form_type": "vendor_variant",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "high"
+    },
+    {
+      "skill": "skl_version_control_basics",
+      "relation": "tool_of",
+      "related_skill": "skl_code_reading",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_forms_validation",
+      "relation": "narrower",
+      "related_skill": "skl_ui_state_interaction",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    },
+    {
+      "skill": "skl_accessibility_basics",
+      "relation": "related",
+      "related_skill": "skl_html_semantic",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "high"
+    },
+    {
+      "skill": "skl_ui_state_interaction",
+      "relation": "related",
+      "related_skill": "ui-state-management",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "high",
+      "_note": "The Slice-1 demo skill `ui-state-management` overlaps this skill. Linked as `related`, NOT merged: the near-duplicate report proposes; a person decides (OPEN)."
+    },
+    {
+      "skill": "ui-testing",
+      "relation": "related",
+      "related_skill": "skl_frontend_debugging",
+      "source": "src_naqla_frontend_pack_v0_1",
+      "decided_by": "content_author (pending)",
+      "confidence": "medium"
+    }
+  ]
+}

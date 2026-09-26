@@ -17,7 +17,7 @@ export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 's
 export interface ScriptedOutput { readonly candidates: readonly unknown[]; }
 
 /** Bumped whenever a template changes, so a harness run names what it ran against. */
-export const LOCAL_TEST_PROVIDER_VERSION = '0.2.0';
+export const LOCAL_TEST_PROVIDER_VERSION = '0.3.0';
 
 export class LocalTestProvider implements AgentProvider {
   readonly name = 'local-test';
@@ -100,7 +100,22 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
     projectTitle: string; evaluationResultId: string; criteriaMet: string[]; totalScore: number; maxScore: number } | undefined;
   if (!ev) return [];
   const met = ev.criteriaMet.length;
-  return [{
+  // Career Data Foundation: role requirements are READ, never invented. Unpublished
+  // or missing role data becomes a stated limitation, not a guess.
+  const rr = ctx['roleRequirements'] as { status: 'published' | 'unpublished' | 'missing'; roleLabelEn: string | null;
+    requirements: { skillId: string; labelAr: string; labelEn: string; isCore: boolean; whyRequiredAr: string | null }[] } | undefined;
+  const states = (ctx['evidenceStates'] as Record<string, string> | undefined) ?? { [ev.skillId]: ev.state };
+  const roleWarnings: string[] = rr && rr.status !== 'published' ? [`role requirements ${rr.status}: readiness against the role cannot be stated`] : [];
+  const gaps: unknown[] = rr && rr.status === 'published'
+    ? rr.requirements.filter((r) => r.isCore && !['demonstrated', 'verified'].includes(states[r.skillId] ?? 'gap')).map((r) => ({
+        proposalType: 'profile_gap', subjectType: 'skill_claim', subjectId: r.skillId,
+        summary: `مهارة أساسية للدور بلا دليل بعد: «${r.labelAr}»`,
+        structuredPayload: { kind: 'gap', skillId: r.skillId, explanation: `${rr.roleLabelEn ?? 'the role'} lists "${r.labelEn}" as a core requirement${r.whyRequiredAr ? ` (${r.whyRequiredAr})` : ''}; the current state is '${states[r.skillId] ?? 'gap'}'`, currentState: states[r.skillId] ?? 'gap' },
+        evidenceRefs: [], sourceRefs: [{ kind: 'target_role', id: String((ctx['targetRole'] as { id?: string } | undefined)?.id ?? '') }],
+        rationale: 'a published role requirement with no qualifying evidence is a gap the user should see, not a claim', warnings: [], requiresUserApproval: false,
+      }))
+    : [];
+  return [...gaps, {
     proposalType: 'cv_bullet', subjectType: 'evidence', subjectId: ev.id,
     summary: `بند سيرة جديد من دليل «${ev.skillLabelAr}»`,
     structuredPayload: {
@@ -124,7 +139,7 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
     summary: 'أضيفي البند إلى السيرة بعد معاينته',
     structuredPayload: { kind: 'action', action: 'review and approve the proposed CV bullet', why: 'it is the only evidence-backed claim not yet on the CV', estimatedMinutes: 2 },
     evidenceRefs: [ev.id], sourceRefs: [{ kind: 'evidence', id: ev.id }],
-    rationale: 'smallest step with the largest profile effect', warnings: [], requiresUserApproval: false,
+    rationale: 'smallest step with the largest profile effect', warnings: roleWarnings, requiresUserApproval: false,
   }];
 }
 
@@ -134,12 +149,18 @@ function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] 
   if (!r) return [];
   const failed = r.criteria.filter((c) => !c.met);
   const passed = r.criteria.filter((c) => c.met);
+  // Career Data Foundation: the structured activity (deliverables, rubric criteria with
+  // linked skills). Missing structure is a stated limitation; nothing is inferred.
+  const act = ctx['activityContext'] as { status: 'structured' | 'legacy_snapshot' | 'missing'; slug: string | null;
+    deliverables: { key: string; mandatory: boolean; descriptionEn: string }[]; rubric: { criteria: { key: string; nameEn: string; linkedSkillId: string }[] } | null } | undefined;
+  const actWarnings: string[] = act && act.status !== 'structured' ? [`activity structure ${act.status}: criteria are explained from the evaluation record only`] : [];
+  const linkedSkill = (key: string) => act?.rubric?.criteria.find((c) => c.key === key)?.linkedSkillId ?? null;
   const out: unknown[] = [{
     proposalType: 'rubric_explanation', subjectType: 'evaluation_result', subjectId: r.evaluationResultId,
     summary: `${passed.length} من ${r.criteria.length} معايير مستوفاة`,
-    structuredPayload: { kind: 'rubric_explanation', criteria: r.criteria.map((c) => ({ criterion: c.key, met: c.met, likelyWhy: c.rationale })) },
+    structuredPayload: { kind: 'rubric_explanation', criteria: r.criteria.map((c) => ({ criterion: c.key, met: c.met, likelyWhy: c.rationale, ...(linkedSkill(c.key) ? { linkedSkillId: linkedSkill(c.key) } : {}) })) },
     evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
-    rationale: 'each line restates the recorded rationale of the deterministic evaluator', warnings: [], requiresUserApproval: false,
+    rationale: 'each line restates the recorded rationale of the deterministic evaluator', warnings: actWarnings, requiresUserApproval: false,
   }];
   const amb = ctx['ambiguity'] as { kind: string; detail: string } | undefined;
   if (amb) {
@@ -156,7 +177,10 @@ function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] 
     out.push({
       proposalType: 'missing_evidence', subjectType: 'skill_claim', subjectId: r.skillId,
       summary: `دليل ناقص: ${failed.map((c) => c.key).join('، ')}`,
-      structuredPayload: { kind: 'missing_evidence', skillId: r.skillId, whatIsMissing: failed.map((c) => c.key).join(', '), howToProvide: 'cover the unmet criteria in a new submission' },
+      structuredPayload: { kind: 'missing_evidence', skillId: r.skillId, whatIsMissing: failed.map((c) => c.key).join(', '),
+        howToProvide: act && act.status === 'structured' && act.deliverables.length
+          ? `cover the unmet criteria in a new submission of ${act.slug}; mandatory deliverables: ${act.deliverables.filter((d) => d.mandatory).map((d) => d.key).join(', ')}`
+          : 'cover the unmet criteria in a new submission' },
       evidenceRefs: [], sourceRefs: [{ kind: 'evaluation_result', id: r.evaluationResultId }],
       rationale: 'distinguishes failed criteria from missing evidence', warnings: [], requiresUserApproval: false,
     }, {

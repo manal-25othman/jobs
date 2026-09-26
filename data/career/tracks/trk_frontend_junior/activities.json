@@ -1,0 +1,578 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "_note": "3 activities, each measuring 2–3 core skills deeply. can_yield_verified = false until SME approval and a verification policy exist.",
+  "records": [
+    {
+      "code": "act_fe_build_interface",
+      "version": "0.1.0",
+      "level": "junior",
+      "title_ar": "بناء واجهة تفاعلية بمدخلات مُهيكلة وحالات بيانات",
+      "title_en": "Build an interactive interface with structured inputs and data states",
+      "business_context_ar": "فريق منتج صغير يريد صفحة «طلب إجازة» للموظفين: نموذج بأربعة حقول، وقائمة الطلبات السابقة تُجلب من خدمة داخلية. القرار المعلّق: هل تصلح الصفحة للتجربة مع 20 موظفًا الأسبوع القادم؟",
+      "business_context_en": "A small product team wants a 'leave request' page: a four-field form and a list of previous requests fetched from an internal service. The pending decision: can the page go to a 20-employee pilot next week?",
+      "objective_ar": "ابنِ الصفحة بـHTML وCSS وJavaScript (بلا إطار مفروض) بحيث تتحقق من المدخلات، وتعرض حالات التحميل والخطأ والفراغ للقائمة، وتصمد على الجوال والحاسوب، واشرح تدفق البيانات.",
+      "objective_en": "Build the page in HTML, CSS and JavaScript (no framework imposed) so it validates input, shows loading/error/empty states for the list, holds on mobile and desktop, and explain the data flow.",
+      "ai_usage_mode": "ai_assisted",
+      "estimated_minutes": 120,
+      "can_yield_demonstrated": true,
+      "can_yield_verified": false,
+      "is_validation_activity": false,
+      "inputs": [
+        {
+          "key": "brief.leave_request",
+          "description_ar": "وصف من فقرة وصورة تقريبية",
+          "description_en": "A one-paragraph brief and a rough sketch",
+          "is_platform_private": true,
+          "contains_planted_issue": true
+        },
+        {
+          "key": "api.mock_requests",
+          "description_ar": "نقطة نهاية وهمية تعيد قائمة، وقد تعيد خطأ 500 أو قائمة فارغة",
+          "description_en": "A mock endpoint returning a list, sometimes a 500 or an empty list",
+          "is_platform_private": true,
+          "contains_planted_issue": false
+        },
+        {
+          "key": "fields.spec",
+          "description_ar": "قائمة الحقول وقواعدها",
+          "description_en": "The field list and its rules",
+          "is_platform_private": true,
+          "contains_planted_issue": false
+        }
+      ],
+      "deliverables": [
+        {
+          "key": "file.index_html",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "صفحة HTML",
+          "description_en": "The HTML page"
+        },
+        {
+          "key": "file.styles_css",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "ملف الأنماط",
+          "description_en": "The stylesheet"
+        },
+        {
+          "key": "file.app_js",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "ملف JavaScript",
+          "description_en": "The JavaScript"
+        },
+        {
+          "key": "note.data_flow",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "ملاحظة تدفق البيانات (فقرة)",
+          "description_en": "Data-flow note (a paragraph)"
+        },
+        {
+          "key": "answer.clarification",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "إجابة سؤال الاستيضاح",
+          "description_en": "Answer to the clarification question"
+        }
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_ui_state_interaction",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_api_data_states",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_html_semantic",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_css_responsive",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_forms_validation",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_technical_explanation",
+          "depth": "secondary"
+        }
+      ],
+      "tasks": [
+        "tsk_fe_build_from_brief",
+        "tsk_fe_form_validation",
+        "tsk_fe_fetch_api",
+        "tsk_fe_data_states"
+      ],
+      "integrity_checks": [
+        {
+          "key": "clarify_fields_conflict",
+          "check_type": "clarification_question",
+          "blocking": false,
+          "location_en": "brief vs fields.spec",
+          "expected_user_behavior_en": "notices the brief says four fields while the spec lists five, and asks or states the decision",
+          "check_definition": {
+            "type": "artifact_text",
+            "artifactKey": "answer.clarification",
+            "minLength": 40
+          },
+          "user_facing_message_ar": "يذكر الوصف أربعة حقول وتذكر قائمة الحقول خمسة. ما قرارك ولماذا؟",
+          "linked_criterion_key": "judgment_assumption_check"
+        },
+        {
+          "key": "explain_data_flow",
+          "check_type": "explanation_question",
+          "blocking": false,
+          "location_en": "note.data_flow",
+          "expected_user_behavior_en": "explains where state lives and how the list gets its data",
+          "check_definition": {
+            "type": "artifact_text",
+            "artifactKey": "note.data_flow",
+            "minLength": 80
+          },
+          "user_facing_message_ar": "اشرحي في فقرة كيف تصل البيانات من الطلب إلى الشاشة وأين تُحفظ الحالة.",
+          "linked_criterion_key": "explanation_clarity"
+        },
+        {
+          "key": "planted_field_count",
+          "check_type": "planted_inconsistency",
+          "blocking": false,
+          "location_en": "fields.spec has five fields; the brief says four",
+          "expected_user_behavior_en": "asks or decides explicitly",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.planted_field_count"
+          },
+          "raw_ai_output_behavior_en": "implements five fields silently without mentioning the conflict",
+          "linked_criterion_key": "judgment_assumption_check"
+        },
+        {
+          "key": "empty_response_edge",
+          "check_type": "edge_case",
+          "blocking": false,
+          "location_en": "api.mock_requests returns []",
+          "expected_user_behavior_en": "shows an empty state, not a blank list or an error",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.empty_response_edge"
+          },
+          "raw_ai_output_behavior_en": "renders nothing or treats [] as an error",
+          "linked_criterion_key": "data_states"
+        },
+        {
+          "key": "error_500_expected_failure",
+          "check_type": "expected_failure_mode",
+          "blocking": false,
+          "location_en": "api.mock_requests returns 500",
+          "expected_user_behavior_en": "shows a readable error and keeps the form usable",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.error_500_expected_failure"
+          },
+          "raw_ai_output_behavior_en": "leaves the spinner running or shows a blank screen",
+          "linked_criterion_key": "data_states"
+        },
+        {
+          "key": "files_present",
+          "check_type": "followup_modification",
+          "blocking": true,
+          "location_en": "submission",
+          "expected_user_behavior_en": "attaches all three source files",
+          "check_definition": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.index_html",
+              "file.styles_css",
+              "file.app_js"
+            ]
+          },
+          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا."
+        }
+      ],
+      "rubric": "rub_fe_build_interface@0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "act_fe_debug_improve",
+      "version": "0.1.0",
+      "level": "junior",
+      "title_ar": "تصحيح وتحسين واجهة قائمة",
+      "title_en": "Debug and improve an existing frontend implementation",
+      "business_context_ar": "صفحة «تسجيل في ورشة» قائمة تلقّت شكاوى: تنكسر على الجوال، لا تعمل بلوحة المفاتيح، وتقبل بريدًا غير صالح. مسؤولة التسويق تريد إطلاقها خلال يومين.",
+      "business_context_en": "An existing 'workshop registration' page has complaints: it breaks on mobile, cannot be used by keyboard, and accepts an invalid email. Marketing wants it live in two days.",
+      "objective_ar": "أصلحي السلوك المتجاوب والبنية الدلالية وأساسيات الإتاحة وحالات التحقق والخطأ، دون إعادة كتابة الصفحة، واشرحي السبب الجذري لكل عطل.",
+      "objective_en": "Fix responsive behaviour, semantic structure, accessibility basics, and validation/error states without rewriting the page, and explain the root cause of each defect.",
+      "ai_usage_mode": "ai_assisted",
+      "estimated_minutes": 90,
+      "can_yield_demonstrated": true,
+      "can_yield_verified": false,
+      "is_validation_activity": false,
+      "inputs": [
+        {
+          "key": "repo.registration_page",
+          "description_ar": "صفحة قائمة بأربعة أعطال مزروعة",
+          "description_en": "An existing page with four planted defects",
+          "is_platform_private": true,
+          "contains_planted_issue": true
+        },
+        {
+          "key": "report.complaints",
+          "description_ar": "ثلاث شكاوى مستخدمين — إحداها تصف عرَضًا لا سببًا",
+          "description_en": "Three user complaints — one describes a symptom, not a cause",
+          "is_platform_private": true,
+          "contains_planted_issue": true
+        }
+      ],
+      "deliverables": [
+        {
+          "key": "file.index_html",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "الصفحة بعد الإصلاح",
+          "description_en": "The fixed page"
+        },
+        {
+          "key": "file.styles_css",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "الأنماط بعد الإصلاح",
+          "description_en": "The fixed stylesheet"
+        },
+        {
+          "key": "file.app_js",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "السكربت بعد الإصلاح",
+          "description_en": "The fixed script"
+        },
+        {
+          "key": "note.root_causes",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "ملاحظة الأسباب الجذرية (لكل عطل سطر)",
+          "description_en": "Root-cause note (a line per defect)"
+        },
+        {
+          "key": "answer.explanation",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "إجابة سؤال الشرح",
+          "description_en": "Answer to the explanation question"
+        }
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_css_responsive",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_html_semantic",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_js_fundamentals",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_accessibility_basics",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_forms_validation",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_frontend_debugging",
+          "depth": "secondary"
+        }
+      ],
+      "tasks": [
+        "tsk_fe_responsive_page",
+        "tsk_fe_improve_semantics",
+        "tsk_fe_accessibility_basics",
+        "tsk_fe_fix_ui_bug"
+      ],
+      "integrity_checks": [
+        {
+          "key": "explain_symptom_vs_cause",
+          "check_type": "explanation_question",
+          "blocking": false,
+          "location_en": "answer.explanation",
+          "expected_user_behavior_en": "explains why the 'button does nothing' complaint was a focus/handler problem, not a button problem",
+          "check_definition": {
+            "type": "artifact_text",
+            "artifactKey": "answer.explanation",
+            "minLength": 60
+          },
+          "user_facing_message_ar": "إحدى الشكاوى تقول «الزر لا يعمل». ما السبب الفعلي الذي وجدتِه، وكيف تأكدتِ؟",
+          "linked_criterion_key": "root_cause_note"
+        },
+        {
+          "key": "followup_change_breakpoint",
+          "check_type": "followup_modification",
+          "blocking": false,
+          "location_en": "after submission",
+          "expected_user_behavior_en": "adjusts one breakpoint on request without breaking the others",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "followup.breakpoint_900"
+          },
+          "user_facing_message_ar": "بعد التسليم: التسويق يريد أن يظهر العمود الجانبي من 900px بدل 1024px. عدّلي."
+        },
+        {
+          "key": "planted_hidden_overflow",
+          "check_type": "planted_inconsistency",
+          "blocking": false,
+          "location_en": "styles.css has overflow-x: hidden masking the real width bug",
+          "expected_user_behavior_en": "removes the mask and fixes the width",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.planted_hidden_overflow"
+          },
+          "raw_ai_output_behavior_en": "keeps overflow-x hidden and calls it fixed",
+          "linked_criterion_key": "responsive_fixed"
+        },
+        {
+          "key": "deterministic_email_signal",
+          "check_type": "deterministic_signal",
+          "blocking": false,
+          "location_en": "app.js validation",
+          "expected_user_behavior_en": "validates email with a reasonable check and shows a per-field message",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.email_validation_present"
+          },
+          "raw_ai_output_behavior_en": "adds a strict regex that rejects valid addresses",
+          "linked_criterion_key": "validation_fixed"
+        },
+        {
+          "key": "output_consistency_layout",
+          "check_type": "output_consistency",
+          "blocking": false,
+          "location_en": "page at 360px and 1024px",
+          "expected_user_behavior_en": "the layout is consistent with the fixed CSS",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.output_consistency_layout"
+          },
+          "raw_ai_output_behavior_en": "claims fixed while the page still scrolls horizontally",
+          "linked_criterion_key": "responsive_fixed"
+        },
+        {
+          "key": "files_present",
+          "check_type": "followup_modification",
+          "blocking": true,
+          "location_en": "submission",
+          "expected_user_behavior_en": "attaches all three source files",
+          "check_definition": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.index_html",
+              "file.styles_css",
+              "file.app_js"
+            ]
+          },
+          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا."
+        }
+      ],
+      "rubric": "rub_fe_debug_improve@0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    },
+    {
+      "code": "act_fe_change_request",
+      "version": "0.1.0",
+      "level": "junior",
+      "title_ar": "تعديل مشروع قائم بعد تغيّر متطلب",
+      "title_en": "Modify an existing project after a changed requirement",
+      "business_context_ar": "قائمة «مهام الفريق» تعمل منذ شهر. صاحب المنتج يطلب: (١) تصفية المهام بالحالة، (٢) إصلاح بلاغ: عند خلو القائمة تظهر رسالة خطأ بدل «لا مهام». الفريق يريد التغيير في هذا المشروع لا مشروعًا جديدًا.",
+      "business_context_en": "A 'team tasks' list has run for a month. The product owner asks: (1) filter tasks by status, (2) fix a report: when the list is empty an error appears instead of 'no tasks'. The team wants the change inside this project, not a new one.",
+      "objective_ar": "افهمي الكود القائم، حدّدي السبب الجذري للبلاغ، نفّذي التصفية ضمن البنية الحالية، واشرحي قرارك والبديل الذي رفضتِه.",
+      "objective_en": "Understand the existing code, find the root cause of the report, implement the filter within the current structure, and explain your decision and the alternative you rejected.",
+      "ai_usage_mode": "ai_assisted",
+      "estimated_minutes": 90,
+      "can_yield_demonstrated": true,
+      "can_yield_verified": false,
+      "is_validation_activity": false,
+      "inputs": [
+        {
+          "key": "repo.team_tasks",
+          "description_ar": "مشروع صغير قائم (HTML/CSS/JS) بحالة مُدارة في ملف واحد",
+          "description_en": "A small existing project (HTML/CSS/JS) with state managed in one file",
+          "is_platform_private": true,
+          "contains_planted_issue": true
+        },
+        {
+          "key": "request.change",
+          "description_ar": "طلب التغيير والبلاغ",
+          "description_en": "The change request and the bug report",
+          "is_platform_private": true,
+          "contains_planted_issue": false
+        },
+        {
+          "key": "api.mock_tasks",
+          "description_ar": "نقطة نهاية وهمية قد تعيد قائمة فارغة",
+          "description_en": "A mock endpoint that may return an empty list",
+          "is_platform_private": true,
+          "contains_planted_issue": false
+        }
+      ],
+      "deliverables": [
+        {
+          "key": "file.app_js",
+          "format": "source file",
+          "mandatory": true,
+          "description_ar": "السكربت بعد التعديل",
+          "description_en": "The modified script"
+        },
+        {
+          "key": "file.index_html",
+          "format": "source file",
+          "mandatory": false,
+          "description_ar": "الصفحة إن تغيّرت",
+          "description_en": "The page, if changed"
+        },
+        {
+          "key": "note.decision",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "ملاحظة القرار: السبب الجذري، ما تغيّر، البديل المرفوض",
+          "description_en": "Decision note: root cause, what changed, rejected alternative"
+        },
+        {
+          "key": "answer.explanation",
+          "format": "text",
+          "mandatory": true,
+          "description_ar": "إجابة سؤال الشرح",
+          "description_en": "Answer to the explanation question"
+        }
+      ],
+      "related_skills": [
+        {
+          "skill": "skl_js_fundamentals",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_ui_state_interaction",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_api_data_states",
+          "depth": "primary"
+        },
+        {
+          "skill": "skl_code_reading",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_frontend_debugging",
+          "depth": "secondary"
+        },
+        {
+          "skill": "skl_technical_explanation",
+          "depth": "secondary"
+        }
+      ],
+      "tasks": [
+        "tsk_fe_inspect_codebase",
+        "tsk_fe_debug_interaction",
+        "tsk_fe_data_states",
+        "tsk_fe_explain_data_flow"
+      ],
+      "integrity_checks": [
+        {
+          "key": "explain_rejected_alternative",
+          "check_type": "explanation_question",
+          "blocking": false,
+          "location_en": "answer.explanation",
+          "expected_user_behavior_en": "names the alternative (e.g. filtering in the DOM vs in state) and why it was rejected",
+          "check_definition": {
+            "type": "artifact_text",
+            "artifactKey": "answer.explanation",
+            "minLength": 60
+          },
+          "user_facing_message_ar": "ما البديل الذي فكّرتِ فيه لتنفيذ التصفية ولماذا رفضتِه؟",
+          "linked_criterion_key": "decision_explained"
+        },
+        {
+          "key": "followup_second_filter",
+          "check_type": "followup_modification",
+          "blocking": false,
+          "location_en": "after submission",
+          "expected_user_behavior_en": "adds a second filter dimension reusing the same mechanism",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "followup.assignee_filter"
+          },
+          "user_facing_message_ar": "بعد التسليم: أضيفي تصفية بالمكلَّف أيضًا."
+        },
+        {
+          "key": "planted_empty_as_error",
+          "check_type": "planted_inconsistency",
+          "blocking": false,
+          "location_en": "app.js treats [] as an error",
+          "expected_user_behavior_en": "fixes the condition at its cause",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.planted_empty_as_error"
+          },
+          "raw_ai_output_behavior_en": "wraps the render in try/catch and hides the message",
+          "linked_criterion_key": "root_cause_fixed"
+        },
+        {
+          "key": "deterministic_state_signal",
+          "check_type": "deterministic_signal",
+          "blocking": false,
+          "location_en": "app.js",
+          "expected_user_behavior_en": "the filter changes state and rendering follows; no second copy of the list",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.filter_in_state"
+          },
+          "raw_ai_output_behavior_en": "filters the DOM directly, keeping two sources of truth",
+          "linked_criterion_key": "filter_in_state"
+        },
+        {
+          "key": "edge_empty_after_filter",
+          "check_type": "edge_case",
+          "blocking": false,
+          "location_en": "filter yields no tasks",
+          "expected_user_behavior_en": "shows 'no tasks match', not an error",
+          "check_definition": {
+            "type": "artifact_present",
+            "artifactKey": "signal.edge_empty_after_filter"
+          },
+          "raw_ai_output_behavior_en": "shows the error again",
+          "linked_criterion_key": "empty_state_correct"
+        },
+        {
+          "key": "files_present",
+          "check_type": "followup_modification",
+          "blocking": true,
+          "location_en": "submission",
+          "expected_user_behavior_en": "attaches the modified script and the decision note",
+          "check_definition": {
+            "type": "all_of",
+            "artifactKeys": [
+              "file.app_js",
+              "note.decision"
+            ]
+          },
+          "user_facing_message_ar": "يلزم إرفاق السكربت المعدَّل وملاحظة القرار."
+        }
+      ],
+      "rubric": "rub_fe_change_request@0.1.0",
+      "source_refs": [
+        "src_naqla_frontend_pack_v0_1"
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import {
   type PublishedRubric, type SubmissionArtifact, type IntegrityCheckSpec,
   type EvidenceState, type EvaluationRun,
   reestablishmentAllowed,
+  type RubricCriterion,
 } from '@naqla/domain';
 
 /**
@@ -314,7 +315,7 @@ export class EvaluationService {
     c: PoolClient, activitySpecId: string, activitySpecVersion: string,
   ): Promise<PublishedRubric> {
     const { rows } = await c.query(
-      `select id, version, status, criteria
+      `select id, version, status, criteria, pass_threshold, proposes_state
          from rubric_version
         where activity_spec_id = $1 and status = 'published'
         order by created_at desc limit 1`,
@@ -324,12 +325,52 @@ export class EvaluationService {
       // INV-2: without a published rubric there is no evaluation to run.
       throw new BadRequestException('no published rubric for this activity');
     }
-    const body = rows[0].criteria as {
-      passThreshold: number; proposesState: EvidenceState; criteria: unknown[];
-    };
+    const rv = rows[0];
+
+    // Career Data Foundation: rubric_criterion rows are authoritative. The JSONB
+    // column is a legacy snapshot used only when no rows exist.
+    const crit = await c.query(
+      `select key, name_ar, linked_skill_id, max_score, mandatory, evaluator_type, check_type,
+              check_artifact_key, check_min_value, check_min_length, check_artifact_keys,
+              rationale_when_met_ar, rationale_when_unmet_ar
+         from rubric_criterion where rubric_version_id = $1 order by position, key`,
+      [rv.id],
+    );
+    if (crit.rows.length > 0) {
+      const nonRule = crit.rows.filter((r) => r.evaluator_type !== 'rule');
+      if (nonRule.length > 0) {
+        // Honest failure: this evaluator is deterministic. A rubric that needs a
+        // human or a model cannot be run by it, and is not silently reduced.
+        throw new BadRequestException(
+          `rubric ${rv.version} has ${nonRule.length} criterion(s) that need a ${nonRule.map((r) => r.evaluator_type).join('/')} evaluator; not runnable deterministically`);
+      }
+      const toCheck = (r: typeof crit.rows[number]): RubricCriterion['check'] => {
+        switch (r.check_type) {
+          case 'artifact_present': return { type: 'artifact_present', artifactKey: r.check_artifact_key };
+          case 'artifact_at_least': return { type: 'artifact_at_least', artifactKey: r.check_artifact_key, min: Number(r.check_min_value) };
+          case 'artifact_text': return { type: 'artifact_text', artifactKey: r.check_artifact_key, minLength: Number(r.check_min_length) };
+          case 'all_of': return { type: 'all_of', artifactKeys: r.check_artifact_keys };
+          default: throw new BadRequestException(`criterion ${r.key} has no deterministic check`);
+        }
+      };
+      if (rv.pass_threshold === null || rv.proposes_state === null) {
+        throw new BadRequestException('a normalized rubric must state pass_threshold and proposes_state');
+      }
+      return {
+        rubricVersionId: rv.id, version: rv.version, activitySpecId, activitySpecVersion, status: 'published',
+        passThreshold: Number(rv.pass_threshold), proposesState: rv.proposes_state as EvidenceState,
+        criteria: crit.rows.map((r) => ({
+          key: r.key, label: r.name_ar, maxScore: Number(r.max_score), skillId: r.linked_skill_id, mandatory: r.mandatory,
+          check: toCheck(r), rationaleWhenMet: r.rationale_when_met_ar, rationaleWhenUnmet: r.rationale_when_unmet_ar,
+        })),
+      };
+    }
+
+    const body = rv.criteria as { passThreshold: number; proposesState: EvidenceState; criteria: unknown[] } | null;
+    if (!body) throw new BadRequestException('published rubric has neither criterion rows nor a legacy snapshot');
     return {
-      rubricVersionId: rows[0].id,
-      version: rows[0].version,
+      rubricVersionId: rv.id,
+      version: rv.version,
       activitySpecId,
       activitySpecVersion,
       status: 'published',

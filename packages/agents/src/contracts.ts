@@ -11,7 +11,7 @@
  * Version of the proposal envelope and payload contract. Bumped when a field,
  * payload kind or validation-relevant semantic changes. Recorded by the harness.
  */
-export const PROPOSAL_SCHEMA_VERSION = '1.1.0';
+export const PROPOSAL_SCHEMA_VERSION = '1.2.0';
 
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
@@ -56,6 +56,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'targetRole', 'skills', 'evidence', 'evidenceStates', 'professionalAssets',
       'supportedClaims', 'unsupportedClaims', 'projects.title', 'projects.kind', 'cv', 'linkedin',
       'approvedTechnologies', 'ambiguity', 'skillId', 'skillState',
+      // Career Data Foundation: published role requirements (never user evidence).
+      'roleRequirements',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },
@@ -64,6 +66,8 @@ export const AGENTS: readonly AgentDefinition[] = [
     allowedContext: [
       'targetRole', 'project', 'submission', 'rubric', 'rubricCriteria', 'artifacts',
       'deterministicResults', 'userExplanation', 'aiDisclosure', 'existingEvidence', 'ambiguity',
+      // Career Data Foundation: the structured activity (deliverables, skills, tasks, rubric criteria).
+      'activityContext',
     ],
     proposalTypes: TECHNICAL_PROPOSAL_TYPES,
   },

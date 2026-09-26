@@ -10,6 +10,7 @@ import {
 } from '@naqla/agents';
 import { assertNoUnsupportedLanguage, InvariantViolation } from '@naqla/domain';
 import { loadDomainFacts, approvedTechnologiesForEvidence } from './domain-facts';
+import { loadRoleRequirements, loadActivityContext } from '../career-data/career-data.service';
 
 export const AGENT_GATEWAY = Symbol('AGENT_GATEWAY');
 /** Development convenience only — refused as a production value (D-073). */
@@ -71,6 +72,12 @@ export class AgentService {
     return this.db.asService(async (c) => {
       const goal = await c.query(`select tr.id, tr.label_en, tr.review_status from career_goal cg join target_role tr on tr.id = cg.target_role_id where cg.user_id = $1 and cg.is_current`, [userId]);
       const ctx: Record<string, unknown> = { targetRole: goal.rows[0] ? { id: goal.rows[0].id, label: goal.rows[0].label_en } : null };
+      // Career Data Foundation: role requirements come from the PUBLISHED layer, or are reported missing.
+      const roleReq = await loadRoleRequirements(c, goal.rows[0]?.id ?? null);
+      ctx['roleRequirements'] = { status: roleReq.status, roleLabelEn: roleReq.roleLabelEn, reviewStatus: roleReq.reviewStatus,
+        requirements: roleReq.requirements.map((r) => ({ skillId: r.skillId, labelAr: r.labelAr, labelEn: r.labelEn, isCore: r.isCore, importance: r.importance, targetProficiency: r.targetProficiency, whyRequiredAr: r.whyRequiredAr })) };
+      const claims = await c.query('select skill_id, state from skill_claim where user_id = $1', [userId]);
+      ctx['evidenceStates'] = Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state]));
       // Full context is built once; the gateway redacts it per agent and records what passed.
       const user = await c.query('select display_name from app_user where id = $1', [userId]);
       ctx['email'] = null; ctx['displayName'] = user.rows[0]?.display_name;
@@ -98,6 +105,9 @@ export class AgentService {
           criteria: crit.rows.map((x) => ({ key: x.criterion_key, met: Number(x.score) >= Number(x.max_score), rationale: x.rationale })),
           blockingCheck: blocking.rows[0]?.check_key ?? null };
         ctx['aiDisclosure'] = facts['aiDisclosure'] ?? null;
+        const spec = await c.query('select s.activity_spec_id from evaluation_result er join submission sub on sub.id = er.submission_id join project s on s.id = sub.project_id where er.id = $1', [facts['evaluationResultId']]);
+        const actCtx = await loadActivityContext(c, spec.rows[0]?.activity_spec_id ?? null);
+        ctx['activityContext'] = actCtx;
         // Private technical notes and CV data exist in the full context on purpose:
         // the test proves the gateway redacts them for the wrong agent.
         ctx['cv'] = { summary: '(cv data)' };

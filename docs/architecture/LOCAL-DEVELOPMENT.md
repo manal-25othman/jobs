@@ -39,6 +39,10 @@ npm test                    # النطاق + الإعدادات
 | `npm run verify:boundaries` | **يفشل** إن استورد النطاق إطارًا، أو أعاد تطبيقٌ تعريف قاعدة |
 | `npm run verify:prototype` | **يفشل** إن تغيّر النموذج المُجمَّد في `apps/web/` |
 | `npm run eval:agents` | منصّة تقييم الوكلاء: ٣٠ سيناريو عبر المُنسّق والبوابة والنطاق بالمزوّد الاختباري، تشغيلان متطابقان، يكتب `packages/agents/eval/last-run.json` |
+| `npm run career:import` | يستورد حزمة `trk_frontend_junior` (DEMO/DRAFT) عبر الخط: مصدر → لقطة L0 → تطبيع → تكرار (اقتراح) → مطابقة → كتابة `draft`؛ متكرّر بلا أثر |
+| `npm run career:validate` | قواعد جودة بيانات المهن (Q01–Q18)؛ **يفشل** بأي FAIL |
+| `npm run career:near-duplicates` | يكتب `data/career/reports/near-duplicates.md` — اقتراحات لا قرارات |
+| `node scripts/career-data.mjs review …` | انتقال مراجعة واحد بالاسم والدور والسبب (يكتب `review_log`) |
 | `npm run build -w @naqla/api` | يبني الـAPI |
 | `npm run build -w @naqla/app` | يبني تطبيق Next.js |
 | `scripts/db-test.sh` | يطبّق الهجرات ويشغّل إثباتات القاعدة والوصول |

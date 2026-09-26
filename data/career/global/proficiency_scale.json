@@ -1,0 +1,67 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "code": "scale_default",
+  "version": "1.0.0",
+  "name_ar": "مقياس الإتقان الافتراضي",
+  "name_en": "Default proficiency scale",
+  "levels": [
+    {
+      "level_key": "foundation",
+      "ordinal": 1,
+      "label_ar": "أساس",
+      "label_en": "Foundation",
+      "descriptor_ar": "يعرف المفاهيم ويطبّقها بإرشاد",
+      "descriptor_en": "Knows the concepts and applies them with guidance",
+      "observable_ar": [
+        "ينجز المهمة بمراجعة متكررة"
+      ],
+      "observable_en": [
+        "completes the task with frequent review"
+      ]
+    },
+    {
+      "level_key": "working",
+      "ordinal": 2,
+      "label_ar": "عملي",
+      "label_en": "Working",
+      "descriptor_ar": "ينجز مهام معتادة باستقلالية على نطاق محدود",
+      "descriptor_en": "Completes routine tasks independently within a bounded scope",
+      "observable_ar": [
+        "ينجز مهمة محددة النطاق دون تدخل",
+        "يشرح ما فعله"
+      ],
+      "observable_en": [
+        "completes a bounded task without intervention",
+        "explains what was done"
+      ]
+    },
+    {
+      "level_key": "independent",
+      "ordinal": 3,
+      "label_ar": "مستقل",
+      "label_en": "Independent",
+      "descriptor_ar": "يتعامل مع مهام غير معتادة ويشرح قراراته",
+      "descriptor_en": "Handles non-routine tasks and explains decisions",
+      "observable_ar": [
+        "يختار بين بدائل ويبرّر"
+      ],
+      "observable_en": [
+        "chooses between alternatives and justifies"
+      ]
+    },
+    {
+      "level_key": "advanced",
+      "ordinal": 4,
+      "label_ar": "متقدم",
+      "label_en": "Advanced",
+      "descriptor_ar": "يقود التصميم ويراجع عمل الآخرين",
+      "descriptor_en": "Leads design and reviews others' work",
+      "observable_ar": [
+        "يراجع ويوجّه"
+      ],
+      "observable_en": [
+        "reviews and guides"
+      ]
+    }
+  ]
+}

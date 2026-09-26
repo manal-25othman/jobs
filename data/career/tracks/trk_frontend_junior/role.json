@@ -1,0 +1,102 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "code": "frontend-developer-junior",
+  "name_ar": "مطوّر/ة واجهات ويب — مبتدئ",
+  "name_en": "Junior Web / Frontend Developer",
+  "family": "software_engineering",
+  "level": "junior",
+  "description_ar": "يبني ويصلح واجهات ويب صغيرة إلى متوسطة من وصف قصير، باستخدام HTML وCSS وJavaScript كما تعرّفها المعايير، ويشرح قراراته لفريقه. لا يُفترض إطار عمل معيّن؛ الأطر تُتعلَّم في سياق الفريق.",
+  "description_en": "Builds and fixes small-to-medium web interfaces from a short brief using standards-based HTML, CSS and JavaScript, and explains decisions to the team. No specific framework is assumed; frameworks are learned in the team's context.",
+  "mission_statement_ar": "تحويل متطلب منتج إلى واجهة تعمل، يمكن للمستخدم استخدامها وللفريق صيانتها.",
+  "mission_statement_en": "Turn a product requirement into a working interface a user can use and the team can maintain.",
+  "typical_responsibilities_ar": [
+    "بناء صفحات ومكوّنات من وصف قصير",
+    "إصلاح أعطال واجهة مُبلَّغ عنها",
+    "ربط الواجهة ببيانات من API",
+    "التحقق من مدخلات النماذج",
+    "جعل الصفحة متجاوبة وقابلة للوصول",
+    "قراءة كود قائم وتعديله",
+    "شرح ما تغيّر ولماذا"
+  ],
+  "typical_responsibilities_en": [
+    "build pages and components from a short brief",
+    "fix reported UI defects",
+    "connect the interface to API data",
+    "validate form input",
+    "make a page responsive and accessible",
+    "read and modify existing code",
+    "explain what changed and why"
+  ],
+  "expected_outputs_ar": [
+    "صفحة/مكوّن يعمل في المتصفح",
+    "إصلاح مع شرح للسبب الجذري",
+    "نموذج مع تحقق ورسائل خطأ",
+    "ملاحظة قرار قصيرة"
+  ],
+  "expected_outputs_en": [
+    "a page/component that works in the browser",
+    "a fix with a root-cause explanation",
+    "a form with validation and error messages",
+    "a short decision note"
+  ],
+  "expected_from_junior_ar": [
+    "إنجاز مهمة محدودة النطاق باستقلالية",
+    "طرح سؤال عند نقص المعلومة بدل الافتراض",
+    "اختبار عمله يدويًا في متصفحين على الأقل",
+    "شرح تدفق البيانات في ما بناه"
+  ],
+  "expected_from_junior_en": [
+    "complete a bounded task independently",
+    "ask when information is missing instead of assuming",
+    "test own work manually in at least two browsers",
+    "explain the data flow of what was built"
+  ],
+  "not_expected_from_junior_ar": [
+    "تصميم معمارية النظام",
+    "اختيار إطار العمل للفريق",
+    "تحسين الأداء المتقدم",
+    "قيادة مراجعة الكود",
+    "إتقان إطار عمل معيّن قبل الانضمام"
+  ],
+  "not_expected_from_junior_en": [
+    "designing system architecture",
+    "choosing the team's framework",
+    "advanced performance work",
+    "leading code review",
+    "mastery of a specific framework before joining"
+  ],
+  "common_tools": [
+    {
+      "name": "browser developer tools",
+      "criticality": "essential",
+      "skill": "skl_frontend_debugging"
+    },
+    {
+      "name": "code editor",
+      "criticality": "essential"
+    },
+    {
+      "name": "Git",
+      "criticality": "essential",
+      "skill": "skl_version_control_basics"
+    },
+    {
+      "name": "HTTP client / API explorer",
+      "criticality": "common",
+      "skill": "skl_api_data_states"
+    },
+    {
+      "name": "accessibility checker",
+      "criticality": "common",
+      "skill": "skl_accessibility_basics"
+    },
+    {
+      "name": "issue tracker",
+      "criticality": "common"
+    }
+  ],
+  "region_scope": "sa",
+  "source_refs": [
+    "src_naqla_frontend_pack_v0_1"
+  ]
+}

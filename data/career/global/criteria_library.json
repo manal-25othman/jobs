@@ -1,0 +1,95 @@
+{
+  "_label": "DEMO / DRAFT / NOT SME APPROVED",
+  "records": [
+    {
+      "key": "core.completeness.deliverables",
+      "name_ar": "اكتمال المخرجات",
+      "name_en": "Deliverables complete",
+      "dimension": "completeness",
+      "description_ar": "كل مخرَج إلزامي موجود",
+      "description_en": "Every mandatory deliverable is present",
+      "default_evaluator": "rule"
+    },
+    {
+      "key": "core.judgment.assumption_check",
+      "name_ar": "فحص الافتراضات",
+      "name_en": "Assumption check",
+      "dimension": "judgment",
+      "description_ar": "الافتراضات مذكورة صراحةً لا مضمرة",
+      "description_en": "Assumptions are stated, not silently made",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.judgment.decision_under_uncertainty",
+      "name_ar": "قرار في ظل غموض",
+      "name_en": "Decision under uncertainty",
+      "dimension": "judgment",
+      "description_ar": "عند نقص المعلومة يُتخذ قرار مبرَّر أو يُطرح سؤال",
+      "description_en": "With missing information, a justified decision is made or a question is asked",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.judgment.scope_discipline",
+      "name_ar": "الانضباط في النطاق",
+      "name_en": "Scope discipline",
+      "dimension": "judgment",
+      "description_ar": "التغيير محصور فيما طُلب",
+      "description_en": "The change stays within what was asked",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.communication.clarity",
+      "name_ar": "وضوح الشرح",
+      "name_en": "Clarity of explanation",
+      "dimension": "communication",
+      "description_ar": "الشرح يُفهم من زميل غير مطّلع",
+      "description_en": "A peer who was not there can follow the explanation",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.communication.audience_fit",
+      "name_ar": "ملاءمة الجمهور",
+      "name_en": "Audience fit",
+      "dimension": "communication",
+      "description_ar": "اللغة مناسبة لصاحب المنتج",
+      "description_en": "The language fits a product owner",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.ambiguity.handling",
+      "name_ar": "التعامل مع الغموض",
+      "name_en": "Handling ambiguity",
+      "dimension": "judgment",
+      "description_ar": "الغموض يُسمّى ويُعالج لا يُتجاهل",
+      "description_en": "Ambiguity is named and handled, not ignored",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.integrity.ai_verification",
+      "name_ar": "التحقق من مخرَج المساعد",
+      "name_en": "Verifying assisted output",
+      "dimension": "integrity",
+      "description_ar": "مخرَج المساعد رُوجع وصُحّح حيث لزم",
+      "description_en": "Assisted output was checked and corrected where needed",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.integrity.error_detection",
+      "name_ar": "اكتشاف الخطأ المزروع",
+      "name_en": "Detecting the planted error",
+      "dimension": "integrity",
+      "description_ar": "التناقض المزروع في المدخلات اكتُشف",
+      "description_en": "The inconsistency planted in the inputs was noticed",
+      "default_evaluator": "human"
+    },
+    {
+      "key": "core.correctness.root_cause",
+      "name_ar": "السبب الجذري",
+      "name_en": "Root cause addressed",
+      "dimension": "correctness",
+      "description_ar": "الإصلاح في السبب لا في العرض",
+      "description_en": "The fix addresses the cause, not the symptom",
+      "default_evaluator": "human"
+    }
+  ]
+}
