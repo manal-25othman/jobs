@@ -40,11 +40,12 @@ npm test                    # النطاق + الإعدادات
 | `npm run verify:prototype` | **يفشل** إن تغيّر النموذج المُجمَّد في `apps/web/` |
 | `npm run eval:agents` | منصّة تقييم الوكلاء: ٣٠ سيناريو عبر المُنسّق والبوابة والنطاق بالمزوّد الاختباري، تشغيلان متطابقان، يكتب `packages/agents/eval/last-run.json` |
 | `npm run career:import` | يستورد حزمة `trk_frontend_junior` (DEMO/DRAFT) عبر الخط: مصدر → لقطة L0 → تطبيع → تكرار (اقتراح) → مطابقة → كتابة `draft`؛ متكرّر بلا أثر |
-| `npm run career:validate` | قواعد جودة بيانات المهن (Q01–Q21)؛ **يفشل** بأي FAIL |
+| `npm run career:validate` | قواعد جودة بيانات المهن (Q01–Q24)؛ **يفشل** بأي FAIL |
 | `npm run career:near-duplicates` | يكتب `data/career/reports/near-duplicates.md` — اقتراحات لا قرارات |
 | `node scripts/career-data.mjs review …` | انتقال مراجعة واحد بالاسم والدور والسبب (يكتب `review_log`) |
 | `node scripts/career-data.mjs promote <kind> <demo-uuid> --by <uuid> [--note …]` | ينشئ **نسخة مراجعة غير تجريبية** (`curated`) من صف DEMO وأبنائه دون المساس بالأصل؛ يفتح `content_promotion` (D-096) |
 | `node scripts/career-data.mjs promotion-correction <promotion-uuid> --field … --from … --to … --by … --reason …` | يسجّل تصحيحًا واحدًا على النسخة داخل سجل الترقية |
+| `node scripts/career-data.mjs approve-values <rubric-version-uuid> --by <sme-uuid> --label "<name>" --reason "<why>"` | **الفعل الوحيد** الذي يحوّل أوزان/عتبات رُبريك (غير تجريبي، قبل اعتماده) من `proposed` إلى `approved`؛ يُسجَّل في `review_log` (D-100). أي طريق آخر ترفضه القاعدة |
 | `node scripts/career-data.mjs promotion-complete <promotion-uuid> --by <uuid>` | يغلق الترقية: يشترط النشر واعتماد SME في `review_log`، ثم يجعل الأصل التجريبي `superseded` (يبقى مُعرَّفًا) |
 | `npm run build -w @naqla/api` | يبني الـAPI |
 | `npm run build -w @naqla/app` | يبني تطبيق Next.js |
@@ -172,6 +173,7 @@ npm run dev -w @naqla/app                                        # :3000
 ثم في المتصفح: `/login` ← `/goal` ← `/project` ← `/evaluation` ← `/asset` ← `/report`.
 
 ### الاختبارات
+> مجموعات e2e تُشغَّل **تسلسليًا** (`npm run test:e2e -w @naqla/api` = `node --test --test-concurrency=1 dist/test/*.e2e.js`): قواعد الجودة تفحص القاعدة كلها، فتشغيل الملفات بالتوازي يجعلها ترى بقايا ملف آخر.
 
 ```bash
 npm test                          # 94 اختبار نطاق + 7 إعدادات

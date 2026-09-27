@@ -4,6 +4,7 @@
  *   validate                           run every quality rule; exit 1 on any FAIL
  *   near-duplicates <packId>           write data/career/reports/near-duplicates.md
  *   review <kind> <id> <to> --role <r> --by <uuid|-> --label <name> --reason "<why>" [--minutes n]
+ *   approve-values <rubric-version-uuid> --by <uuid> --label <name> --reason "<why>"   the ONE recorded SME act that lets weight/threshold statuses become approved (OPEN-043)
  */
 import { Pool } from 'pg';
 import { writeFileSync } from 'node:fs';
@@ -11,7 +12,7 @@ import { join } from 'node:path';
 import { loadPack } from './pack-loader';
 import { importPack, renderNearDuplicateReport, ImportError } from './pipeline';
 import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
-import { reviewTransition } from './review';
+import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
@@ -32,7 +33,8 @@ export async function main(argv: string[], root: string): Promise<number> {
       console.log(`  snapshots: ${r.snapshots.filter((s) => s.stored === 'new').length} new, ${r.snapshots.filter((s) => s.stored === 'existing').length} existing · normalized records: ${r.normalizedRecords}`);
       console.log(`  written (draft): ${Object.entries(r.written).map(([k, v]) => `${k}=${v}`).join(' ')}`);
       if (r.skippedFrozen.length) console.log(`  not touched (past curated): ${r.skippedFrozen.join(', ')}`);
-      console.log(`  near-duplicate candidates proposed: ${r.nearDuplicates.length} (nothing merged)`);
+      console.log(`  near-duplicate candidates proposed: ${r.nearDuplicates.length} (nothing merged automatically)`);
+      for (const x of r.resolutions) console.log(`  owner-decided resolution: ${x.alias} → ${x.canonical} ${x.applied ? `applied (alias kept as merged_into; repointed ${Object.entries(x.repointed).map(([k, v]) => `${k}=${v}`).join(' ') || 'nothing'})` : 'already applied'}`);
       return 0;
     }
     if (cmd === 'validate') {
@@ -58,6 +60,13 @@ export async function main(argv: string[], root: string): Promise<number> {
       console.log(`${a1} ${a2}: ${r.from} → ${r.to} (${role}, ${label})`);
       return 0;
     }
+    if (cmd === 'approve-values') {
+      const by = arg(argv, '--by'); const label = arg(argv, '--label') ?? by ?? 'unknown'; const reason = arg(argv, '--reason') ?? '';
+      if (!by || by === '-' || !reason.trim()) { console.error('approve-values needs --by <reviewer-uuid> and --reason'); return 2; }
+      const r = await approveRubricValues(pool, { rubricVersionId: a1!, decidedBy: by, decidedByLabel: label, reason });
+      console.log(`rubric ${r.version}: ${r.criteria} criteria weights/thresholds and the pass threshold are now approved by ${label} (recorded)`);
+      return 0;
+    }
     if (cmd === 'promote') {
       const r = await promoteDemo(pool, a1!, a2!, arg(argv, '--by') ?? 'unknown', arg(argv, '--note') ?? null);
       console.log(`promotion ${r.promotionId}: review copy ${r.canonicalId} created (${Object.entries(r.copied).map(([k, v]) => `${k}=${v}`).join(' ')}); it is curated, non-demo, and now walks the review workflow`);
@@ -71,7 +80,7 @@ export async function main(argv: string[], root: string): Promise<number> {
       const r = await completePromotion(pool, a1!);
       console.log(`promotion closed: demo superseded=${r.demoSuperseded}, ${r.reviewLogIds.length} review decision(s) recorded`); return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review|promote|promotion-correction|promotion-complete> …'); return 2;
+    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

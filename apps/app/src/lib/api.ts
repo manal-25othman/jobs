@@ -79,7 +79,8 @@ export interface ReviewItem {
   itemId: string; state: string;
   activity: { slug: string; titleAr: string; objectiveAr: string; businessContextAr: string; aiUsageMode: string; deliverables: { key: string; mandatory: boolean; descriptionAr: string }[] };
   criterion: { key: string; nameAr: string; descriptionAr: string; expectedEvidenceAr: string; maxScore: number; mandatory: boolean;
-    levels: { levelKey: string; score: number; descriptorAr: string; observableEvidenceEn: string }[] };
+    levels: { levelKey: string; score: number; descriptorAr: string; observableEvidenceEn: string }[];
+    observations: { key: string; reviewerPromptAr: string; reviewerPromptEn: string; passWhenEn: string; failWhenEn: string; affectsEvidence: boolean }[] };
   submission: { artifacts: { key: string; kind: string; valueBool: boolean | null; valueNumber: number | null; valueText: string | null; locator: string | null }[];
     files: { name: string; downloadUrl: string; sizeBytes: number }[]; userExplanation: { key: string; text: string | null }[]; aiDisclosure: { declaredUse: string[] } };
   deterministic: { criteria: { key: string; score: number; maxScore: number; rationale: string }[]; integrityChecks: { key: string; passed: boolean }[] };

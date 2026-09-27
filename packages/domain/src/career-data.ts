@@ -10,7 +10,7 @@
  *   layers:   raw → normalized → curated → approved → published → superseded
  */
 import { DomainError, MissingPrerequisite, IllegalTransition } from './errors.js';
-import { evidenceOrdinal, type EvidenceState } from './evidence-state.js';
+import { evidenceOrdinal, EVIDENCE_STATES, type EvidenceState } from './evidence-state.js';
 
 /* ────────────────────────────── review workflow ───────────────────────── */
 
@@ -189,18 +189,75 @@ export interface NearDuplicateCandidate {
  * the threshold are PROPOSED for a human decision. Nothing here merges.
  */
 export function nearDuplicateCandidates(
-  skills: readonly { readonly code: string; readonly nameEn: string; readonly nameAr: string }[],
+  skills: readonly { readonly code: string; readonly nameEn: string; readonly nameAr: string; readonly status?: SkillStatus }[],
   threshold = 0.5,
 ): NearDuplicateCandidate[] {
   const out: NearDuplicateCandidate[] = [];
-  for (let i = 0; i < skills.length; i++) for (let j = i + 1; j < skills.length; j++) {
-    const a = skills[i]!, b = skills[j]!;
+  // A skill already merged into a canonical one (or deprecated) is RESOLVED: it
+  // is an alias, not an unresolved near-duplicate (OPEN-039, D-097).
+  const active = skills.filter((s) => (s.status ?? 'active') === 'active');
+  for (let i = 0; i < active.length; i++) for (let j = i + 1; j < active.length; j++) {
+    const a = active[i]!, b = active[j]!;
     const en = matchKeySimilarity(a.nameEn, b.nameEn);
     const ar = matchKeySimilarity(a.nameAr, b.nameAr);
     if (en >= threshold) out.push({ aCode: a.code, bCode: b.code, similarity: Number(en.toFixed(3)), onField: 'name_en' });
     else if (ar >= threshold) out.push({ aCode: a.code, bCode: b.code, similarity: Number(ar.toFixed(3)), onField: 'name_ar' });
   }
   return out.sort((x, y) => y.similarity - x.similarity);
+}
+
+/* ─────────────────────────── canonical skill / alias ────────────────────── */
+
+export const SKILL_STATUSES = ['active', 'deprecated', 'merged_into'] as const;
+export type SkillStatus = (typeof SKILL_STATUSES)[number];
+
+export interface SkillAliasRow { readonly id: string; readonly status: SkillStatus; readonly mergedIntoId: string | null }
+
+/**
+ * Follows `merged_into` to the canonical skill (OPEN-039, D-097). The alias row
+ * keeps its id and every historical reference to it; only NEW lookups resolve.
+ * A chain longer than 5 or a cycle is a data error, not something to guess at.
+ */
+export function resolveCanonicalSkillId(skills: readonly SkillAliasRow[], id: string): string {
+  const byId = new Map(skills.map((s) => [s.id, s]));
+  let cur = id; const seen = new Set<string>();
+  for (let hops = 0; hops <= 5; hops++) {
+    const row = byId.get(cur);
+    if (!row || row.status !== 'merged_into' || !row.mergedIntoId) return cur;
+    if (seen.has(cur)) throw new DomainError(`skill alias cycle at ${cur}`);
+    seen.add(cur); cur = row.mergedIntoId;
+  }
+  throw new DomainError(`skill alias chain too long from ${id}`);
+}
+
+/**
+ * Collapses per-skill claim states onto canonical skills: an alias claim counts
+ * for its canonical skill, and where both exist the more advanced state wins
+ * (the ladder is forward-only, so the higher one is the honest summary).
+ */
+export function canonicalEvidenceStates(
+  skills: readonly SkillAliasRow[],
+  claims: readonly { readonly skillId: string; readonly state: EvidenceState }[],
+): Record<string, EvidenceState> {
+  const out: Record<string, EvidenceState> = {};
+  for (const c of claims) {
+    const k = resolveCanonicalSkillId(skills, c.skillId);
+    const cur = out[k];
+    if (!cur || EVIDENCE_STATES.indexOf(c.state) > EVIDENCE_STATES.indexOf(cur)) out[k] = c.state;
+  }
+  return out;
+}
+
+/** An owner-decided resolution of a near-duplicate pair, carried by the pack. Only `equivalent` merges. */
+export interface DuplicateResolution {
+  readonly alias: string; readonly canonical: string; readonly relation: 'equivalent';
+  readonly decided_by: string; readonly decided_at: string; readonly decision_ref: string; readonly reason: string;
+}
+export function assertDuplicateResolutionWellFormed(r: DuplicateResolution, knownSkills: ReadonlySet<string>): void {
+  if (r.alias === r.canonical) throw new DomainError('a skill cannot be an alias of itself');
+  if (r.relation !== 'equivalent') throw new DomainError(`only an 'equivalent' pair is resolved by aliasing (got '${r.relation}'); broader/narrower/related stay two skills`);
+  if (!knownSkills.has(r.canonical)) throw new DomainError(`canonical skill '${r.canonical}' must be in the pack`);
+  for (const f of ['decided_by', 'decided_at', 'decision_ref', 'reason'] as const) if (!r[f]?.trim()) throw new DomainError(`duplicate resolution ${r.alias}→${r.canonical}: ${f} is required (a merge is a documented human decision, D-083)`);
 }
 
 /** Two skills whose match keys are identical are duplicates, not near-duplicates. */
@@ -234,9 +291,68 @@ export function evidencePathStatus(input: {
 /* ───────────────────────────── activities and rubrics ─────────────────── */
 
 export const INTEGRITY_CHECK_TYPES = {
-  user_facing: ['clarification_question', 'explanation_question', 'followup_modification'],
+  user_facing: ['clarification_question', 'explanation_question', 'followup_modification', 'mandatory_deliverables'],
   assessment_only: ['planted_inconsistency', 'deterministic_signal', 'edge_case', 'output_consistency', 'expected_failure_mode'],
 } as const;
+
+/**
+ * OPEN-045: how an integrity check is evaluated.
+ *  - deterministic        a rule over artifacts the platform can actually produce
+ *  - human_observable     a reviewer judges it from the submission; it becomes an
+ *                         input to a named human criterion, never a score by itself
+ *  - future_deterministic valuable, but needs a producer that does not exist yet;
+ *                         registered, inactive, never blocks the current activity
+ */
+export const INTEGRITY_EVALUATION_MODES = ['deterministic', 'human_observable', 'future_deterministic'] as const;
+export type IntegrityEvaluationMode = (typeof INTEGRITY_EVALUATION_MODES)[number];
+
+/**
+ * Artifact key prefixes the platform has a producer for today. Anything else
+ * (`signal.*`, `followup.*`, `test.*` from a runner …) has NO producer, so an
+ * ACTIVE deterministic check on it would be evaluated against nothing.
+ */
+export const ARTIFACT_PRODUCERS: Readonly<Record<string, string>> = {
+  'file.': 'user upload (submission files, keyed by deliverable)',
+  'note.': 'user text (a note deliverable)',
+  'answer.': 'user text (an answer to a user-facing question)',
+  'test.': 'user-declared test facts (Slice 1 demo submission form)',
+};
+export function artifactHasProducer(key: string): boolean {
+  return Object.keys(ARTIFACT_PRODUCERS).some((p) => key.startsWith(p));
+}
+export function artifactKeysOf(check: { readonly type: string; readonly artifactKey?: string; readonly artifactKeys?: readonly string[] }): readonly string[] {
+  return check.artifactKeys ?? (check.artifactKey ? [check.artifactKey] : []);
+}
+/** No active deterministic check may depend on an artifact nothing produces (OPEN-045). */
+export function assertActiveChecksHaveProducers(
+  checks: readonly { readonly key: string; readonly mode?: IntegrityEvaluationMode; readonly active?: boolean; readonly check: { readonly type: string; readonly artifactKey?: string; readonly artifactKeys?: readonly string[] } }[],
+): void {
+  const bad: string[] = [];
+  for (const c of checks) {
+    if ((c.mode ?? 'deterministic') !== 'deterministic' || c.active === false) continue;
+    for (const k of artifactKeysOf(c.check)) if (!artifactHasProducer(k)) bad.push(`${c.key} → ${k}`);
+  }
+  if (bad.length) throw new DomainError(`active deterministic integrity check(s) depend on an artifact no producer creates: ${bad.join(', ')}`);
+}
+
+/* ───────────────────────────── criterion kinds (OPEN-044) ──────────────── */
+
+/**
+ * skill_evidence  measures a skill; its score may feed that skill's evidence.
+ * gate            submission completeness / admissibility; blocks or admits, never evidence.
+ * quality         a quality signal on the submission as a whole; never skill evidence.
+ */
+export const CRITERION_KINDS = ['skill_evidence', 'gate', 'quality'] as const;
+export type CriterionKind = (typeof CRITERION_KINDS)[number];
+export function criterionMayProduceEvidence(c: { readonly kind?: CriterionKind; readonly skillId: string | null }): boolean {
+  return (c.kind ?? 'skill_evidence') === 'skill_evidence' && c.skillId !== null;
+}
+export function assertCriterionKindShape(c: { readonly key: string; readonly kind?: CriterionKind; readonly skillId: string | null; readonly thresholdForSkill: number | null }): void {
+  const kind = c.kind ?? 'skill_evidence';
+  if (kind === 'skill_evidence' && c.skillId === null) throw new DomainError(`criterion '${c.key}' measures a skill but names none`);
+  if (kind !== 'skill_evidence' && c.skillId !== null) throw new DomainError(`criterion '${c.key}' is a ${kind} criterion: it must not be mapped to a skill (OPEN-044)`);
+  if (kind !== 'skill_evidence' && c.thresholdForSkill !== null) throw new DomainError(`criterion '${c.key}' is a ${kind} criterion: a skill threshold does not apply`);
+}
 export type IntegrityCheckType =
   | (typeof INTEGRITY_CHECK_TYPES.user_facing)[number] | (typeof INTEGRITY_CHECK_TYPES.assessment_only)[number];
 

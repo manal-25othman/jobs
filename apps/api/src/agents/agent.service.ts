@@ -8,7 +8,7 @@ import {
   WORDING_PROPOSAL_TYPES, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
   type ProposalLifecycle, type InputReference, type WordingPayload, type TestProviderMode,
 } from '@naqla/agents';
-import { assertNoUnsupportedLanguage, InvariantViolation } from '@naqla/domain';
+import { assertNoUnsupportedLanguage, InvariantViolation, canonicalEvidenceStates } from '@naqla/domain';
 import { loadDomainFacts, approvedTechnologiesForEvidence } from './domain-facts';
 import { loadRoleRequirements, loadActivityContext } from '../career-data/career-data.service';
 
@@ -76,8 +76,9 @@ export class AgentService {
       const roleReq = await loadRoleRequirements(c, goal.rows[0]?.id ?? null);
       ctx['roleRequirements'] = { status: roleReq.status, roleLabelEn: roleReq.roleLabelEn, reviewStatus: roleReq.reviewStatus,
         requirements: roleReq.requirements.map((r) => ({ skillId: r.skillId, labelAr: r.labelAr, labelEn: r.labelEn, isCore: r.isCore, importance: r.importance, targetProficiency: r.targetProficiency, whyRequiredAr: r.whyRequiredAr })) };
-      const claims = await c.query('select skill_id, state from skill_claim where user_id = $1', [userId]);
-      ctx['evidenceStates'] = Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state]));
+      // OPEN-039: a claim on an alias skill is reported under its canonical skill (the higher state wins).
+      const claims = await c.query('select canonical_skill_id(skill_id) as skill_id, state from skill_claim where user_id = $1', [userId]);
+      ctx['evidenceStates'] = canonicalEvidenceStates([], claims.rows.map((r) => ({ skillId: r.skill_id, state: r.state })));
       // Full context is built once; the gateway redacts it per agent and records what passed.
       const user = await c.query('select display_name from app_user where id = $1', [userId]);
       ctx['email'] = null; ctx['displayName'] = user.rows[0]?.display_name;

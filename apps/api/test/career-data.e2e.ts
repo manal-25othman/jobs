@@ -43,8 +43,31 @@ describe('import pipeline — Source → Raw → Normalize → Deduplicate → M
     assert.equal((await pool.query(`select count(*)::int n from activity_spec where can_yield_verified`)).rows[0].n, 0, 'nothing can yield Verified');
     assert.equal((await pool.query(`select count(*)::int n from learning_resource where url is not null`)).rows[0].n, 0, 'no invented URLs');
     assert.equal((await pool.query(`select count(*)::int n from learning_resource where quality_status <> 'unverified'`)).rows[0].n, 0);
-    assert.ok(r1.nearDuplicates.some((d) => [d.aCode, d.bCode].includes('ui-state-management') && [d.aCode, d.bCode].includes('skl_ui_state_interaction')), 'the near-duplicate report proposes the overlap; nothing merged');
-    assert.equal((await pool.query(`select count(*)::int n from skill where status <> 'active'`)).rows[0].n, 0, 'no automatic merge happened');
+    // OPEN-039 (D-097): the owner resolved the pair as `equivalent`; the pipeline applies it non-destructively.
+    assert.ok(!r1.nearDuplicates.some((d) => [d.aCode, d.bCode].includes('ui-state-management')), '2 — the resolved pair is no longer an unresolved near-duplicate');
+    assert.deepEqual(r1.resolutions.map((x) => [x.alias, x.canonical]), [['ui-state-management', 'skl_ui_state_interaction']]);
+    assert.equal(r2.resolutions[0]!.applied, false, 'idempotent: a later import finds the resolution already applied and changes nothing');
+    assert.equal((await pool.query(`select count(*)::int n from skill where status <> 'active'`)).rows[0].n, 1, 'exactly the alias is merged; nothing else changed status');
+  });
+  test('OPEN-039 — 1: the alias keeps its id; the canonical skill is one; mappings and provenance updated; nothing deleted', async () => {
+    const alias = await pool.query(`select id, slug, status, merged_into_id, review_status, label_ar from skill where slug = 'ui-state-management'`);
+    const canon = await pool.query(`select id from skill where slug = 'skl_ui_state_interaction' and is_demo_fixture`);
+    assert.equal(alias.rowCount, 1, 'the alias row still exists'); assert.equal(alias.rows[0].id, 'a0000000-0000-4000-8000-000000000001', 'under its original id');
+    assert.equal(alias.rows[0].status, 'merged_into'); assert.equal(alias.rows[0].merged_into_id, canon.rows[0].id); assert.equal(alias.rows[0].review_status, 'superseded');
+    assert.equal(alias.rows[0].label_ar, 'إدارة حالة الواجهة', 'never renamed');
+    assert.equal((await pool.query(`select canonical_skill_id($1) = $2 as ok`, [alias.rows[0].id, canon.rows[0].id])).rows[0].ok, true, 'lookups resolve alias → canonical');
+    const syn = await pool.query(`select surface_form, language from skill_synonym where skill_id = $1 and relation = 'equivalent' and surface_form in ('إدارة حالة الواجهة', 'UI state management') order by language`, [canon.rows[0].id]);
+    assert.equal(syn.rowCount, 2, 'the alias names live on as equivalent surface forms of the canonical skill');
+    const rr = await pool.query(`select s.slug from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id where tr.slug = 'frontend-developer' order by s.slug`);
+    assert.deepEqual(rr.rows.map((r) => r.slug), ['component-building', 'skl_ui_state_interaction', 'ui-testing'], 'the Slice-1 role requirement was repointed to the canonical skill');
+    const dedup = await pool.query(`select decision, decided_by, decision_reason from dedup_candidate where a_code = 'ui-state-management' and b_code = 'skl_ui_state_interaction'`);
+    assert.equal(dedup.rows[0].decision, 'merge'); assert.match(dedup.rows[0].decision_reason, /D-097/);
+    const log = await pool.query(`select role_performed, to_status, reason from review_log where entity_kind = 'skill' and entity_id = $1`, [alias.rows[0].id]);
+    assert.equal(log.rowCount, 1); assert.equal(log.rows[0].role_performed, 'product_owner'); assert.equal(log.rows[0].to_status, 'superseded');
+    const { renderNearDuplicateReport } = await import('../src/career-data/pipeline');
+    const md = renderNearDuplicateReport([], 'trk_frontend_junior', '0.2.0', (await pool.query('select a_code, b_code, decision, decision_reason from dedup_candidate')).rows);
+    assert.match(md, /## Resolved/); assert.match(md, /ui-state-management.*skl_ui_state_interaction.*merge/);
+    assert.ok(!/\| proposed \|/.test(md), 'no unresolved candidate remains in the report');
   });
   test('NEGATIVE: a pack that names a framework as a role skill, or invents a URL, is refused before anything is written', async () => {
     const { pack } = loadPack(join(ROOT, 'data', 'career'), 'trk_frontend_junior');
@@ -170,7 +193,9 @@ describe('agent integration — agents read structured career data or state a li
       values ('e2e-demo-role-' || substr(gen_random_uuid()::text,1,8), 'دور تجريبي', 'E2E demo role', 'e2e', 'curated', 'DEMO', 'curated', 'e2e', true) returning id`);
     const roleId = role.rows[0].id;
     await pool.query(`update target_role set review_status = 'published' where id = $1`, [roleId]);
-    for (const skill of [FIXTURE.skillUiTesting, 'a0000000-0000-4000-8000-000000000001']) {
+    // OPEN-039: the second core requirement names the CANONICAL skill (the Slice-1 alias is merged into it).
+    const canonicalUiState = (await pool.query(`select id from skill where slug = 'skl_ui_state_interaction' and is_demo_fixture`)).rows[0].id;
+    for (const skill of [FIXTURE.skillUiTesting, canonicalUiState]) {
       const rr = await pool.query(`insert into role_requirement (target_role_id, skill_id, is_core, importance, target_proficiency, why_required_ar, why_required_en, review_status, is_demo_fixture) values ($1,$2,true,'high','working','سبب','reason','curated',true) returning id`, [roleId, skill]);
       await pool.query(`update role_requirement set review_status = 'published' where id = $1`, [rr.rows[0].id]);
     }
@@ -178,10 +203,10 @@ describe('agent integration — agents read structured career data or state a li
     const ps = await evaluated(user, roleId);
     const gaps = ps.filter((p) => p.proposalType === 'profile_gap');
     assert.equal(gaps.length, 1, 'one core skill (UI state management) has no qualifying evidence; UI testing was just demonstrated');
-    assert.equal(gaps[0]!.structuredPayload['skillId'], 'a0000000-0000-4000-8000-000000000001');
+    assert.equal(gaps[0]!.structuredPayload['skillId'], canonicalUiState, 'the gap names the canonical skill, never the alias');
     assert.equal(gaps[0]!.structuredPayload['currentState'], 'gap');
     assert.equal((await pool.query('select count(*)::int n from evidence where user_id = $1', [user.id])).rows[0].n, 1, 'role requirements created no evidence');
-    assert.equal((await pool.query(`select count(*)::int n from skill_claim where user_id = $1 and skill_id = 'a0000000-0000-4000-8000-000000000001'`, [user.id])).rows[0].n, 0, 'no claim was written for the required skill');
+    assert.equal((await pool.query(`select count(*)::int n from skill_claim where user_id = $1 and skill_id in ($2, 'a0000000-0000-4000-8000-000000000001')`, [user.id, canonicalUiState])).rows[0].n, 0, 'no claim was written for the required skill');
     assert.ok(ps.find((p) => p.proposalType === 'recruiter_next_action')!.warnings.length === 0);
   });
   test('Technical Agent reads the structured activity: missing_evidence names the activity and its mandatory deliverables', async () => {
@@ -223,5 +248,76 @@ describe('OPEN-040 — demo → canonical promotion never mutates the demo row',
     // Q01 does not treat the demo/canonical pair as a duplicate; Q19 flags canonical rows that still point at demo skills.
     const q = await runQualityChecks(pool);
     assert.equal(q.results.find((x) => x.id === 'Q01')!.passed, true);
+  });
+});
+
+describe('final content review preparation — OPEN-044, OPEN-045, pack facts, value approval', () => {
+  const pack = () => loadPack(join(ROOT, 'data', 'career'), 'trk_frontend_junior');
+  const mutated = (f: (p: ReturnType<typeof loadPack>['pack']) => void) => { const { pack: p } = pack(); const c = JSON.parse(JSON.stringify(p)) as typeof p; f(c); return c; };
+  test('3 — the completeness criterion is a gate: no skill, no skill threshold, and the schema refuses a gate mapped to a skill', async () => {
+    const gates = await pool.query(`select rc.key, rc.linked_skill_id, rc.threshold_for_skill, rc.threshold_status, rc.mandatory from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id where rc.criterion_kind = 'gate' and rv.is_demo_fixture and rv.version like 'rub_fe_%@0.1.0'`);
+    assert.equal(gates.rowCount, 3);
+    for (const g of gates.rows) { assert.equal(g.key, 'deliverables_complete'); assert.equal(g.linked_skill_id, null); assert.equal(g.threshold_for_skill, null); assert.equal(g.threshold_status, null); assert.equal(g.mandatory, true, 'still mandatory: it gates'); }
+    const anySkill = (await pool.query(`select id from skill where status = 'active' limit 1`)).rows[0].id;
+    await assert.rejects(() => pool.query(`update rubric_criterion set linked_skill_id = $1 where criterion_kind = 'gate' and key = 'deliverables_complete'`, [anySkill]), /rubric_criterion_kind_shape/);
+    assert.throws(() => validatePack(mutated((p) => { const c = p.track.rubrics[0]!.criteria.find((x) => x.key === 'deliverables_complete')!; c.linked_skill = 'skl_html_semantic'; })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /must not be mapped to a skill/.test(x)));
+    assert.equal((await pool.query(`select count(*)::int n from rubric_criterion where dimension = 'completeness' and criterion_kind = 'skill_evidence'`)).rows[0].n, 0, 'no completeness criterion can yield skill evidence');
+  });
+  test('5, 7, 8 — no active check depends on a producer-less signal; future checks are inactive; the removed check is gone', async () => {
+    const specs = await pool.query(`select a.slug, i.key, i.evaluation_mode, i.active, i.blocking, i.check_definition->>'type' as t from integrity_check_spec i join activity_spec a on a.id = i.activity_spec_id where a.slug like 'act_fe_%' and a.is_demo_fixture order by a.slug, i.key`);
+    const byMode = (m: string) => specs.rows.filter((r) => r.evaluation_mode === m);
+    assert.equal(specs.rowCount, 17 + 2, '17 pack checks + 2 Slice-1 checks');
+    assert.equal(byMode('human_observable').length, 7); assert.equal(byMode('future_deterministic').length, 4);
+    for (const r of byMode('future_deterministic')) { assert.equal(r.active, false); assert.equal(r.blocking, false); }
+    for (const r of byMode('human_observable')) { assert.equal(r.t, 'human_observation'); assert.equal(r.blocking, false); }
+    for (const r of byMode('deterministic')) assert.equal(r.active, true);
+    assert.ok(!specs.rows.some((r) => r.key === 'planted_field_count'), '8 — the removed check no longer exists in the spec');
+    assert.equal((await pool.query(`select count(*)::int n from integrity_check_spec where key = 'files_present' and check_type = 'mandatory_deliverables'`)).rows[0].n, 4, 'the gate is typed as what it is');
+    assert.throws(() => validatePack(mutated((p) => { p.track.activities[0]!.integrity_checks.push({ key: 'bogus', check_type: 'deterministic_signal', evaluation_mode: 'deterministic', blocking: false, location_en: 'x', expected_user_behavior_en: 'x', check_definition: { type: 'artifact_present', artifactKey: 'signal.nothing_produces_me' } }); })),
+      (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /no producer creates/.test(x)));
+    assert.throws(() => validatePack(mutated((p) => { const c = p.track.activities[1]!.integrity_checks.find((x) => x.evaluation_mode === 'future_deterministic')!; c.active = true; })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /inactive until its producer exists/.test(x)));
+  });
+  test('9, 10, 11 — exactly 3 activities, each measuring 2–3 CORE skills deeply, and no framework anywhere', async () => {
+    const { pack: p } = pack();
+    assert.equal(p.track.activities.length, 3);
+    const core = new Set(p.track.roleSkills.filter((x) => x.is_core_for_role).map((x) => x.skill)); assert.equal(core.size, 5);
+    for (const a of p.track.activities) { const n = a.related_skills.filter((s) => s.depth === 'primary' && core.has(s.skill)).length; assert.ok(n >= 2 && n <= 3, `${a.code}: ${n} core primaries`); }
+    assert.throws(() => validatePack(mutated((p2) => { (p2.track.activities[0] as { title_en: string }).title_en = 'Build a React component'; })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /framework/.test(x)));
+    assert.throws(() => validatePack(mutated((p2) => { p2.track.tasks[0]!.common_failure_modes_en.push('forgetting Vue reactivity'); })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /framework/.test(x)));
+    assert.throws(() => validatePack(mutated((p2) => { p2.track.activities.pop(); })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /exactly 3/.test(x)));
+    assert.throws(() => validatePack(mutated((p2) => { p2.track.activities[0]!.related_skills = p2.track.activities[0]!.related_skills.map((s) => ({ ...s, depth: 'secondary' as const })); })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /2–3 CORE skills/.test(x)));
+    const terms = await pool.query(`select count(*)::int n from career_presentation_rule where template_pattern_en ~* '\\m(react|vue|angular)\\M' or array_to_string(allowed_claim_verbs_en, ' ') ~* '\\m(react|vue|angular)\\M'`);
+    assert.equal(terms.rows[0].n, 0, 'no presentation rule inserts a framework');
+  });
+  test('12 — a proposed/TBD value cannot silently become approved: not by the pack, not by a direct update, never on a demo rubric', async () => {
+    assert.throws(() => validatePack(mutated((p2) => { p2.track.rubrics[0]!.criteria[0]!.weight_status = 'approved'; })), (e: unknown) => e instanceof PackValidationError && e.problems.some((x) => /cannot declare its own values approved/.test(x)));
+    const demoRubric = (await pool.query(`select id from rubric_version where version = 'rub_fe_change_request@0.1.0' and is_demo_fixture`)).rows[0].id;
+    await assert.rejects(() => pool.query(`update rubric_criterion set weight_status = 'approved' where rubric_version_id = $1 and key = 'js_correctness'`, [demoRubric]), /DEMO fixture never carries an approved/);
+    await assert.rejects(() => pool.query(`update rubric_version set pass_threshold_status = 'approved' where id = $1`, [demoRubric]), /DEMO fixture never carries an approved/);
+    const { approveRubricValues } = await import('../src/career-data/review');
+    await assert.rejects(() => approveRubricValues(pool, { rubricVersionId: demoRubric, decidedBy: '22222222-2222-4222-8222-222222222222', decidedByLabel: 'SME', reason: 'x' }), /DEMO fixture/);
+    // A non-demo copy (the activity is promoted; its rubric, criteria, levels and checks come with it): a direct
+    // update is still refused until the ONE recorded SME act exists. A rubric alone cannot be promoted before its activity.
+    const { promoteDemo } = await import('../src/career-data/promotion');
+    await assert.rejects(() => promoteDemo(pool, 'rubric_version', demoRubric, 'content author', 'values test'), /promote the activity first/);
+    const demoAct = (await pool.query(`select id from activity_spec where slug = 'act_fe_change_request' and is_demo_fixture`)).rows[0].id;
+    const r = await promoteDemo(pool, 'activity_spec', demoAct, 'content author', 'values test');
+    assert.equal(r.copied['rubric_criterion'], 7); assert.ok((r.copied['integrity_check_spec'] ?? 0) >= 5, 'checks come with the activity');
+    const copy = (await pool.query(`select id from rubric_version where promoted_from_id = $1`, [demoRubric])).rows[0].id;
+    assert.equal((await pool.query(`select count(*)::int n from rubric_criterion where rubric_version_id = $1 and (weight_status = 'approved' or threshold_status = 'approved')`, [copy])).rows[0].n, 0, 'copying never approves a value');
+    await assert.rejects(() => pool.query(`update rubric_criterion set weight_status = 'approved' where rubric_version_id = $1 and key = 'js_correctness'`, [copy]), /recorded SME approval/);
+    const ok = await approveRubricValues(pool, { rubricVersionId: copy, decidedBy: '22222222-2222-4222-8222-222222222222', decidedByLabel: 'SME Person', reason: 'calibration sample of 12 submissions reviewed' });
+    assert.equal(ok.criteria, 7);
+    const after = await pool.query(`select criterion_kind, weight_status, threshold_status from rubric_criterion where rubric_version_id = $1`, [copy]);
+    for (const c of after.rows) { assert.equal(c.weight_status, 'approved'); assert.equal(c.threshold_status, c.criterion_kind === 'skill_evidence' ? 'approved' : null); }
+    assert.equal((await pool.query(`select count(*)::int n from review_log where entity_kind = 'rubric_version' and entity_id = $1 and reason like 'values approved%'`, [copy])).rows[0].n, 1, 'recorded by name');
+  });
+  test('13 — no pack row is SME-approved, and the database would refuse it', async () => {
+    for (const [t, col] of [['skill', 'review_status'], ['target_role', 'review_status'], ['task', 'review_status'], ['activity_spec', 'status'], ['rubric_version', 'status'], ['learning_resource', 'review_status']] as const) {
+      const n = (await pool.query(`select count(*)::int n from ${t} where is_demo_fixture and (${col} in ('sme_reviewed','approved') or reviewed_by is not null)`)).rows[0].n;
+      assert.equal(n, 0, `${t}: a demo row is neither SME-reviewed nor approved`);
+    }
+    const act = (await pool.query(`select id from activity_spec where slug = 'act_fe_change_request' and is_demo_fixture`)).rows[0].id;
+    await assert.rejects(() => pool.query(`update activity_spec set status = 'curated' where id = $1 and status = 'draft'`, [act]).then(() => pool.query(`update activity_spec set status = 'sme_reviewed', reviewed_by = '22222222-2222-4222-8222-222222222222', reviewed_at = now() where id = $1`, [act])), /DEMO fixture is never SME reviewed or approved/);
   });
 });

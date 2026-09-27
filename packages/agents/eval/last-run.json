@@ -5,7 +5,7 @@
     "provider_model": "deterministic-template/0.3.0",
     "dataset_version": "1.0.0",
     "proposal_schema_version": "1.2.0",
-    "domain_version": "0.6.0",
+    "domain_version": "0.7.0",
     "fixed_clock": "2026-09-26T12:00:00.000Z",
     "deterministic": true
   },

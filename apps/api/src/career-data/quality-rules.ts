@@ -3,7 +3,7 @@
  * offending rows; a FAIL rule with offenders fails the run. Loudly.
  */
 import type { Pool, PoolClient } from 'pg';
-import { isExactDuplicate, evidencePathStatus } from '@naqla/domain';
+import { isExactDuplicate, evidencePathStatus, artifactKeysOf, artifactHasProducer } from '@naqla/domain';
 
 export interface QualityRule { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; run(c: PoolClient): Promise<string[]>; }
 export interface QualityResult { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; readonly offenders: readonly string[]; readonly passed: boolean; }
@@ -39,8 +39,8 @@ export const QUALITY_RULES: readonly QualityRule[] = [
   { id: 'Q04', title: 'activity without a rubric (and published activity without a published rubric)', severity: 'fail',
     run: q(`select a.slug, a.version, a.status from activity_spec a where not exists (select 1 from rubric_version rv where rv.activity_spec_id = a.id)
               or (a.status = 'published' and not exists (select 1 from rubric_version rv where rv.activity_spec_id = a.id and rv.status = 'published'))`, (r) => `${r.slug}@${r.version} (${r.status})`) },
-  { id: 'Q05', title: 'rubric criterion without a linked skill; published rubric with no criteria at all', severity: 'fail',
-    run: q(`select 'criterion ' || rc.key as label from rubric_criterion rc where rc.linked_skill_id is null
+  { id: 'Q05', title: 'skill-evidence criterion without a linked skill; gate/quality criterion mapped to a skill; published rubric with no criteria at all', severity: 'fail',
+    run: q(`select 'criterion ' || rc.key as label from rubric_criterion rc where (rc.criterion_kind = 'skill_evidence' and rc.linked_skill_id is null) or (rc.criterion_kind <> 'skill_evidence' and rc.linked_skill_id is not null)
             union all select 'rubric ' || rv.version from rubric_version rv where rv.status = 'published' and not exists (select 1 from rubric_criterion rc where rc.rubric_version_id = rv.id) and rv.criteria is null`, (r) => String(r.label)) },
   { id: 'Q06', title: 'core skill without an evidence path (no activity measures it through a linked criterion)', severity: 'fail',
     async run(c) { const { rows } = await c.query(`select tr.slug as role, s.slug as skill,
@@ -66,7 +66,7 @@ export const QUALITY_RULES: readonly QualityRule[] = [
             union all select 'mutual ' || a.slug || ' ⇄ ' || b.slug from skill_synonym x join skill_synonym y on y.skill_id = x.related_skill_id and y.related_skill_id = x.skill_id
               join skill a on a.id = x.skill_id join skill b on b.id = x.related_skill_id where x.relation in ('broader','narrower') and y.relation = x.relation
             union all select 'equivalent "' || sy.surface_form || '" of ' || a.slug || ' is the canonical name of ' || b.slug from skill_synonym sy join skill a on a.id = sy.skill_id
-              join skill b on b.id <> a.id and (lower(b.label_en) = lower(sy.surface_form) or b.label_ar = sy.surface_form) where sy.relation = 'equivalent'`, (r) => String(r.label)) },
+              join skill b on b.id <> a.id and b.status = 'active' and (lower(b.label_en) = lower(sy.surface_form) or b.label_ar = sy.surface_form) where sy.relation = 'equivalent'`, (r) => String(r.label)) },
   { id: 'Q11', title: 'missing provenance (a career-data record with no source_ref)', severity: 'fail',
     async run(c) { const out: string[] = [];
       for (const [kind, t, label] of PROVENANCE) { const { rows } = await c.query(`select ${label} as label from ${t} x where not exists (select 1 from source_ref r where r.entity_kind = '${kind}' and r.entity_id = x.id)`); out.push(...rows.map((r) => `${t}: ${r.label}`)); }
@@ -108,6 +108,17 @@ export const QUALITY_RULES: readonly QualityRule[] = [
               where rv.status = 'published' and not rv.is_demo_fixture and (rc.weight_status <> 'approved' or rc.threshold_status <> 'approved')`, (r) => String(r.label)) },
   { id: 'Q21', title: 'a human-required criterion that could never be reviewed (no levels defined)', severity: 'fail',
     run: q(`select rv.version || '/' || rc.key as label from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id where rc.evaluator_type <> 'rule' and not exists (select 1 from rubric_criterion_level l where l.criterion_id = rc.id)`, (r) => String(r.label)) },
+  { id: 'Q22', title: 'active deterministic integrity check that depends on an artifact no producer creates (OPEN-045)', severity: 'fail',
+    async run(c) { const { rows } = await c.query(`select a.slug, i.key, i.check_definition from integrity_check_spec i join activity_spec a on a.id = i.activity_spec_id where i.evaluation_mode = 'deterministic' and i.active and a.status <> 'superseded'`);
+      const out: string[] = [];
+      for (const r of rows) for (const k of artifactKeysOf(r.check_definition)) if (!artifactHasProducer(k)) out.push(`${r.slug}/${r.key} → ${k}`);
+      return out; } },
+  { id: 'Q23', title: 'completeness criterion that could yield skill evidence (must be a gate, OPEN-044)', severity: 'fail',
+    run: q(`select rv.version || '/' || rc.key as label from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id left join criterion_library l on l.id = rc.library_criterion_id
+             where (rc.dimension = 'completeness' or l.key = 'core.completeness.deliverables') and rc.criterion_kind = 'skill_evidence'`, (r) => String(r.label)) },
+  { id: 'Q24', title: 'approved weight/threshold without a recorded SME values approval on the rubric (OPEN-043)', severity: 'fail',
+    run: q(`select rv.version || '/' || rc.key as label from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id where (rc.weight_status = 'approved' or rc.threshold_status = 'approved') and rv.values_approved_at is null
+            union all select rv.version || ': pass_threshold' from rubric_version rv where rv.pass_threshold_status = 'approved' and rv.values_approved_at is null`, (r) => String(r.label)) },
   { id: 'Q18', title: 'role-skill mapping references a skill the role does not measure through any task or activity', severity: 'warn',
     run: q(`select tr.slug || ' → ' || s.slug as label from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id
              where not exists (select 1 from activity_skill ak join activity_spec a on a.id = ak.activity_spec_id where a.target_role_id = rr.target_role_id and ak.skill_id = rr.skill_id)

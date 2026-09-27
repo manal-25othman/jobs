@@ -90,6 +90,35 @@ describe('4, 5, 12 — deterministic stage, queue contents, what the user sees',
   });
 });
 
+describe('OPEN-044 / OPEN-045 / OPEN-039 — what the deterministic stage records, what the reviewer receives, what a claim may name', () => {
+  test('6, 8 — human-observable checks reach the reviewer of their criterion as inputs; removed and inactive checks are not evaluated; the gate scores without a skill', async () => {
+    const user = await newUser(); const { ev } = await submitted(user); const r = await reviewer();
+    const interim = (await pool.query(`select id from evaluation_result where evaluation_id = $1 order by evaluated_at limit 1`, [ev.evaluationId])).rows[0].id;
+    const checks = (await pool.query('select check_key from integrity_check where evaluation_result_id = $1 order by check_key', [interim])).rows.map((x) => x.check_key);
+    assert.deepEqual(checks, ['clarify_fields_conflict', 'explain_data_flow', 'files_present'], '8 — only active deterministic checks were evaluated; no signal.* check, no removed check');
+    const gate = (await pool.query(`select skill_id, score, max_score from evaluation_criterion_score where evaluation_result_id = $1 and criterion_key = 'deliverables_complete'`, [interim])).rows[0];
+    assert.equal(gate.skill_id, null, '3 — the completeness gate is scored but mapped to no skill'); assert.equal(Number(gate.score), Number(gate.max_score));
+    const item = (await pool.query(`select id from review_queue_item where evaluation_id = $1 and criterion_key = 'data_states'`, [ev.evaluationId])).rows[0];
+    await http.post(`/v1/review/queue/${item.id}/assign`).set(auth(r)).send({}).expect(201);
+    const opened = await http.get(`/v1/review/items/${item.id}`).set(auth(r)).expect(200);
+    const obs = opened.body.data.criterion.observations as Array<{ key: string; reviewerPromptAr: string; passWhenEn: string; failWhenEn: string; affectsEvidence: boolean }>;
+    assert.deepEqual(obs.map((o) => o.key).sort(), ['empty_response_edge', 'error_500_expected_failure'], '6 — the two human-observable checks of data_states are inputs to its reviewer');
+    for (const o of obs) { assert.ok(o.reviewerPromptAr.length > 20); assert.ok(o.passWhenEn && o.failWhenEn); assert.equal(o.affectsEvidence, true); }
+    assert.doesNotThrow(() => assertBlindPayload(opened.body.data));
+    const other = (await pool.query(`select id from review_queue_item where evaluation_id = $1 and criterion_key = 'semantic_structure'`, [ev.evaluationId])).rows[0];
+    await http.post(`/v1/review/queue/${other.id}/assign`).set(auth(r)).send({}).expect(201);
+    assert.deepEqual((await http.get(`/v1/review/items/${other.id}`).set(auth(r)).expect(200)).body.data.criterion.observations, [], 'a criterion with no observation gets none');
+  });
+  test('OPEN-039 — a claim on the alias skill is refused and names the canonical skill; nothing is guessed', async () => {
+    const user = await newUser(); await http.post('/v1/me/bootstrap').set(auth(user)).send({ displayName: 'Alias Claimer' }).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
+    const project = await http.post('/v1/projects').set(auth(user)).send({ title: 'x', kind: 'platform_activity', activitySpecId: activityId }).expect(201);
+    const res = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: ['a0000000-0000-4000-8000-000000000001'], artifacts: ARTIFACTS, uploadIds: [], aiDisclosure: { declaredUse: [] } }).expect(400);
+    assert.match(JSON.stringify(res.body), /merged_into.*skl_ui_state_interaction/);
+    assert.equal((await pool.query(`select count(*)::int n from skill where id = 'a0000000-0000-4000-8000-000000000001'`)).rows[0].n, 1, 'the alias row still exists');
+  });
+});
+
 describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability, finalisation', () => {
   test('3 — the reviewer receives no identity: queue and item payloads carry no name, email, user id or profile data', async () => {
     const user = await newUser(); const { submissionId, ev } = await submitted(user); const r = await reviewer();

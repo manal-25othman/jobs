@@ -209,12 +209,15 @@ insert into activity_skill (activity_spec_id, skill_id, depth) values
   ('c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002', 'primary'),
   ('c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000003', 'secondary')
 on conflict do nothing;
-update integrity_check_spec set check_type = 'followup_modification', location_en = 'submission form',
+update integrity_check_spec set check_type = 'mandatory_deliverables', location_en = 'submission form',
   expected_user_behavior_en = 'attaches both files'
 where activity_spec_id = 'c0000000-0000-4000-8000-000000000001' and key = 'files_present';
 update integrity_check_spec set check_type = 'deterministic_signal', location_en = 'test file',
   expected_user_behavior_en = 'tests import and exercise the component under test',
-  raw_ai_output_behavior_en = 'tests that assert on a copy of the component rather than importing it'
+  raw_ai_output_behavior_en = 'tests that assert on a copy of the component rather than importing it',
+  -- OPEN-045: this signal has no producer (no test runner inspects imports). Registered, inactive, never blocking.
+  evaluation_mode = 'future_deterministic', active = false, blocking = false,
+  required_producer_en = 'A test-runner step that parses the submitted test file and confirms it imports the component under test (signal.tests_reference_component). Not built.'
 where activity_spec_id = 'c0000000-0000-4000-8000-000000000001' and key = 'tests_reference_component';
 
 -- The same four criteria as rows. The evaluator reads these; the JSONB above is a legacy snapshot.

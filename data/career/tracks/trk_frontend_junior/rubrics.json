@@ -57,7 +57,8 @@
               "descriptor_en": "fully semantic",
               "observable_evidence_en": "landmarks, ordered headings, labelled form"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "form_validation",
@@ -103,7 +104,8 @@
               "descriptor_en": "per-field validation",
               "observable_evidence_en": "message beside each field, submission blocked"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "data_states",
@@ -149,7 +151,8 @@
               "descriptor_en": "all three visible",
               "observable_evidence_en": "loading, error and empty each shown"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "state_transitions",
@@ -195,7 +198,8 @@
               "descriptor_en": "explicit state",
               "observable_evidence_en": "one representation, rendering follows"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "responsive_layout",
@@ -241,7 +245,8 @@
               "descriptor_en": "holds",
               "observable_evidence_en": "both widths fine"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "explanation_clarity",
@@ -288,7 +293,8 @@
               "observable_evidence_en": "flow and state location explained"
             }
           ],
-          "library_criterion": "core.communication.clarity"
+          "library_criterion": "core.communication.clarity",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "judgment_assumption_check",
@@ -301,7 +307,7 @@
           "weight_status": "proposed",
           "max_score": 1,
           "mandatory": false,
-          "threshold_for_skill": 1.0,
+          "threshold_for_skill": 1,
           "threshold_status": "proposed",
           "evaluator_type": "human",
           "human_review_required": true,
@@ -328,21 +334,21 @@
               "observable_evidence_en": "the required artifact or behaviour is present"
             }
           ],
-          "library_criterion": "core.judgment.assumption_check"
+          "library_criterion": "core.judgment.assumption_check",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "deliverables_complete",
           "name_ar": "اكتمال المخرجات",
           "name_en": "Deliverables complete",
           "dimension": "completeness",
-          "linked_skill": "skl_html_semantic",
+          "linked_skill": null,
           "source": "core",
           "weight": 0.5,
           "weight_status": "proposed",
           "max_score": 1,
           "mandatory": true,
           "threshold_for_skill": null,
-          "threshold_status": "TBD",
           "evaluator_type": "rule",
           "human_review_required": false,
           "description_ar": "الملفات الثلاثة موجودة",
@@ -376,7 +382,9 @@
               "file.app_js"
             ]
           },
-          "library_criterion": "core.completeness.deliverables"
+          "library_criterion": "core.completeness.deliverables",
+          "criterion_kind": "gate",
+          "_note": "OPEN-044 (D-098): a completeness GATE. It may block the submission and counts toward its score; it never produces skill evidence and is mapped to no skill."
         }
       ]
     },
@@ -435,7 +443,8 @@
               "descriptor_en": "fixed",
               "observable_evidence_en": "width cause fixed"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "semantic_fixed",
@@ -481,7 +490,8 @@
               "descriptor_en": "fixed",
               "observable_evidence_en": "all planted structure defects fixed"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "a11y_basics_fixed",
@@ -527,7 +537,8 @@
               "descriptor_en": "yes",
               "observable_evidence_en": "all basics fixed"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "validation_fixed",
@@ -573,7 +584,8 @@
               "descriptor_en": "correct",
               "observable_evidence_en": "reasonable check, per-field message"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "root_cause_note",
@@ -620,7 +632,8 @@
               "observable_evidence_en": "four of four named"
             }
           ],
-          "library_criterion": "core.correctness.root_cause"
+          "library_criterion": "core.correctness.root_cause",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "scope_discipline",
@@ -633,7 +646,7 @@
           "weight_status": "proposed",
           "max_score": 1,
           "mandatory": false,
-          "threshold_for_skill": 1.0,
+          "threshold_for_skill": 1,
           "threshold_status": "proposed",
           "evaluator_type": "human",
           "human_review_required": true,
@@ -660,21 +673,21 @@
               "observable_evidence_en": "the required artifact or behaviour is present"
             }
           ],
-          "library_criterion": "core.judgment.scope_discipline"
+          "library_criterion": "core.judgment.scope_discipline",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "deliverables_complete",
           "name_ar": "اكتمال المخرجات",
           "name_en": "Deliverables complete",
           "dimension": "completeness",
-          "linked_skill": "skl_html_semantic",
+          "linked_skill": null,
           "source": "core",
           "weight": 0.5,
           "weight_status": "proposed",
           "max_score": 1,
           "mandatory": true,
           "threshold_for_skill": null,
-          "threshold_status": "TBD",
           "evaluator_type": "rule",
           "human_review_required": false,
           "description_ar": "الملفات والملاحظة موجودة",
@@ -709,7 +722,9 @@
               "note.root_causes"
             ]
           },
-          "library_criterion": "core.completeness.deliverables"
+          "library_criterion": "core.completeness.deliverables",
+          "criterion_kind": "gate",
+          "_note": "OPEN-044 (D-098): a completeness GATE. It may block the submission and counts toward its score; it never produces skill evidence and is mapped to no skill."
         }
       ]
     },
@@ -769,7 +784,8 @@
               "observable_evidence_en": "condition corrected at cause"
             }
           ],
-          "library_criterion": "core.correctness.root_cause"
+          "library_criterion": "core.correctness.root_cause",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "filter_in_state",
@@ -815,7 +831,8 @@
               "descriptor_en": "state",
               "observable_evidence_en": "single source of truth"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "js_correctness",
@@ -861,7 +878,8 @@
               "descriptor_en": "correct",
               "observable_evidence_en": "clean"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "empty_state_correct",
@@ -907,7 +925,8 @@
               "descriptor_en": "both",
               "observable_evidence_en": "both empty cases shown as state"
             }
-          ]
+          ],
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "code_reading",
@@ -954,7 +973,8 @@
               "observable_evidence_en": "minimal, well-placed change"
             }
           ],
-          "library_criterion": "core.judgment.scope_discipline"
+          "library_criterion": "core.judgment.scope_discipline",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "decision_explained",
@@ -1001,21 +1021,21 @@
               "observable_evidence_en": "cause, change, alternative and reason"
             }
           ],
-          "library_criterion": "core.communication.clarity"
+          "library_criterion": "core.communication.clarity",
+          "criterion_kind": "skill_evidence"
         },
         {
           "key": "deliverables_complete",
           "name_ar": "اكتمال المخرجات",
           "name_en": "Deliverables complete",
           "dimension": "completeness",
-          "linked_skill": "skl_js_fundamentals",
+          "linked_skill": null,
           "source": "core",
           "weight": 0.5,
           "weight_status": "proposed",
           "max_score": 1,
           "mandatory": true,
           "threshold_for_skill": null,
-          "threshold_status": "TBD",
           "evaluator_type": "rule",
           "human_review_required": false,
           "description_ar": "السكربت والملاحظة موجودان",
@@ -1048,7 +1068,9 @@
               "note.decision"
             ]
           },
-          "library_criterion": "core.completeness.deliverables"
+          "library_criterion": "core.completeness.deliverables",
+          "criterion_kind": "gate",
+          "_note": "OPEN-044 (D-098): a completeness GATE. It may block the submission and counts toward its score; it never produces skill evidence and is mapped to no skill."
         }
       ]
     }

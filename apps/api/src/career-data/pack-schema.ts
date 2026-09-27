@@ -7,7 +7,8 @@
 import {
   SKILL_TYPES, AI_SUBSTITUTABILITY, SYNONYM_RELATIONS, IMPORTANCE, EVIDENCE_TYPES, RUBRIC_DIMENSIONS, EVALUATOR_TYPES,
   INTEGRITY_CHECK_TYPES, PRESENTATION_ASSET_TYPES, RESOURCE_QUALITY, assertSynonymWellFormed, assertPresentationRuleSane,
-  assertLearningResourceHonest, type SynonymRelation, type PresentationAssetType, type EvidenceState,
+  assertLearningResourceHonest, INTEGRITY_EVALUATION_MODES, CRITERION_KINDS, artifactHasProducer, artifactKeysOf, assertDuplicateResolutionWellFormed, assertCriterionKindShape,
+  type SynonymRelation, type PresentationAssetType, type EvidenceState, type DuplicateResolution, type IntegrityEvaluationMode, type CriterionKind,
 } from '@naqla/domain';
 
 export interface PackSource { code: string; source_type: 'official' | 'curated' | 'platform_generated' | 'market_signal'; source_name: string; publisher?: string | null; jurisdiction: string; language: string; url: string | null; url_verified?: boolean; retrieved_at: string | null; version: string; license_or_usage_notes: string; reliability: 'high' | 'medium' | 'low'; }
@@ -19,14 +20,15 @@ export interface PackSynonym { skill: string; relation: SynonymRelation; surface
 export interface PackCriterionLib { key: string; name_ar: string; name_en: string; dimension: string; description_ar: string; description_en: string; default_evaluator: string; }
 export interface PackPresentationRule { asset_type: PresentationAssetType; evidence_level: EvidenceState; allowed: boolean; minimum_source_strength: string | null; minimum_evidence_count: number; requires_verified: boolean; allowed_claim_verbs_ar: string[]; allowed_claim_verbs_en: string[]; forbidden_phrases_ar: string[]; forbidden_phrases_en: string[]; template_pattern_en?: string; numeric_claims_policy_en?: string; ai_disclosure_handling_en?: string; recency_handling_en?: string; language_target?: 'ar' | 'en'; on_user_edit_en?: string; source_refs: string[]; }
 export interface PackResource { code: string; skill: string; title_ar: string; title_en: string; provider: string; resource_type: string; language: 'ar' | 'en'; level: string; duration_minutes: number; free_or_paid: string; url: string | null; why_recommended_ar: string; why_recommended_en: string; covers_target_level: boolean; practice_activity: string; quality_status: string; last_checked: string | null; access_notes_en?: string; source_refs: string[]; }
-export interface PackManifest { pack_id: string; track_id: string; pack_version: string; status: string; dataset_label: string; is_demo_fixture: boolean; drafting_aid: 'none' | 'ai_assisted'; levels_included: string[]; language_coverage: string[]; region_scope?: string; primary_source: string; sources: string[]; global_registry_versions: Record<string, string>; framework_policy?: string; contents?: Record<string, number>; }
+export interface PackManifest { pack_id: string; track_id: string; pack_version: string; status: string; dataset_label: string; is_demo_fixture: boolean; drafting_aid: 'none' | 'ai_assisted'; levels_included: string[]; language_coverage: string[]; region_scope?: string; primary_source: string; sources: string[]; global_registry_versions: Record<string, string>; framework_policy?: string; duplicate_resolutions?: DuplicateResolution[]; changelog_ref?: string; contents?: Record<string, number>; }
 export interface PackRole { code: string; name_ar: string; name_en: string; family: string; level: 'junior' | 'mid' | 'senior'; description_ar: string; description_en: string; mission_statement_ar?: string; mission_statement_en?: string; typical_responsibilities_ar: string[]; typical_responsibilities_en: string[]; expected_outputs_ar: string[]; expected_outputs_en: string[]; expected_from_junior_ar: string[]; expected_from_junior_en: string[]; not_expected_from_junior_ar: string[]; not_expected_from_junior_en: string[]; common_tools: { name: string; criticality: 'essential' | 'common' | 'optional'; skill?: string; note_en?: string }[]; region_scope?: string; source_refs: string[]; }
 export interface PackRoleSkill { skill: string; is_core_for_role: boolean; importance: string; target_proficiency: string; why_required_ar: string; why_required_en: string; evidence_type_expected: string[]; minimum_evidence_count: number; can_be_partially_auto_evaluated: boolean; human_review_required: boolean; source_refs: string[]; }
 export interface PackTask { code: string; title_ar: string; title_en: string; description_ar: string; description_en: string; frequency: string; complexity: string; expected_output_ar: string; expected_output_en: string; expected_output_kind: string; typical_inputs_en?: string[]; common_tools?: string[]; common_failure_modes_ar: string[]; common_failure_modes_en: string[]; realism_notes_en?: string; related_skills: { skill: string; involvement: 'primary' | 'secondary' }[]; source_refs: string[]; }
 export interface PackCheckDef { type: 'artifact_present' | 'artifact_at_least' | 'artifact_text' | 'all_of'; artifactKey?: string; artifactKeys?: string[]; min?: number; minLength?: number; }
-export interface PackIntegrityCheck { key: string; check_type: string; blocking: boolean; location_en: string; expected_user_behavior_en: string; raw_ai_output_behavior_en?: string; user_facing_message_ar?: string; linked_criterion_key?: string; check_definition: PackCheckDef; }
+export interface PackHumanObservation { type: 'human_observation'; criterionKey: string; reviewerPromptAr: string; reviewerPromptEn: string; passWhenEn: string; failWhenEn: string; affectsEvidence: boolean; }
+export interface PackIntegrityCheck { key: string; check_type: string; evaluation_mode: IntegrityEvaluationMode; active?: boolean; required_producer_en?: string; previous_signal_dependency?: string; blocking: boolean; location_en: string; expected_user_behavior_en: string; raw_ai_output_behavior_en?: string; user_facing_message_ar?: string; linked_criterion_key?: string; check_definition: PackCheckDef | PackHumanObservation; }
 export interface PackActivity { code: string; version: string; level: 'junior' | 'mid' | 'senior'; title_ar: string; title_en: string; business_context_ar: string; business_context_en: string; objective_ar: string; objective_en: string; ai_usage_mode: 'ai_prohibited' | 'ai_assisted' | 'ai_expected'; estimated_minutes: number; can_yield_demonstrated: boolean; can_yield_verified: boolean; is_validation_activity: boolean; inputs: { key: string; description_ar: string; description_en: string; is_platform_private: boolean; contains_planted_issue: boolean }[]; deliverables: { key: string; format: string; mandatory: boolean; description_ar: string; description_en: string }[]; related_skills: { skill: string; depth: 'primary' | 'secondary' }[]; tasks: string[]; integrity_checks: PackIntegrityCheck[]; rubric: string; source_refs: string[]; }
-export interface PackCriterion { weight_status?: 'approved' | 'proposed' | 'TBD'; threshold_status?: 'approved' | 'proposed' | 'TBD'; key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
+export interface PackCriterion { criterion_kind?: CriterionKind; weight_status?: 'approved' | 'proposed' | 'TBD'; threshold_status?: 'approved' | 'proposed' | 'TBD'; key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string | null; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
 export interface PackRubric { pass_threshold_status?: 'approved' | 'proposed' | 'TBD'; code: string; activity: string; pass_threshold: number; proposes_state: EvidenceState; scoring_policy_version: string; criteria: PackCriterion[]; source_refs: string[]; }
 
 export interface Pack {
@@ -158,6 +160,20 @@ export function validatePack(p: Pack): void {
   }
   need(p.track.tasks.length >= 10 && p.track.tasks.length <= 12, `tasks: 10–12 expected, found ${p.track.tasks.length}`);
   need(p.track.activities.length === 3, `activities: exactly 3 expected in the first track, found ${p.track.activities.length}`);
+  // OPEN-039: an owner-decided duplicate resolution is documented, equivalent-only, and names a pack skill as canonical.
+  for (const r of p.track.manifest.duplicate_resolutions ?? []) {
+    try { assertDuplicateResolutionWellFormed(r, skillCodes); } catch (e) { need(false, `duplicate_resolutions ${r.alias}→${r.canonical}: ${(e as Error).message}`); }
+    need(!skillCodes.has(r.alias), `duplicate_resolutions: alias '${r.alias}' is also a pack skill; the pack cannot both define and alias it`);
+  }
+  // No framework assumption anywhere in the pack (D-084, §9). The manifest's framework_policy is the one place the names may appear, as exclusions.
+  const FRAMEWORK = /\b(react|reactjs|vue|vuejs|angular|next\.?js|nuxt|svelte|jquery|tailwind|bootstrap)\b/i;
+  const scan = (label: string, v: unknown): void => {
+    if (typeof v === 'string') { if (FRAMEWORK.test(v)) need(false, `${label}: names a framework/library ('${v.match(FRAMEWORK)![0]}'); the track is framework-independent`); return; }
+    if (Array.isArray(v)) { v.forEach((x, i) => scan(`${label}[${i}]`, x)); return; }
+    if (v && typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) if (k !== 'framework_policy') scan(`${label}.${k}`, x);
+  };
+  scan('role', p.track.role); scan('roleSkills', p.track.roleSkills); scan('tasks', p.track.tasks); scan('activities', p.track.activities); scan('rubrics', p.track.rubrics);
+  scan('skills', p.global.skills); scan('presentationRules', p.global.presentationRules); scan('resources', p.global.resources);
   const allCheckTypes = [...INTEGRITY_CHECK_TYPES.user_facing, ...INTEGRITY_CHECK_TYPES.assessment_only] as readonly string[];
   for (const a of p.track.activities) {
     const o = `activity '${a.code}'`; uniq('activity', a.code);
@@ -179,7 +195,29 @@ export function validatePack(p: Pack): void {
       need(!uf || isStr(c.user_facing_message_ar), `${o}/${c.key}: a user-facing check needs its Arabic message`);
       need(uf || !c.user_facing_message_ar, `${o}/${c.key}: an assessment-only check carries no user-facing message`);
       need(!c.raw_ai_output_behavior_en || !uf, `${o}/${c.key}: raw_ai_output_behavior belongs to assessment-only checks`);
+      // OPEN-045: every check states how it is evaluated, and no active deterministic check depends on a signal nothing produces.
+      need((INTEGRITY_EVALUATION_MODES as readonly string[]).includes(c.evaluation_mode), `${o}/${c.key}: evaluation_mode must be one of ${INTEGRITY_EVALUATION_MODES.join('|')} (OPEN-045)`);
+      if (c.evaluation_mode === 'deterministic') {
+        need(c.check_definition.type !== 'human_observation', `${o}/${c.key}: a deterministic check carries a rule, not a human observation`);
+        need(c.active !== false, `${o}/${c.key}: a deterministic check is active; an inactive one is future_deterministic`);
+        for (const k of artifactKeysOf(c.check_definition as PackCheckDef)) need(artifactHasProducer(k), `${o}/${c.key}: active deterministic check depends on '${k}', which no producer creates (OPEN-045)`);
+      } else if (c.evaluation_mode === 'human_observable') {
+        const h = c.check_definition as PackHumanObservation;
+        need(h.type === 'human_observation', `${o}/${c.key}: a human-observable check is defined as a human_observation`);
+        need(!c.blocking, `${o}/${c.key}: a human-observable check cannot block (a person judges it inside a criterion)`);
+        need(isStr(c.linked_criterion_key) && h.criterionKey === c.linked_criterion_key, `${o}/${c.key}: a human-observable check names the human criterion it informs`);
+        need(isStr(h.reviewerPromptAr) && isStr(h.reviewerPromptEn) && isStr(h.passWhenEn) && isStr(h.failWhenEn), `${o}/${c.key}: a human observation states what the reviewer sees and what counts as pass/fail`);
+        need(typeof h.affectsEvidence === 'boolean', `${o}/${c.key}: affectsEvidence must be stated`);
+      } else {
+        need(c.active === false, `${o}/${c.key}: a future_deterministic check is inactive until its producer exists`);
+        need(!c.blocking, `${o}/${c.key}: an inactive check cannot block the current activity`);
+        need(isStr(c.required_producer_en), `${o}/${c.key}: a future_deterministic check documents the producer it needs`);
+      }
     }
+    // Each activity measures 2–3 CORE skills deeply (the primaries are the core ones).
+    const coreCodes = new Set(p.track.roleSkills.filter((x) => x.is_core_for_role).map((x) => x.skill));
+    const corePrimaries = primaries.filter((s) => coreCodes.has(s.skill));
+    need(corePrimaries.length >= 2 && corePrimaries.length <= 3, `${o}: an activity measures 2–3 CORE skills deeply, found ${corePrimaries.length}`);
     refsOk(o, a.source_refs);
   }
   for (const r of p.track.rubrics) {
@@ -192,7 +230,12 @@ export function validatePack(p: Pack): void {
     const keys = new Set<string>();
     for (const c of r.criteria) {
       const co = `${o}/${c.key}`; need(!keys.has(c.key), `${co}: duplicate key`); keys.add(c.key);
-      need(skillCodes.has(c.linked_skill) || mapped.has(c.linked_skill), `${co}: linked_skill '${c.linked_skill}' unknown (a criterion without a linked skill produces no evidence)`);
+      const kind = c.criterion_kind ?? 'skill_evidence';
+      need((CRITERION_KINDS as readonly string[]).includes(kind), `${co}: bad criterion_kind`);
+      try { assertCriterionKindShape({ key: c.key, kind, skillId: c.linked_skill, thresholdForSkill: c.threshold_for_skill }); } catch (e) { need(false, `${co}: ${(e as Error).message}`); }
+      need(kind !== 'skill_evidence' || !!c.linked_skill && (skillCodes.has(c.linked_skill) || mapped.has(c.linked_skill)), `${co}: linked_skill '${c.linked_skill}' unknown (a skill-evidence criterion names its skill)`);
+      need(kind === 'skill_evidence' || c.threshold_status === undefined, `${co}: a ${kind} criterion has no skill threshold status (OPEN-044)`);
+      need(kind === 'skill_evidence' || c.dimension === 'completeness' || kind === 'quality', `${co}: a gate criterion lives in the completeness dimension`);
       need((RUBRIC_DIMENSIONS as readonly string[]).includes(c.dimension), `${co}: bad dimension`);
       need((EVALUATOR_TYPES as readonly string[]).includes(c.evaluator_type), `${co}: bad evaluator_type`);
       need(c.evaluator_type !== 'rule' || !!c.check, `${co}: a rule-evaluated criterion needs a deterministic check`);
@@ -206,13 +249,13 @@ export function validatePack(p: Pack): void {
     }
     refsOk(o, r.source_refs);
     // integrity checks that name a criterion must name one that exists
-    const act = p.track.activities.find((a) => a.code === r.activity)!;
-    for (const c of act.integrity_checks) if (c.linked_criterion_key) need(keys.has(c.linked_criterion_key), `${o}: integrity check '${c.key}' links unknown criterion '${c.linked_criterion_key}'`);
+    const act = p.track.activities.find((a) => a.code === r.activity);
+    for (const c of act?.integrity_checks ?? []) if (c.linked_criterion_key) need(keys.has(c.linked_criterion_key), `${o}: integrity check '${c.key}' links unknown criterion '${c.linked_criterion_key}'`);
   }
   // Every core skill: covered by ≥1 activity through a linked criterion (evidence path).
   for (const rs of p.track.roleSkills.filter((x) => x.is_core_for_role)) {
     const acts = new Set<string>();
-    for (const r of p.track.rubrics) if (r.criteria.some((c) => c.linked_skill === rs.skill)) acts.add(r.activity);
+    for (const r of p.track.rubrics) if (r.criteria.some((c) => (c.criterion_kind ?? 'skill_evidence') === 'skill_evidence' && c.linked_skill === rs.skill)) acts.add(r.activity);
     need(acts.size >= 1, `core skill '${rs.skill}' has no evidence path: no activity measures it through a linked criterion`);
   }
   if (problems.length) throw new PackValidationError(problems);

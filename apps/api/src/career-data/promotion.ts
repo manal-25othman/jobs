@@ -13,7 +13,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { assertPromotionAllowed } from '@naqla/domain';
 
-interface KindSpec { table: string; status: string; code: string; children: { table: string; fk: string; remap?: Record<string, string> }[] }
+interface KindSpec { table: string; status: string; code: string; children: { table: string; fk: string; remap?: Record<string, string> }[]; remap?: Record<string, string> }
 const KINDS: Record<string, KindSpec> = {
   skill: { table: 'skill', status: 'review_status', code: 'slug', children: [] },
   skill_family: { table: 'skill_family', status: 'review_status', code: 'code', children: [] },
@@ -26,10 +26,11 @@ const KINDS: Record<string, KindSpec> = {
   activity_spec: { table: 'activity_spec', status: 'status', code: 'slug', children: [
     { table: 'activity_input', fk: 'activity_spec_id' }, { table: 'activity_deliverable', fk: 'activity_spec_id' }, { table: 'activity_skill', fk: 'activity_spec_id', remap: { skill_id: 'skill' } },
     { table: 'activity_task', fk: 'activity_spec_id', remap: { task_id: 'task' } }, { table: 'integrity_check_spec', fk: 'activity_spec_id' }, { table: 'rubric_version', fk: 'activity_spec_id' } ] },
+  rubric_version: { table: 'rubric_version', status: 'status', code: 'version', children: [], remap: { activity_spec_id: 'activity_spec' } },
   learning_resource: { table: 'learning_resource', status: 'review_status', code: 'code', children: [] },
   career_presentation_rule: { table: 'career_presentation_rule', status: 'review_status', code: 'asset_type', children: [] },
 };
-const SKIP_COLUMNS = new Set(['id', 'created_at', 'updated_at', 'review_status', 'status', 'reviewed_by', 'reviewed_at', 'published_at', 'sme_approved_by', 'sme_approved_at', 'is_demo_fixture', 'promoted_from_id', 'version']);
+const SKIP_COLUMNS = new Set(['id', 'created_at', 'updated_at', 'review_status', 'status', 'reviewed_by', 'reviewed_at', 'published_at', 'sme_approved_by', 'sme_approved_at', 'is_demo_fixture', 'promoted_from_id', 'values_approved_by', 'values_approved_by_label', 'values_approved_at', 'values_approval_reason']);
 
 async function columns(c: PoolClient, table: string): Promise<string[]> {
   const { rows } = await c.query(`select column_name from information_schema.columns where table_schema = 'public' and table_name = $1 order by ordinal_position`, [table]);
@@ -43,20 +44,38 @@ async function canonicalOf(c: PoolClient, kind: string, demoId: string): Promise
   return rows[0]?.id ?? demoId;
 }
 
+/** Criteria (with their level descriptors) and provenance of a rubric copy. Values statuses are copied as they are: never approved by copying. */
+async function copyCriteria(c: PoolClient, fromRubric: string, toRubric: string, copied: Record<string, number>): Promise<void> {
+  const crits = await c.query('select id from rubric_criterion where rubric_version_id = $1 order by position', [fromRubric]);
+  for (const cr of crits.rows) {
+    const newCrit = await copyRow(c, 'rubric_criterion', cr.id, { rubric_version_id: toRubric }, { linked_skill_id: 'skill', library_criterion_id: 'criterion_library' });
+    const lv = await c.query('select id from rubric_criterion_level where criterion_id = $1', [cr.id]);
+    for (const l of lv.rows) await copyRow(c, 'rubric_criterion_level', l.id, { criterion_id: newCrit });
+    copied['rubric_criterion'] = (copied['rubric_criterion'] ?? 0) + 1;
+  }
+  await c.query(`insert into source_ref (entity_kind, entity_id, source_id) select 'rubric_version', $2, source_id from source_ref where entity_kind = 'rubric_version' and entity_id = $1 on conflict do nothing`, [fromRubric, toRubric]);
+}
+
 async function copyRow(c: PoolClient, table: string, sourceId: string, overrides: Record<string, unknown>, remap: Record<string, string> = {}): Promise<string> {
-  const cols = (await columns(c, table)).filter((col) => !SKIP_COLUMNS.has(col));
   const src = await c.query(`select * from ${table} where id = $1`, [sourceId]);
-  const row = src.rows[0];
+  return (await insertCopy(c, table, src.rows[0], overrides, remap))!;
+}
+
+/** Inserts a copy of `row` into `table`. Returns the new id, or null for a table without one (pure link tables). */
+async function insertCopy(c: PoolClient, table: string, row: Record<string, unknown>, overrides: Record<string, unknown>, remap: Record<string, string> = {}): Promise<string | null> {
+  const all = await columns(c, table);
+  const cols = all.filter((col) => !SKIP_COLUMNS.has(col));
   const values: unknown[] = []; const names: string[] = [];
   for (const col of cols) {
     let v = row[col];
-    if (remap[col] && v) v = await canonicalOf(c, remap[col]!, v);
+    if (remap[col] && v) v = await canonicalOf(c, remap[col]!, String(v));
     if (col in overrides) v = overrides[col];
     names.push(col); values.push(Array.isArray(v) ? v : (v && typeof v === 'object' ? JSON.stringify(v) : v));
   }
   for (const [k, v] of Object.entries(overrides)) if (!names.includes(k)) { names.push(k); values.push(v); }
-  const r = await c.query(`insert into ${table} (${names.join(', ')}) values (${names.map((_, i) => `$${i + 1}`).join(', ')}) returning id`, values);
-  return r.rows[0].id;
+  const hasId = all.includes('id');
+  const r = await c.query(`insert into ${table} (${names.join(', ')}) values (${names.map((_, i) => `$${i + 1}`).join(', ')})${hasId ? ' returning id' : ''}`, values);
+  return hasId ? r.rows[0].id : null;
 }
 
 export async function promoteDemo(pool: Pool, kind: string, demoId: string, by: string, note: string | null): Promise<{ promotionId: string; canonicalId: string; copied: Record<string, number> }> {
@@ -69,28 +88,26 @@ export async function promoteDemo(pool: Pool, kind: string, demoId: string, by: 
     const open = await c.query(`select 1 from content_promotion where entity_kind = $1 and demo_entity_id = $2 and step not in ('published','abandoned')`, [kind, demoId]);
     assertPromotionAllowed({ sourceIsDemo: src.rows[0].is_demo_fixture, sourceStatus: src.rows[0].status, alreadyPromoted: (open.rowCount ?? 0) > 0 });
     const copied: Record<string, number> = {};
-    const canonicalId = await copyRow(c, spec.table, demoId, { is_demo_fixture: false, [spec.status]: 'curated', promoted_from_id: demoId, ...(spec.table === 'activity_spec' ? { can_yield_verified: false } : {}) });
+    if (spec.table === 'rubric_version') {
+      // A rubric belongs to its activity: the copy hangs under the CANONICAL activity, so that one must exist first.
+      const act = await c.query('select activity_spec_id from rubric_version where id = $1', [demoId]);
+      const canonAct = await canonicalOf(c, 'activity_spec', act.rows[0].activity_spec_id);
+      if (canonAct === act.rows[0].activity_spec_id) throw new Error('promote the activity first: a rubric copy belongs to the canonical activity, not to the demo one');
+    }
+    const canonicalId = await copyRow(c, spec.table, demoId, { is_demo_fixture: false, [spec.status]: 'curated', promoted_from_id: demoId, ...(spec.table === 'activity_spec' ? { can_yield_verified: false } : {}) }, spec.remap ?? {});
     copied[spec.table] = 1;
+    if (spec.table === 'rubric_version') await copyCriteria(c, demoId, canonicalId, copied);
     for (const ch of spec.children) {
-      const kids = await c.query(`select id from ${ch.table} where ${ch.fk} = $1`, [demoId]);
+      const cols = await columns(c, ch.table);
+      const kids = await c.query(`select * from ${ch.table} where ${ch.fk} = $1`, [demoId]);
       for (const k of kids.rows) {
-        const hasDemoFlag = (await columns(c, ch.table)).includes('is_demo_fixture');
-        const hasStatus = (await columns(c, ch.table)).includes('review_status') || (await columns(c, ch.table)).includes('status');
-        const statusCol = (await columns(c, ch.table)).includes('review_status') ? 'review_status' : 'status';
-        const hasPromoted = (await columns(c, ch.table)).includes('promoted_from_id');
-        const overrides: Record<string, unknown> = { [ch.fk]: canonicalId, ...(hasDemoFlag ? { is_demo_fixture: false } : {}), ...(hasStatus ? { [statusCol]: 'curated' } : {}), ...(hasPromoted ? { promoted_from_id: k.id } : {}) };
-        const newId = await copyRow(c, ch.table, k.id, overrides, ch.remap ?? {});
+        const hasDemoFlag = cols.includes('is_demo_fixture');
+        const statusCol = cols.includes('review_status') ? 'review_status' : cols.includes('status') ? 'status' : null;
+        const hasPromoted = cols.includes('promoted_from_id') && cols.includes('id');
+        const overrides: Record<string, unknown> = { [ch.fk]: canonicalId, ...(hasDemoFlag ? { is_demo_fixture: false } : {}), ...(statusCol ? { [statusCol]: 'curated' } : {}), ...(hasPromoted ? { promoted_from_id: k['id'] } : {}) };
+        const newId = await insertCopy(c, ch.table, k, overrides, ch.remap ?? {});
         copied[ch.table] = (copied[ch.table] ?? 0) + 1;
-        if (ch.table === 'rubric_version') {
-          const crits = await c.query('select id from rubric_criterion where rubric_version_id = $1', [k.id]);
-          for (const cr of crits.rows) {
-            const newCrit = await copyRow(c, 'rubric_criterion', cr.id, { rubric_version_id: newId }, { linked_skill_id: 'skill', library_criterion_id: 'criterion_library' });
-            const lv = await c.query('select id from rubric_criterion_level where criterion_id = $1', [cr.id]);
-            for (const l of lv.rows) await copyRow(c, 'rubric_criterion_level', l.id, { criterion_id: newCrit });
-            copied['rubric_criterion'] = (copied['rubric_criterion'] ?? 0) + 1;
-          }
-          await c.query(`insert into source_ref (entity_kind, entity_id, source_id) select 'rubric_version', $2, source_id from source_ref where entity_kind = 'rubric_version' and entity_id = $1 on conflict do nothing`, [k.id, newId]);
-        }
+        if (ch.table === 'rubric_version' && newId) await copyCriteria(c, String(k['id']), newId, copied);
       }
     }
     // Provenance travels with the copy: the same sources, plus the demo origin recorded on the promotion.

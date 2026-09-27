@@ -1,4 +1,6 @@
 # OPEN-039 — تحليل التكرار: `ui-state-management` مقابل `skl_ui_state_interaction`
+> **قرار المالكة (2026-09-27 · D-097):** قُبلت التوصية `equivalent`. الكانونية `skl_ui_state_interaction`؛ `ui-state-management` مرادف يحتفظ بمعرّفه وتاريخه (`merged_into`، لا حذف). مُطبَّق في الحزمة 0.2.0 ومُختبَر. **OPEN-039 مُغلق.** ما يلي هو التحليل الذي سبق القرار.
+
 **لا دمج آلي. القرار للمالكة/SME.** تشابه مفتاح المطابقة العربي 0.9 (تقرير التكرار).
 
 | البُعد | `ui-state-management` (الشريحة ١) | `skl_ui_state_interaction` (الحزمة) |

@@ -74,6 +74,11 @@ export class SubmissionService {
       const submissionId: string = sub.rows[0].id;
 
       for (const skillId of input.skillIds) {
+        // OPEN-039: an alias (merged) skill is not claimable; the canonical one is. Nothing is guessed:
+        // the caller is told which skill replaced it.
+        const sk = await c.query(`select status, merged_into_id, (select slug from skill k where k.id = s.merged_into_id) as canonical_slug from skill s where s.id = $1`, [skillId]);
+        if (sk.rowCount === 0) throw new BadRequestException(`unknown skill ${skillId}`);
+        if (sk.rows[0].status !== 'active') throw new BadRequestException(`skill ${skillId} is ${sk.rows[0].status}${sk.rows[0].canonical_slug ? `; claim its canonical skill '${sk.rows[0].canonical_slug}' (${sk.rows[0].merged_into_id})` : ''}`);
         await c.query(
           `insert into submission_claimed_skill (submission_id, skill_id, user_id)
            values ($1,$2,$3) on conflict do nothing`,

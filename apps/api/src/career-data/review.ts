@@ -50,3 +50,27 @@ export async function supersedePrevious(pool: Pool, entityKind: 'activity_spec' 
   for (const r of rows) { await reviewTransition(pool, { entityKind, entityId: r.id, to: 'superseded', decidedBy: null, decidedByLabel: by, rolePerformed: 'system', reason: `superseded by ${newId}`, production }); done.push(r.id); }
   return done;
 }
+
+/**
+ * OPEN-043: the one recorded act that lets a rubric's weights, skill thresholds and pass
+ * threshold become `approved`. Refused for a DEMO fixture (the trigger refuses too) and
+ * for a rubric past approval (frozen). Writes a review_log row by the SME's name.
+ */
+export async function approveRubricValues(pool: Pool, cmd: { rubricVersionId: string; decidedBy: string; decidedByLabel: string; reason: string }): Promise<{ version: string; criteria: number }> {
+  if (!cmd.reason.trim()) throw new Error('a values approval needs a written reason');
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    const rv = await c.query('select version, status, is_demo_fixture from rubric_version where id = $1 for update', [cmd.rubricVersionId]);
+    if (rv.rowCount === 0) throw new Error(`rubric_version ${cmd.rubricVersionId} not found`);
+    if (rv.rows[0].is_demo_fixture) throw new Error('a DEMO fixture never carries approved values (D-081, OPEN-043)');
+    if (!['draft', 'curated', 'sme_reviewed'].includes(rv.rows[0].status)) throw new Error(`values are approved before the rubric is approved/published (status ${rv.rows[0].status})`);
+    await c.query(`update rubric_version set values_approved_by = $2, values_approved_by_label = $3, values_approved_at = now(), values_approval_reason = $4, pass_threshold_status = 'approved' where id = $1`,
+      [cmd.rubricVersionId, cmd.decidedBy, cmd.decidedByLabel, cmd.reason]);
+    const n = await c.query(`update rubric_criterion set weight_status = 'approved', threshold_status = case when criterion_kind = 'skill_evidence' then 'approved'::value_status else null end where rubric_version_id = $1`, [cmd.rubricVersionId]);
+    await c.query(`insert into review_log (entity_kind, entity_id, from_status, to_status, decided_by, decided_by_label, role_performed, reason) values ('rubric_version', $1, $2::review_state, $2::review_state, $3, $4, 'sme', $5)`,
+      [cmd.rubricVersionId, rv.rows[0].status, cmd.decidedBy, cmd.decidedByLabel, `values approved (weights, skill thresholds, pass threshold): ${cmd.reason}`]);
+    await c.query('commit');
+    return { version: rv.rows[0].version, criteria: n.rowCount ?? 0 };
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}

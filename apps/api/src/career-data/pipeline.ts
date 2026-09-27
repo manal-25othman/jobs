@@ -8,7 +8,7 @@
  */
 import type { Pool, PoolClient } from 'pg';
 import {
-  normalizeMatchKey, nearDuplicateCandidates, integrityClassificationOf, type IntegrityCheckType, type NearDuplicateCandidate,
+  normalizeMatchKey, nearDuplicateCandidates, integrityClassificationOf, type IntegrityCheckType, type NearDuplicateCandidate, type DuplicateResolution,
 } from '@naqla/domain';
 import type { Pack, PackCheckDef } from './pack-schema';
 import { validatePack } from './pack-schema';
@@ -20,6 +20,8 @@ export interface ImportReport {
   readonly snapshots: { file: string; sha256: string; stored: 'new' | 'existing' }[];
   readonly normalizedRecords: number;
   readonly nearDuplicates: NearDuplicateCandidate[];
+  /** OPEN-039: owner-decided resolutions applied (alias → canonical), each idempotent. */
+  readonly resolutions: { alias: string; canonical: string; applied: boolean; repointed: Record<string, number> }[];
   readonly written: Record<string, number>;
   readonly skippedFrozen: string[];
   readonly unmapped: string[];
@@ -85,10 +87,13 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     }
 
     /* ── Deduplicate: PROPOSE near-duplicates across DB ∪ pack; never merge ── */
-    const dbSkills = await c.query(`select slug as code, label_en as name_en, label_ar as name_ar from skill where status = 'active'`);
-    const universe = new Map<string, { code: string; nameEn: string; nameAr: string }>();
-    for (const r of dbSkills.rows) universe.set(r.code, { code: r.code, nameEn: r.name_en, nameAr: r.name_ar });
-    for (const s of pack.global.skills) universe.set(s.code, { code: s.code, nameEn: s.name_en, nameAr: s.name_ar });
+    const dbSkills = await c.query(`select slug as code, label_en as name_en, label_ar as name_ar, status from skill`);
+    const resolutions: readonly DuplicateResolution[] = m.duplicate_resolutions ?? [];
+    const resolvedAliases = new Set(resolutions.map((r) => r.alias));
+    const universe = new Map<string, { code: string; nameEn: string; nameAr: string; status: 'active' | 'deprecated' | 'merged_into' }>();
+    // A pair the owner already resolved (alias → canonical) is not an unresolved candidate, even before this import marks the alias.
+    for (const r of dbSkills.rows) universe.set(r.code, { code: r.code, nameEn: r.name_en, nameAr: r.name_ar, status: resolvedAliases.has(r.code) ? 'merged_into' : r.status });
+    for (const s of pack.global.skills) universe.set(s.code, { code: s.code, nameEn: s.name_en, nameAr: s.name_ar, status: 'active' });
     const nearDuplicates = nearDuplicateCandidates([...universe.values()]);
     for (const d of nearDuplicates) {
       await c.query(
@@ -266,14 +271,21 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
       let pos = 0; for (const d of a.deliverables) await c.query('insert into activity_deliverable (activity_spec_id, key, format, mandatory, description_ar, description_en, position) values ($1,$2,$3,$4,$5,$6,$7)', [aid_, d.key, d.format, d.mandatory, d.description_ar, d.description_en, pos++]);
       for (const s of a.related_skills) { const sid = skillId(s.skill, `activity ${a.code}`); if (sid) await c.query('insert into activity_skill (activity_spec_id, skill_id, depth) values ($1,$2,$3)', [aid_, sid, s.depth]); }
       for (const t of a.tasks) await c.query('insert into activity_task (activity_spec_id, task_id) values ($1,$2)', [aid_, taskIds.get(t)]);
+      // A check the pack no longer carries is removed from this (editable) activity's spec. History stays in the
+      // L0 snapshot of the earlier pack version and in the pack's CHANGES.md; past evaluation results keep their rows.
+      await c.query('delete from integrity_check_spec where activity_spec_id = $1 and not (key = any($2::text[]))', [aid_, a.integrity_checks.map((ic) => ic.key)]);
       for (const ic of a.integrity_checks) {
         const cls = integrityClassificationOf(ic.check_type as IntegrityCheckType);
+        const active = ic.evaluation_mode === 'future_deterministic' ? false : ic.active ?? true;
         await c.query(
-          `insert into integrity_check_spec (activity_spec_id, key, classification, blocking, check_definition, user_facing_message, check_type, location_en, expected_user_behavior_en, raw_ai_output_behavior_en, linked_criterion_key)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          `insert into integrity_check_spec (activity_spec_id, key, classification, blocking, check_definition, user_facing_message, check_type, location_en, expected_user_behavior_en, raw_ai_output_behavior_en, linked_criterion_key,
+             evaluation_mode, active, required_producer_en)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
            on conflict (activity_spec_id, key) do update set classification = excluded.classification, blocking = excluded.blocking, check_definition = excluded.check_definition, user_facing_message = excluded.user_facing_message,
-             check_type = excluded.check_type, location_en = excluded.location_en, expected_user_behavior_en = excluded.expected_user_behavior_en, raw_ai_output_behavior_en = excluded.raw_ai_output_behavior_en, linked_criterion_key = excluded.linked_criterion_key`,
-          [aid_, ic.key, cls, ic.blocking, JSON.stringify(ic.check_definition), cls === 'user_facing' ? ic.user_facing_message_ar ?? null : null, ic.check_type, ic.location_en, ic.expected_user_behavior_en, ic.raw_ai_output_behavior_en ?? null, ic.linked_criterion_key ?? null]);
+             check_type = excluded.check_type, location_en = excluded.location_en, expected_user_behavior_en = excluded.expected_user_behavior_en, raw_ai_output_behavior_en = excluded.raw_ai_output_behavior_en, linked_criterion_key = excluded.linked_criterion_key,
+             evaluation_mode = excluded.evaluation_mode, active = excluded.active, required_producer_en = excluded.required_producer_en`,
+          [aid_, ic.key, cls, ic.blocking, JSON.stringify(ic.check_definition), cls === 'user_facing' ? ic.user_facing_message_ar ?? null : null, ic.check_type, ic.location_en, ic.expected_user_behavior_en, ic.raw_ai_output_behavior_en ?? null, ic.linked_criterion_key ?? null,
+           ic.evaluation_mode, active, ic.required_producer_en ?? null]);
       }
       for (const s of a.source_refs) await sourceRef(c, 'activity_spec', aid_, sourceIds.get(s)!);
     }
@@ -292,16 +304,18 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
       await c.query('delete from rubric_criterion where rubric_version_id = $1', [rid]);
       let pos = 0;
       for (const cr of rb.criteria) {
-        const sid = skillId(cr.linked_skill, `rubric ${rb.code}/${cr.key}`); if (!sid) continue;
+        const kind = cr.criterion_kind ?? 'skill_evidence';
+        // OPEN-044: a gate/quality criterion is mapped to no skill; only a skill-evidence criterion resolves one.
+        const sid = kind === 'skill_evidence' ? skillId(cr.linked_skill!, `rubric ${rb.code}/${cr.key}`) : null; if (kind === 'skill_evidence' && !sid) continue;
         const chk = toCheckColumns(cr.check);
         const row = await c.query(
           `insert into rubric_criterion (rubric_version_id, key, position, name_ar, name_en, dimension, linked_skill_id, library_criterion_id, source, weight, max_score, mandatory, threshold_for_skill, evaluator_type, human_review_required,
              check_type, check_artifact_key, check_min_value, check_min_length, check_artifact_keys, description_ar, description_en, expected_evidence_ar, expected_evidence_en, excerpt_guidance_en, rationale_when_met_ar, rationale_when_unmet_ar,
-             weight_status, threshold_status)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29) returning id`,
+             weight_status, threshold_status, criterion_kind)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) returning id`,
           [rid, cr.key, pos++, cr.name_ar, cr.name_en, cr.dimension, sid, cr.library_criterion ? libIds.get(cr.library_criterion) : null, cr.source, cr.weight, cr.max_score, cr.mandatory, cr.threshold_for_skill, cr.evaluator_type, cr.human_review_required,
            chk.type, chk.artifactKey, chk.min, chk.minLength, chk.artifactKeys, cr.description_ar, cr.description_en, cr.expected_evidence_ar, cr.expected_evidence_en, cr.excerpt_guidance_en ?? null, cr.rationale_when_met_ar, cr.rationale_when_unmet_ar,
-           cr.weight_status ?? 'TBD', cr.threshold_status ?? 'TBD']);
+           cr.weight_status ?? 'TBD', kind === 'skill_evidence' ? cr.threshold_status ?? 'TBD' : null, kind]);
         for (const l of cr.levels) await c.query('insert into rubric_criterion_level (criterion_id, level_key, score, descriptor_ar, descriptor_en, observable_evidence_en) values ($1,$2,$3,$4,$5,$6)', [row.rows[0].id, l.level_key, l.score, l.descriptor_ar, l.descriptor_en, l.observable_evidence_en]);
         bump('rubric_criterion');
         for (const s of rb.source_refs) await sourceRef(c, 'rubric_criterion', row.rows[0].id, sourceIds.get(s)!);
@@ -333,13 +347,56 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     for (const [, id] of libIds) await sourceRef(c, 'criterion_library', id, primarySource);
     const syn = await c.query('select id from skill_synonym where is_demo_fixture = $1', [demo]); for (const r of syn.rows) await sourceRef(c, 'skill_synonym', r.id, primarySource);
 
+    /* ── OPEN-039: apply owner-decided duplicate resolutions (alias → canonical), non-destructively ── */
+    const applied: ImportReport['resolutions'] = [];
+    for (const r of resolutions) applied.push(await applyDuplicateResolution(c, r, skillIds, primarySource, snapshotId));
+
     if (unmapped.length) throw new ImportError('map', 'unmapped references; nothing was written', unmapped);
     if (opts.dryRun) await c.query('rollback'); else await c.query('commit');
-    return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: demo, snapshots, normalizedRecords: normalized, nearDuplicates, written, skippedFrozen, unmapped };
+    return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: demo, snapshots, normalizedRecords: normalized, nearDuplicates, resolutions: applied, written, skippedFrozen, unmapped };
   } catch (e) {
     await c.query('rollback').catch(() => undefined);
     throw e;
   } finally { c.release(); }
+}
+
+/**
+ * OPEN-039 / D-097. The alias keeps its id and every historical reference
+ * (evidence, claims, criterion scores, review log). What changes:
+ *   - alias.status = merged_into, merged_into_id = canonical, review_status = superseded (+ review_log row)
+ *   - mappings (role requirement, task/activity skill, criterion, learning resource) are repointed
+ *     to the canonical skill where the canonical is not already mapped; otherwise left for a person (Q02 flags it)
+ *   - dedup_candidate for the pair is decided 'merge' with the owner's reason
+ *   - the equivalent surface forms come from the pack's synonyms (data), not from here
+ * Idempotent: a second run finds the alias already merged and does nothing.
+ */
+async function applyDuplicateResolution(c: PoolClient, r: DuplicateResolution, skillIds: Map<string, string>, sourceId: string, snapshotId: string | null): Promise<ImportReport['resolutions'][number]> {
+  const canonicalId = skillIds.get(r.canonical); if (!canonicalId) throw new ImportError('resolve', `canonical skill '${r.canonical}' not found`);
+  const alias = await c.query(`select id, status, review_status from skill where slug = $1 and status <> 'merged_into' order by is_demo_fixture desc limit 1`, [r.alias]);
+  const decidedBy = r.decided_by; const reason = `${r.decision_ref}: ${r.reason}`;
+  await c.query(`insert into dedup_candidate (snapshot_id, a_code, b_code, similarity, on_field, proposed_relation, decision, decided_by, decided_at, decision_reason)
+                 values ($1,$2,$3,1,'owner_decision','equivalent','merge',$4,$5,$6)
+                 on conflict (a_code, b_code) do update set decision = 'merge', proposed_relation = 'equivalent', decided_by = excluded.decided_by, decided_at = excluded.decided_at, decision_reason = excluded.decision_reason`,
+    [snapshotId, r.alias, r.canonical, decidedBy, r.decided_at, reason]);
+  await c.query(`update dedup_candidate set decision = 'merge', proposed_relation = 'equivalent', decided_by = $3, decided_at = $4, decision_reason = $5 where a_code = $2 and b_code = $1 and decision = 'proposed'`, [r.alias, r.canonical, decidedBy, r.decided_at, reason]);
+  if (alias.rowCount === 0) return { alias: r.alias, canonical: r.canonical, applied: false, repointed: {} };
+  const aliasId: string = alias.rows[0].id;
+  const repointed: Record<string, number> = {};
+  const count = async (label: string, sql: string, params: unknown[]) => { const res = await c.query(sql, params); if (res.rowCount) repointed[label] = res.rowCount; };
+  await count('role_requirement', `update role_requirement rr set skill_id = $2 where rr.skill_id = $1 and not exists (select 1 from role_requirement x where x.target_role_id = rr.target_role_id and x.skill_id = $2)`, [aliasId, canonicalId]);
+  await count('task_skill', `update task_skill tk set skill_id = $2 where tk.skill_id = $1 and not exists (select 1 from task_skill x where x.task_id = tk.task_id and x.skill_id = $2)`, [aliasId, canonicalId]);
+  await count('activity_skill', `update activity_skill ak set skill_id = $2 where ak.skill_id = $1 and not exists (select 1 from activity_skill x where x.activity_spec_id = ak.activity_spec_id and x.skill_id = $2)`, [aliasId, canonicalId]);
+  await count('rubric_criterion', `update rubric_criterion set linked_skill_id = $2 where linked_skill_id = $1`, [aliasId, canonicalId]);
+  await count('learning_resource', `update learning_resource set skill_id = $2 where skill_id = $1`, [aliasId, canonicalId]);
+  await c.query(`update skill set status = 'merged_into', merged_into_id = $2 where id = $1`, [aliasId, canonicalId]);
+  const from = alias.rows[0].review_status as string;
+  if (from !== 'superseded') {
+    await c.query(`update skill set review_status = 'superseded' where id = $1`, [aliasId]);
+    await c.query(`insert into review_log (entity_kind, entity_id, from_status, to_status, decided_by, decided_by_label, role_performed, reason)
+                   values ('skill', $1, $2::review_state, 'superseded', null, $3, 'product_owner', $4)`, [aliasId, from, decidedBy, `merged into ${r.canonical} as an equivalent alias — ${reason}`]);
+  }
+  await sourceRef(c, 'skill', aliasId, sourceId);
+  return { alias: r.alias, canonical: r.canonical, applied: true, repointed };
 }
 
 async function sourceRef(c: PoolClient, kind: string, entityId: string, sourceId: string): Promise<void> {
@@ -356,6 +413,11 @@ export function renderNearDuplicateReport(cands: readonly NearDuplicateCandidate
   const lines = [`# Near-Duplicate Report — ${packId}@${packVersion}`, '', 'Proposed by the import pipeline from normalised match keys (domain: `nearDuplicateCandidates`). **Nothing here was merged.** A person decides: merge (`status = merged_into`, never a delete), link (a `skill_synonym` relation), keep separate, or reject.', '',
     '| A | B | similarity | on | decision |', '|---|---|---|---|---|'];
   for (const c of cands) { const d = decided.find((x) => x.a_code === c.aCode && x.b_code === c.bCode); lines.push(`| \`${c.aCode}\` | \`${c.bCode}\` | ${c.similarity} | ${c.onField} | ${d ? `${d.decision}${d.decision_reason ? ` — ${d.decision_reason}` : ''}` : 'proposed'} |`); }
-  if (cands.length === 0) lines.push('| — | — | — | — | no candidates above threshold |');
+  if (cands.length === 0) lines.push('| — | — | — | — | no unresolved candidates above threshold |');
+  const resolved = decided.filter((d) => d.decision !== 'proposed' && !cands.some((c) => c.aCode === d.a_code && c.bCode === d.b_code));
+  if (resolved.length) {
+    lines.push('', '## Resolved (a documented human decision; the pair is no longer an unresolved candidate)', '', '| A | B | decision | reason |', '|---|---|---|---|');
+    for (const d of resolved) lines.push(`| \`${d.a_code}\` | \`${d.b_code}\` | ${d.decision} | ${d.decision_reason ?? ''} |`);
+  }
   return lines.join('\n') + '\n';
 }

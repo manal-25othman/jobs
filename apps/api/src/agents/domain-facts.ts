@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import type { DomainFacts } from '@naqla/agents';
-import type { EvidenceState } from '@naqla/domain';
+import { canonicalEvidenceStates, type EvidenceState } from '@naqla/domain';
 
 /**
  * The facts domain validation runs against, loaded from the database.
@@ -11,7 +11,8 @@ import type { EvidenceState } from '@naqla/domain';
  * The vocabulary itself is data: `technology_term`, seeded from track packs.
  */
 export async function loadDomainFacts(c: PoolClient, userId: string): Promise<DomainFacts> {
-  const claims = await c.query('select skill_id, state from skill_claim where user_id = $1', [userId]);
+  // OPEN-039: alias claims count for the canonical skill.
+  const claims = await c.query('select canonical_skill_id(skill_id) as skill_id, state from skill_claim where user_id = $1', [userId]);
   const ev = await c.query('select id from evidence where user_id = $1 and withdrawn_at is null', [userId]);
   const approved = await c.query(
     `select distinct t from (
@@ -30,7 +31,7 @@ export async function loadDomainFacts(c: PoolClient, userId: string): Promise<Do
   const numericFacts = new Set<string>();
   for (const r of scores.rows) for (const v of [r.total, r.max, r.met]) numericFacts.add(String(Number(v)));
   return {
-    skillStates: Object.fromEntries(claims.rows.map((r) => [r.skill_id, r.state as EvidenceState])),
+    skillStates: canonicalEvidenceStates([], claims.rows.map((r) => ({ skillId: String(r.skill_id), state: r.state as EvidenceState }))),
     existingEvidence: new Set<string>(ev.rows.map((r) => r.id)),
     approvedTechnologies: new Set<string>(approved.rows.map((r) => String(r.t))),
     knownTechnologies: new Map<string, readonly string[]>(known.rows.map((r) => [String(r.term), (r.aliases as string[]) ?? []])),

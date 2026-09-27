@@ -1,4 +1,4 @@
-# حزمة المسار الأول — Junior Web / Frontend Developer (`trk_frontend_junior@0.1.0`)
+# حزمة المسار الأول — Junior Web / Frontend Developer (`trk_frontend_junior@0.2.0`)
 **التسمية:** **DEMO / DRAFT / NOT SME APPROVED** · `drafting_aid = ai_assisted` · كل صف `is_demo_fixture = true` · الحالة في القاعدة `draft`
 **الملفات:** `data/career/global/*.json` (السجلات العالمية) · `data/career/tracks/trk_frontend_junior/*.json` (الحزمة) — تُستورد بـ`npm run career:import`.
 
@@ -66,3 +66,9 @@
 
 ## قواعد العرض (١٥)
 ٥ أنواع أصول × ٣ مستويات. `cv_bullet` من `practiced` («عملتُ على») · `linkedin_skill`/`case_study` من `demonstrated` · `professional_profile` يتطلب `verified`. عبارات ممنوعة موحّدة (خبير · محترف · senior · mastered …). `must_cite_evidence` دائمًا.
+
+## ما تغيّر في 0.2.0 (قرارات المالكة · D-097 … D-100)
+- `ui-state-management` (الشريحة ١) مرادف `equivalent` لـ`skl_ui_state_interaction` — مُعلَن في `manifest.duplicate_resolutions`؛ الخط يطبّقه بلا حذف.
+- `deliverables_complete` (×٣) **بوابة** (`criterion_kind = gate`): لا مهارة، لا عتبة مهارة، لا دليل. البنود ١٩ دليل + ٣ بوابات.
+- فحوص النزاهة **١٧** (كانت ١٨): ٧ حتمية بمُنتِج · ٧ يلاحظها المراجع (`human_observable`، مُدخلات لبنود بشرية) · ٣ مؤجَّلة معطَّلة (`future_deterministic`) · حُذف `planted_field_count`. `files_present` نوعه `mandatory_deliverables`. **لا فحص نشط على إشارة بلا مُنتِج.**
+- السجل الكامل: `data/career/tracks/trk_frontend_junior/CHANGES.md`. الحالة: **DEMO / DRAFT / NOT SME APPROVED** بلا تغيير.

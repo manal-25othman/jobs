@@ -122,7 +122,8 @@
             "minLength": 40
           },
           "user_facing_message_ar": "يذكر الوصف أربعة حقول وتذكر قائمة الحقول خمسة. ما قرارك ولماذا؟",
-          "linked_criterion_key": "judgment_assumption_check"
+          "linked_criterion_key": "judgment_assumption_check",
+          "evaluation_mode": "deterministic"
         },
         {
           "key": "explain_data_flow",
@@ -136,20 +137,8 @@
             "minLength": 80
           },
           "user_facing_message_ar": "اشرحي في فقرة كيف تصل البيانات من الطلب إلى الشاشة وأين تُحفظ الحالة.",
-          "linked_criterion_key": "explanation_clarity"
-        },
-        {
-          "key": "planted_field_count",
-          "check_type": "planted_inconsistency",
-          "blocking": false,
-          "location_en": "fields.spec has five fields; the brief says four",
-          "expected_user_behavior_en": "asks or decides explicitly",
-          "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.planted_field_count"
-          },
-          "raw_ai_output_behavior_en": "implements five fields silently without mentioning the conflict",
-          "linked_criterion_key": "judgment_assumption_check"
+          "linked_criterion_key": "explanation_clarity",
+          "evaluation_mode": "deterministic"
         },
         {
           "key": "empty_response_edge",
@@ -158,11 +147,18 @@
           "location_en": "api.mock_requests returns []",
           "expected_user_behavior_en": "shows an empty state, not a blank list or an error",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.empty_response_edge"
+            "type": "human_observation",
+            "criterionKey": "data_states",
+            "reviewerPromptAr": "عند إرجاع الخدمة قائمة فارغة []: هل تعرض الصفحة حالة «لا توجد طلبات» واضحة، لا قائمة فارغة صامتة ولا رسالة خطأ؟ (افحصي معالجة الاستجابة في app.js)",
+            "reviewerPromptEn": "When the endpoint returns []: does the page show an explicit empty state, rather than a blank list or an error? (inspect the response handling in app.js)",
+            "passWhenEn": "an explicit empty-state message/branch exists for an empty array",
+            "failWhenEn": "[] renders nothing, or is treated as an error",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "renders nothing or treats [] as an error",
-          "linked_criterion_key": "data_states"
+          "linked_criterion_key": "data_states",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.empty_response_edge"
         },
         {
           "key": "error_500_expected_failure",
@@ -171,15 +167,22 @@
           "location_en": "api.mock_requests returns 500",
           "expected_user_behavior_en": "shows a readable error and keeps the form usable",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.error_500_expected_failure"
+            "type": "human_observation",
+            "criterionKey": "data_states",
+            "reviewerPromptAr": "عند فشل الخدمة (500): هل تظهر رسالة خطأ مقروءة ويبقى النموذج قابلًا للاستخدام، أم يبقى مؤشر التحميل يدور أو تفرغ الشاشة؟",
+            "reviewerPromptEn": "When the endpoint fails (500): is a readable error shown and the form still usable, or does the spinner run forever / the screen go blank?",
+            "passWhenEn": "the rejection is caught, a message is rendered, loading state is cleared",
+            "failWhenEn": "no rejection handling, endless loading, or a blank screen",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "leaves the spinner running or shows a blank screen",
-          "linked_criterion_key": "data_states"
+          "linked_criterion_key": "data_states",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.error_500_expected_failure"
         },
         {
           "key": "files_present",
-          "check_type": "followup_modification",
+          "check_type": "mandatory_deliverables",
           "blocking": true,
           "location_en": "submission",
           "expected_user_behavior_en": "attaches all three source files",
@@ -191,7 +194,8 @@
               "file.app_js"
             ]
           },
-          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا."
+          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا.",
+          "evaluation_mode": "deterministic"
         }
       ],
       "rubric": "rub_fe_build_interface@0.1.0",
@@ -312,7 +316,8 @@
             "minLength": 60
           },
           "user_facing_message_ar": "إحدى الشكاوى تقول «الزر لا يعمل». ما السبب الفعلي الذي وجدتِه، وكيف تأكدتِ؟",
-          "linked_criterion_key": "root_cause_note"
+          "linked_criterion_key": "root_cause_note",
+          "evaluation_mode": "deterministic"
         },
         {
           "key": "followup_change_breakpoint",
@@ -324,7 +329,10 @@
             "type": "artifact_present",
             "artifactKey": "followup.breakpoint_900"
           },
-          "user_facing_message_ar": "بعد التسليم: التسويق يريد أن يظهر العمود الجانبي من 900px بدل 1024px. عدّلي."
+          "user_facing_message_ar": "بعد التسليم: التسويق يريد أن يظهر العمود الجانبي من 900px بدل 1024px. عدّلي.",
+          "evaluation_mode": "future_deterministic",
+          "active": false,
+          "required_producer_en": "A post-submission follow-up round in the submission flow (a second, time-boxed change request producing a `followup.*` artifact). Not built."
         },
         {
           "key": "planted_hidden_overflow",
@@ -333,11 +341,18 @@
           "location_en": "styles.css has overflow-x: hidden masking the real width bug",
           "expected_user_behavior_en": "removes the mask and fixes the width",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.planted_hidden_overflow"
+            "type": "human_observation",
+            "criterionKey": "responsive_fixed",
+            "reviewerPromptAr": "كان في styles.css قاعدة overflow-x: hidden تُخفي عطل العرض الحقيقي. هل أُزيلت وأُصلح سبب العرض، أم بقيت كقناع؟",
+            "reviewerPromptEn": "styles.css contained overflow-x: hidden masking the real width bug. Was the mask removed and the width fixed at its cause, or is it still masking?",
+            "passWhenEn": "the mask is gone and the width cause (fixed px widths / missing wrapping) is fixed",
+            "failWhenEn": "overflow-x: hidden remains and the layout is declared fixed",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "keeps overflow-x hidden and calls it fixed",
-          "linked_criterion_key": "responsive_fixed"
+          "linked_criterion_key": "responsive_fixed",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.planted_hidden_overflow"
         },
         {
           "key": "deterministic_email_signal",
@@ -346,11 +361,18 @@
           "location_en": "app.js validation",
           "expected_user_behavior_en": "validates email with a reasonable check and shows a per-field message",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.email_validation_present"
+            "type": "human_observation",
+            "criterionKey": "validation_fixed",
+            "reviewerPromptAr": "هل يُتحقَّق من البريد بفحص معقول (يقبل عناوين صحيحة شائعة) وتُعرض رسالة بجانب الحقل، أم استُخدم تعبير صارم يرفض عناوين صحيحة أو رسالة عامة واحدة؟",
+            "reviewerPromptEn": "Is the email validated with a reasonable check (accepting common valid addresses) with a per-field message, or with an over-strict regex that rejects valid addresses / one generic message?",
+            "passWhenEn": "reasonable check + a message beside the field",
+            "failWhenEn": "over-strict regex, alert(), or a single generic message",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "adds a strict regex that rejects valid addresses",
-          "linked_criterion_key": "validation_fixed"
+          "linked_criterion_key": "validation_fixed",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.email_validation_present"
         },
         {
           "key": "output_consistency_layout",
@@ -363,11 +385,14 @@
             "artifactKey": "signal.output_consistency_layout"
           },
           "raw_ai_output_behavior_en": "claims fixed while the page still scrolls horizontally",
-          "linked_criterion_key": "responsive_fixed"
+          "linked_criterion_key": "responsive_fixed",
+          "evaluation_mode": "future_deterministic",
+          "active": false,
+          "required_producer_en": "A browser rendering runner that loads the submitted page at 360px and 1024px and records horizontal overflow (a `signal.output_consistency_layout` artifact). Not built."
         },
         {
           "key": "files_present",
-          "check_type": "followup_modification",
+          "check_type": "mandatory_deliverables",
           "blocking": true,
           "location_en": "submission",
           "expected_user_behavior_en": "attaches all three source files",
@@ -379,7 +404,8 @@
               "file.app_js"
             ]
           },
-          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا."
+          "user_facing_message_ar": "يلزم إرفاق ملفات HTML وCSS وJavaScript معًا.",
+          "evaluation_mode": "deterministic"
         }
       ],
       "rubric": "rub_fe_debug_improve@0.1.0",
@@ -500,7 +526,8 @@
             "minLength": 60
           },
           "user_facing_message_ar": "ما البديل الذي فكّرتِ فيه لتنفيذ التصفية ولماذا رفضتِه؟",
-          "linked_criterion_key": "decision_explained"
+          "linked_criterion_key": "decision_explained",
+          "evaluation_mode": "deterministic"
         },
         {
           "key": "followup_second_filter",
@@ -512,7 +539,10 @@
             "type": "artifact_present",
             "artifactKey": "followup.assignee_filter"
           },
-          "user_facing_message_ar": "بعد التسليم: أضيفي تصفية بالمكلَّف أيضًا."
+          "user_facing_message_ar": "بعد التسليم: أضيفي تصفية بالمكلَّف أيضًا.",
+          "evaluation_mode": "future_deterministic",
+          "active": false,
+          "required_producer_en": "A post-submission follow-up round in the submission flow (a second, time-boxed change request producing a `followup.*` artifact). Not built."
         },
         {
           "key": "planted_empty_as_error",
@@ -521,11 +551,18 @@
           "location_en": "app.js treats [] as an error",
           "expected_user_behavior_en": "fixes the condition at its cause",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.planted_empty_as_error"
+            "type": "human_observation",
+            "criterionKey": "root_cause_fixed",
+            "reviewerPromptAr": "كان app.js يعامل القائمة الفارغة [] كخطأ. هل أُصلح الشرط في موضعه، أم أُخفيت الرسالة (مثلًا try/catch حول العرض)؟",
+            "reviewerPromptEn": "app.js treated [] as an error. Was the condition fixed at its cause, or was the message hidden (e.g. try/catch around render)?",
+            "passWhenEn": "the emptiness/error condition is corrected where it is decided",
+            "failWhenEn": "the symptom is hidden and the wrong condition remains",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "wraps the render in try/catch and hides the message",
-          "linked_criterion_key": "root_cause_fixed"
+          "linked_criterion_key": "root_cause_fixed",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.planted_empty_as_error"
         },
         {
           "key": "deterministic_state_signal",
@@ -534,11 +571,18 @@
           "location_en": "app.js",
           "expected_user_behavior_en": "the filter changes state and rendering follows; no second copy of the list",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.filter_in_state"
+            "type": "human_observation",
+            "criterionKey": "filter_in_state",
+            "reviewerPromptAr": "هل تغيّر التصفية الحالة ثم يتبعها العرض (مصدر واحد للحقيقة)، أم تُصفَّى عناصر DOM مباشرة فتوجد نسختان من القائمة؟",
+            "reviewerPromptEn": "Does the filter change state and rendering follow (one source of truth), or are DOM nodes filtered directly leaving two copies of the list?",
+            "passWhenEn": "filter value lives in state; render derives the visible list from state",
+            "failWhenEn": "DOM nodes hidden/removed directly; list state and view diverge",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "filters the DOM directly, keeping two sources of truth",
-          "linked_criterion_key": "filter_in_state"
+          "linked_criterion_key": "filter_in_state",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.filter_in_state"
         },
         {
           "key": "edge_empty_after_filter",
@@ -547,15 +591,22 @@
           "location_en": "filter yields no tasks",
           "expected_user_behavior_en": "shows 'no tasks match', not an error",
           "check_definition": {
-            "type": "artifact_present",
-            "artifactKey": "signal.edge_empty_after_filter"
+            "type": "human_observation",
+            "criterionKey": "empty_state_correct",
+            "reviewerPromptAr": "حين لا تطابق التصفية أي مهمة: هل تظهر «لا مهام مطابقة»، أم تعود رسالة الخطأ؟",
+            "reviewerPromptEn": "When the filter yields no tasks: is \"no tasks match\" shown, or does the error message come back?",
+            "passWhenEn": "a distinct empty-after-filter state is rendered",
+            "failWhenEn": "the error path is shown again, or nothing",
+            "affectsEvidence": true
           },
           "raw_ai_output_behavior_en": "shows the error again",
-          "linked_criterion_key": "empty_state_correct"
+          "linked_criterion_key": "empty_state_correct",
+          "evaluation_mode": "human_observable",
+          "previous_signal_dependency": "signal.edge_empty_after_filter"
         },
         {
           "key": "files_present",
-          "check_type": "followup_modification",
+          "check_type": "mandatory_deliverables",
           "blocking": true,
           "location_en": "submission",
           "expected_user_behavior_en": "attaches the modified script and the decision note",
@@ -566,7 +617,8 @@
               "note.decision"
             ]
           },
-          "user_facing_message_ar": "يلزم إرفاق السكربت المعدَّل وملاحظة القرار."
+          "user_facing_message_ar": "يلزم إرفاق السكربت المعدَّل وملاحظة القرار.",
+          "evaluation_mode": "deterministic"
         }
       ],
       "rubric": "rub_fe_change_request@0.1.0",
@@ -574,5 +626,6 @@
         "src_naqla_frontend_pack_v0_1"
       ]
     }
-  ]
+  ],
+  "_changes": "0.2.0: OPEN-045 classification of the 11 assessment-only checks that depended on signal.*/followup.* artifacts — 7 human_observable, 3 future_deterministic (inactive), 1 removed (planted_field_count, duplicate of clarify_fields_conflict + judgment_assumption_check). See CHANGES.md."
 }

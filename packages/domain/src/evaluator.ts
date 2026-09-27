@@ -13,6 +13,7 @@
  */
 
 import { MissingPrerequisite, InvariantViolation } from './errors.js';
+import type { CriterionKind, IntegrityEvaluationMode } from './career-data.js';
 import type { EvaluationOutcome, EvaluationCriterionScore } from './evaluation.js';
 import { EVIDENCE_STATES, type EvidenceState, evidenceOrdinal } from './evidence-state.js';
 
@@ -48,12 +49,15 @@ export type CriterionCheck =
 
 export type CriterionEvaluatorType = 'rule' | 'llm' | 'human';
 
+
 export interface RubricCriterion {
   readonly key: string;
   readonly label: string;
   readonly maxScore: number;
-  /** Which skill this criterion speaks to. */
-  readonly skillId: string;
+  /** What this criterion is for. Default 'skill_evidence'. */
+  readonly kind?: CriterionKind;
+  /** Which skill this criterion speaks to. Null for a gate/quality criterion (OPEN-044). */
+  readonly skillId: string | null;
   /** Who decides this criterion. Default 'rule'. A 'human' criterion is never scored here. */
   readonly evaluatorType?: CriterionEvaluatorType;
   /** The deterministic check. Null only for a criterion no rule can decide. */
@@ -80,13 +84,35 @@ export interface PublishedRubric {
 
 /* ──────────────────────────── integrity checks ─────────────────────────── */
 
+/** A check a reviewer judges from the submission; it is an INPUT to a named human criterion, never a score. */
+export interface HumanObservation {
+  readonly type: 'human_observation';
+  readonly criterionKey: string;
+  readonly reviewerPromptAr: string;
+  readonly reviewerPromptEn: string;
+  readonly passWhenEn: string;
+  readonly failWhenEn: string;
+  /** Whether a fail here should weigh on the linked criterion's evidence eligibility. Informational for the reviewer. */
+  readonly affectsEvidence: boolean;
+}
+
 export interface IntegrityCheckSpec {
   readonly key: string;
   readonly classification: 'user_facing' | 'assessment_only';
-  readonly check: CriterionCheck;
+  readonly check: CriterionCheck | HumanObservation;
   /** True when failing this check must stop the pipeline. */
   readonly blocking: boolean;
   readonly userFacingMessage: string | null;
+  /** OPEN-045. Default 'deterministic'. */
+  readonly mode?: IntegrityEvaluationMode;
+  /** False for a registered check whose producer does not exist yet. Never evaluated, never blocks. */
+  readonly active?: boolean;
+}
+
+/** A registered check this run did NOT evaluate, and why. Transparency, not a score. */
+export interface DeferredCheck {
+  readonly key: string;
+  readonly reason: 'human_review' | 'inactive_no_producer';
 }
 
 export interface IntegrityCheckResult {
@@ -114,6 +140,8 @@ export interface EvaluationRun {
   readonly reason: string;
   /** Criteria a person must decide before this run can be finalised. Empty when none. */
   readonly pendingHumanCriteria: readonly string[];
+  /** Registered checks left unevaluated on purpose (human-observable or inactive). */
+  readonly deferredChecks: readonly DeferredCheck[];
 }
 
 export interface EvaluatorInput {
@@ -183,9 +211,20 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
   }
 
   /* 1. Integrity checks run BEFORE scoring (doc 11: checks precede the
-        evaluator, and a blocking failure stops the pipeline). */
-  const integrityChecks: IntegrityCheckResult[] = integritySpecs.map((spec) => {
-    const { met } = runCheck(spec.check, artifacts);
+        evaluator, and a blocking failure stops the pipeline). Only ACTIVE
+        DETERMINISTIC checks are evaluated here (OPEN-045): a human-observable
+        check is handed to the reviewer of its criterion, and an inactive check
+        (no producer yet) is neither evaluated nor allowed to block. */
+  const deferredChecks: DeferredCheck[] = [];
+  const evaluable: IntegrityCheckSpec[] = [];
+  for (const spec of integritySpecs) {
+    const mode = spec.mode ?? 'deterministic';
+    if (mode === 'human_observable' || spec.check.type === 'human_observation') { deferredChecks.push({ key: spec.key, reason: 'human_review' }); continue; }
+    if (mode === 'future_deterministic' || spec.active === false) { deferredChecks.push({ key: spec.key, reason: 'inactive_no_producer' }); continue; }
+    evaluable.push(spec);
+  }
+  const integrityChecks: IntegrityCheckResult[] = evaluable.map((spec) => {
+    const { met } = runCheck(spec.check as CriterionCheck, artifacts);
     return {
       key: spec.key,
       classification: spec.classification,
@@ -210,6 +249,7 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
       proposedState: null,
       reason: `a mandatory integrity check did not pass: ${blockingFailure.key}`,
       pendingHumanCriteria: [],
+      deferredChecks,
     };
   }
 
@@ -246,10 +286,27 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
       proposedState: null,
       reason: `${humanCriteria.length} criterion(s) need a human reviewer: ${humanCriteria.map((c) => c.key).join(', ')}`,
       pendingHumanCriteria: humanCriteria.map((c) => c.key),
+      deferredChecks,
     };
   }
 
-  return concludeRun(rubric, criteria, integrityChecks, currentState);
+  return concludeRun(rubric, criteria, integrityChecks, currentState, deferredChecks);
+}
+
+/**
+ * OPEN-044: which skills this run's criteria may speak for. A gate/quality
+ * criterion (e.g. deliverables complete) is never among them, whatever its score.
+ * Returns the skill ids whose skill-evidence criteria ALL met their maximum.
+ */
+export function skillsEvidencedByRun(rubric: PublishedRubric, run: EvaluationRun): readonly string[] {
+  const bySkill = new Map<string, boolean>();
+  for (const c of rubric.criteria) {
+    if ((c.kind ?? 'skill_evidence') !== 'skill_evidence' || c.skillId === null) continue;
+    const scored = run.criteria.find((s) => s.criterionId === c.key);
+    const met = scored !== undefined && scored.score >= c.maxScore;
+    bySkill.set(c.skillId, (bySkill.get(c.skillId) ?? true) && met);
+  }
+  return [...bySkill.entries()].filter(([, ok]) => ok).map(([id]) => id);
 }
 
 /** A person's decision on one human-evaluated criterion, already validated (human-review.ts). */
@@ -304,10 +361,10 @@ export function aggregateWithHumanDecisions(input: {
     });
   // Keep the rubric's order so the result reads like the rubric.
   const all = rubric.criteria.map((c) => deterministic.criteria.find((s) => s.criterionId === c.key) ?? humanScores.find((s) => s.criterionId === c.key)!);
-  return concludeRun(rubric, all, deterministic.integrityChecks, currentState);
+  return concludeRun(rubric, all, deterministic.integrityChecks, currentState, deterministic.deferredChecks);
 }
 
-function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCriterionScore[], integrityChecks: readonly IntegrityCheckResult[], currentState: EvidenceState): EvaluationRun {
+function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCriterionScore[], integrityChecks: readonly IntegrityCheckResult[], currentState: EvidenceState, deferredChecks: readonly DeferredCheck[] = []): EvaluationRun {
   const totalScore = criteria.reduce((s, c) => s + c.score, 0);
   const maxScore = criteria.reduce((s, c) => s + c.maxScore, 0);
 
@@ -337,6 +394,7 @@ function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCrite
       proposedState: null,
       reason: why,
       pendingHumanCriteria: [],
+      deferredChecks,
     };
   }
 
@@ -355,6 +413,7 @@ function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCrite
       proposedState: null,
       reason: `passed, and the claim is already at '${currentState}'; no promotion is earned`,
       pendingHumanCriteria: [],
+      deferredChecks,
     };
   }
 
@@ -369,6 +428,7 @@ function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCrite
     proposedState: proposed,
     reason: `all mandatory criteria met, ${totalScore}/${maxScore}`,
     pendingHumanCriteria: [],
+    deferredChecks,
   };
 }
 

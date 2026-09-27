@@ -67,6 +67,20 @@ export default function ReviewDetailPage() {
         <h2>المعيار</h2>
         <p className="body-sm">{c.descriptionAr}</p>
         <p className="body-sm muted">الدليل المتوقَّع: {c.expectedEvidenceAr} · {c.mandatory ? 'إلزامي' : 'اختياري'} · الحد الأقصى <span className="num">{c.maxScore}</span></p>
+        {(c.observations ?? []).length > 0 && (
+          <div className="stack" style={{ gap: 6 }}>
+            <h3 className="body-sm" style={{ fontWeight: 500 }}>ما يُطلب منكِ ملاحظته في التسليم</h3>
+            <ul className="stack" style={{ gap: 6 }}>
+              {c.observations.map((o) => (
+                <li key={o.key} className="stack" style={{ gap: 2 }}>
+                  <span className="body-sm">{o.reviewerPromptAr}</span>
+                  <span className="micro muted term">pass: {o.passWhenEn} · fail: {o.failWhenEn}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="micro muted">هذه ملاحظات تُعين قرارك على هذا البند؛ لا تُسجَّل درجةً بذاتها.</p>
+          </div>
+        )}
       </section>
       <section className="card stack" style={{ gap: 8 }}>
         <h2>التسليم</h2>

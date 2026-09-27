@@ -69,7 +69,7 @@ export class EvaluationService {
       const artifacts = await this.loadArtifacts(c, submissionId);
       const integritySpecs = await this.loadIntegritySpecs(c, s.activity_spec_id);
       const claimedSkills = await c.query(
-        `select skill_id from submission_claimed_skill where submission_id = $1`, [submissionId],
+        `select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1`, [submissionId],
       );
       const skillIds: string[] = claimedSkills.rows.map((r) => r.skill_id);
       if (skillIds.length === 0) throw new BadRequestException('the submission claims no skill');
@@ -258,12 +258,16 @@ export class EvaluationService {
         integrityChecks: detChecks.rows.map((r) => { const spec = specs.find((x) => x.key === r.check_key); return { key: r.check_key, classification: r.classification, passed: r.passed, blocking: spec?.blocking ?? false, message: r.classification === 'user_facing' ? spec?.userFacingMessage ?? null : null }; }),
         totalScore: detScores.rows.reduce((a, r) => a + Number(r.score), 0), maxScore: rubric.criteria.reduce((a, r) => a + r.maxScore, 0), proposedState: null, reason: 'interim',
         pendingHumanCriteria: rubric.criteria.filter((r) => (r.evaluatorType ?? 'rule') !== 'rule').map((r) => r.key),
+        // OPEN-045: registered checks the deterministic stage left to people or to a future producer.
+        deferredChecks: specs.filter((x) => (x.mode ?? 'deterministic') !== 'deterministic' || x.active === false)
+          .map((x) => ({ key: x.key, reason: (x.mode ?? 'deterministic') === 'human_observable' ? 'human_review' as const : 'inactive_no_producer' as const })),
       };
       // The latest decision per queue item is the one that counts; earlier ones stay as history.
       const decisions = await c.query(
         `select distinct on (queue_item_id) queue_item_id, criterion_key, score, rationale from criterion_review where queue_item_id = any($1::uuid[]) order by queue_item_id, created_at desc`,
         [queue.rows.map((q) => q.id)]);
-      const primarySkill = await c.query('select skill_id from submission_claimed_skill where submission_id = $1 limit 1', [e.submission_id]);
+      // OPEN-039: a claim on an alias skill is honoured on its canonical skill.
+      const primarySkill = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1 limit 1', [e.submission_id]);
       const primarySkillId: string = primarySkill.rows[0].skill_id;
       const currentState = await this.currentClaimState(c, e.user_id, primarySkillId);
 
@@ -429,7 +433,7 @@ export class EvaluationService {
     // Career Data Foundation: rubric_criterion rows are authoritative. The JSONB
     // column is a legacy snapshot used only when no rows exist.
     const crit = await c.query(
-      `select key, name_ar, linked_skill_id, max_score, mandatory, evaluator_type, check_type,
+      `select key, name_ar, linked_skill_id, criterion_kind, max_score, mandatory, evaluator_type, check_type,
               check_artifact_key, check_min_value, check_min_length, check_artifact_keys,
               rationale_when_met_ar, rationale_when_unmet_ar
          from rubric_criterion where rubric_version_id = $1 order by position, key`,
@@ -454,7 +458,8 @@ export class EvaluationService {
         rubricVersionId: rv.id, version: rv.version, activitySpecId, activitySpecVersion, status: 'published',
         passThreshold: Number(rv.pass_threshold), proposesState: rv.proposes_state as EvidenceState,
         criteria: crit.rows.map((r) => ({
-          key: r.key, label: r.name_ar, maxScore: Number(r.max_score), skillId: r.linked_skill_id, mandatory: r.mandatory,
+          // OPEN-044: a gate/quality criterion carries no skill; it can never feed skill evidence.
+          key: r.key, label: r.name_ar, maxScore: Number(r.max_score), kind: r.criterion_kind, skillId: r.linked_skill_id, mandatory: r.mandatory,
           evaluatorType: r.evaluator_type, check: r.evaluator_type === 'rule' ? toCheck(r) : null,
           rationaleWhenMet: r.rationale_when_met_ar, rationaleWhenUnmet: r.rationale_when_unmet_ar,
         })),
@@ -493,16 +498,20 @@ export class EvaluationService {
 
   private async loadIntegritySpecs(c: PoolClient, activitySpecId: string): Promise<IntegrityCheckSpec[]> {
     const { rows } = await c.query(
-      `select key, classification, blocking, check_definition, user_facing_message
+      `select key, classification, blocking, check_definition, user_facing_message, evaluation_mode, active
          from integrity_check_spec where activity_spec_id = $1 order by key`,
       [activitySpecId],
     );
+    // OPEN-045: the evaluator runs only active deterministic checks; human-observable
+    // ones reach the reviewer of their criterion; inactive ones are neither run nor blocking.
     return rows.map((r) => ({
       key: r.key,
       classification: r.classification,
       blocking: r.blocking,
       check: r.check_definition,
       userFacingMessage: r.user_facing_message,
+      mode: r.evaluation_mode,
+      active: r.active,
     }));
   }
 

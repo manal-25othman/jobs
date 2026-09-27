@@ -190,6 +190,10 @@ export class ReviewService {
                                    from submission_artifact a join upload u on u.id = a.upload_id where a.submission_id = $1 and a.kind = 'file' and u.state = 'confirmed' order by a.key`, [item['submission_id']]);
     const disclosure = await c.query('select declared_use from ai_disclosure where submission_id = $1', [item['submission_id']]);
     const context = await this.deterministicContext(c, String(item['evaluation_id']));
+    // OPEN-045: human-observable integrity checks are INPUTS to this criterion's decision — what to look at,
+    // and what counts as pass/fail. They carry no identity and no score of their own.
+    const obs = await c.query(`select key, check_definition, location_en, expected_user_behavior_en from integrity_check_spec
+                                 where activity_spec_id = $1 and evaluation_mode = 'human_observable' and active and linked_criterion_key = $2 order by key`, [item['activity_spec_id'], item['criterion_key']]);
     const decisions = await c.query('select id, decision, score, rationale, created_at, supersedes_review_id from criterion_review where queue_item_id = $1 order by created_at', [item['id']]);
     const fileEntries = [];
     for (const f of files.rows) {
@@ -204,7 +208,9 @@ export class ReviewService {
         deliverables: deliverables.rows.map((d) => ({ key: d.key, format: d.format, mandatory: d.mandatory, descriptionAr: d.description_ar, descriptionEn: d.description_en })) },
       criterion: { key: k.key, nameAr: k.name_ar, nameEn: k.name_en, dimension: k.dimension, descriptionAr: k.description_ar, descriptionEn: k.description_en, expectedEvidenceAr: k.expected_evidence_ar, expectedEvidenceEn: k.expected_evidence_en,
         excerptGuidanceEn: k.excerpt_guidance_en, maxScore: Number(k.max_score), mandatory: k.mandatory, evaluatorType: k.evaluator_type, thresholdForSkill: k.threshold_for_skill === null ? null : Number(k.threshold_for_skill),
-        levels: levels.rows.map((l) => ({ levelKey: l.level_key, score: Number(l.score), descriptorAr: l.descriptor_ar, descriptorEn: l.descriptor_en, observableEvidenceEn: l.observable_evidence_en })) },
+        levels: levels.rows.map((l) => ({ levelKey: l.level_key, score: Number(l.score), descriptorAr: l.descriptor_ar, descriptorEn: l.descriptor_en, observableEvidenceEn: l.observable_evidence_en })),
+        observations: obs.rows.map((o) => { const d = o.check_definition as Record<string, unknown>; return { key: o.key, locationEn: o.location_en, expectedBehaviourEn: o.expected_user_behavior_en,
+          reviewerPromptAr: d['reviewerPromptAr'], reviewerPromptEn: d['reviewerPromptEn'], passWhenEn: d['passWhenEn'], failWhenEn: d['failWhenEn'], affectsEvidence: d['affectsEvidence'] === true }; }) },
       submission: {
         artifacts: arts.rows.map((r) => ({ key: r.key, kind: r.kind, valueBool: r.value_bool, valueNumber: r.value_number === null ? null : Number(r.value_number), valueText: r.value_text, locator: r.locator })),
         files: fileEntries,

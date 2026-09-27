@@ -28,4 +28,4 @@ export * from './career-data.js';
 export * from './human-review.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.6.0';
+export const DOMAIN_RULESET_VERSION = '0.7.0';

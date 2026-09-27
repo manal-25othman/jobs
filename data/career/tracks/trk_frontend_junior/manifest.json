@@ -1,7 +1,7 @@
 {
   "pack_id": "trk_frontend_junior",
   "track_id": "TRK-01",
-  "pack_version": "0.1.0",
+  "pack_version": "0.2.0",
   "status": "draft",
   "dataset_label": "DEMO / DRAFT / NOT SME APPROVED",
   "is_demo_fixture": true,
@@ -40,5 +40,17 @@
     "tasks": 11,
     "activities": 3,
     "rubrics": 3
-  }
+  },
+  "duplicate_resolutions": [
+    {
+      "alias": "ui-state-management",
+      "canonical": "skl_ui_state_interaction",
+      "relation": "equivalent",
+      "decided_by": "R-1 (product owner)",
+      "decided_at": "2026-09-27",
+      "decision_ref": "D-097 · OPEN-039",
+      "reason": "Same concept (explicit UI state, interaction changes state, rendering follows). The pack skill has the full definition and indicators, so it is canonical; the Slice-1 skill keeps its id as an equivalent alias. Non-destructive: no row deleted, no id reused, historical evidence untouched."
+    }
+  ],
+  "changelog_ref": "CHANGES.md"
 }
