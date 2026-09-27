@@ -2,6 +2,10 @@
 
 Every earlier version stays archived verbatim as an L0 `raw_snapshot` (content-addressed); this file records **what** changed and **why**, so nothing is lost silently.
 
+## 0.2.1 — 2026-09-27 · owner decisions OD-3 and OD-10 applied (SRS-001 v1.5 §20 · D-107) — still DEMO / DRAFT / NOT SME APPROVED
+- **OD-3:** `ui-testing` removed from the P1 role-skill map (it had no task and no activity measuring it). **No replacement task or criterion.** The Slice-1 skill row itself and its synonym link are untouched (global registry, not the role map). Role map: 13 → 12 (5 core + 7 supporting).
+- **OD-10:** the `live_defense` expectation removed from P1: from `evidence_type_expected` on 4 role-map rows (`skl_js_fundamentals` · `skl_frontend_debugging` · `skl_code_reading` · `skl_technical_explanation`) and from `evidence_types_possible` on 6 global skills. **No live-defense mechanism was built**; the evidence-type vocabulary in the domain is unchanged.
+
 ## 0.2.0 — 2026-09-27 · owner decisions before the final content review (DEMO / DRAFT / NOT SME APPROVED)
 
 ### OPEN-039 · near-duplicate `ui-state-management` ↔ `skl_ui_state_interaction` → `equivalent`

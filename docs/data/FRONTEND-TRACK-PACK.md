@@ -1,4 +1,4 @@
-# حزمة المسار الأول — Junior Web / Frontend Developer (`trk_frontend_junior@0.2.0`)
+# حزمة المسار الأول — Junior Web / Frontend Developer (`trk_frontend_junior@0.2.1`)
 **التسمية:** **DEMO / DRAFT / NOT SME APPROVED** · `drafting_aid = ai_assisted` · كل صف `is_demo_fixture = true` · الحالة في القاعدة `draft`
 **الملفات:** `data/career/global/*.json` (السجلات العالمية) · `data/career/tracks/trk_frontend_junior/*.json` (الحزمة) — تُستورد بـ`npm run career:import`.
 
@@ -26,7 +26,6 @@
 | `skl_version_control_basics` | tool | supporting | high | rp_tools |
 | `skl_technical_explanation` | behavioral | supporting | low | rp_behavioral |
 | `skl_requirements_reading` | behavioral | supporting | low | rp_behavioral |
-| `ui-testing` *(الشريحة ١)* | supporting | supporting | medium | rp_practice |
 
 **`skill_type` في السجل ≠ `is_core` في الربط:** كل المهارات أعلاه `supporting`/`tool`/`behavioral` كنوع عالمي؛ «الأساسية» صفة **الربط بهذا الدور** (٥ بالضبط). كل مهارة: تعريف يفصلها عن أقربها · مؤشرات ملاحَظة · أنماط فشل · نوع دليل ممكن · مصدر.
 **المترادفات (١٨):** صيغ (`RWD` · `a11y` · `JS` · «جافاسكريبت» نقحرة · …) وروابط (`skl_forms_validation` narrower→ `skl_ui_state_interaction` · `skl_version_control_basics` tool_of→ `skl_code_reading` · `skl_ui_state_interaction` related→ `ui-state-management`). **لا دمج.**
@@ -72,3 +71,7 @@
 - `deliverables_complete` (×٣) **بوابة** (`criterion_kind = gate`): لا مهارة، لا عتبة مهارة، لا دليل. البنود ١٩ دليل + ٣ بوابات.
 - فحوص النزاهة **١٧** (كانت ١٨): ٧ حتمية بمُنتِج · ٧ يلاحظها المراجع (`human_observable`، مُدخلات لبنود بشرية) · ٣ مؤجَّلة معطَّلة (`future_deterministic`) · حُذف `planted_field_count`. `files_present` نوعه `mandatory_deliverables`. **لا فحص نشط على إشارة بلا مُنتِج.**
 - السجل الكامل: `data/career/tracks/trk_frontend_junior/CHANGES.md`. الحالة: **DEMO / DRAFT / NOT SME APPROVED** بلا تغيير.
+
+## ما تغيّر في 0.2.1 (D-107)
+- OD-3: `ui-testing` أُزيلت من ربط الدور (12 مهارة: 5 أساسية + 7 مساندة)؛ لا بديل.
+- OD-10: `live_defense` أُزيل من الدليل المتوقَّع في ربط الدور ومن أنواع الدليل الممكنة في سجل المهارات؛ لا آلية بُنيت.

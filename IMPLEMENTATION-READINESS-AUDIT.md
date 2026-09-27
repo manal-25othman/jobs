@@ -15,7 +15,7 @@
 | `docs/design/NAQLA-DESIGN-HANDOFF-FOR-CODE.md` (v1.0، مُجمَّدة) | ١٧ قسمًا: الرموز، الشبكة، RTL/LTR، المكوّنات، دلالات الدليل والدرجات، الحالات، الوصولية |
 | `docs/design/NAQLA-APP.dc.html` | ١٣ شاشة مُجمَّدة — مصدر التخطيط والنسخ |
 | `apps/web/` | التنفيذ الثابت: **١٢ صفحة** · **٩٧٦ سطرًا** من CSS/JS · **١٠٠ فئة مكوّن** |
-| `docs/srs/SRS-001-career-os-functional.md` v1.3 | **١٠٤ متطلبات وظيفية** · ١٨ قاعدة عمل · الثوابت التسعة |
+| `docs/srs/SRS-001-naqla-functional.md` v1.3 *(اسم الملف حينها `SRS-001-career-os-functional.md`؛ أُعيدت تسميته في v1.5)* | **١٠٤ متطلبات وظيفية** · ١٨ قاعدة عمل · الثوابت التسعة |
 | `docs/blueprint/19-phase1-feature-inventory.md` | **١٠٨ بنود** في الجرد |
 | `docs/blueprint/24-open-decisions-register.md` | **٣٧ بندًا مفتوحًا**، منها **١١ حاجبًا**، و`OPEN-019` مُغلق بـ`CHG-005` |
 | `docs/decisions/DECISIONS.md` | D-001 … D-044b |

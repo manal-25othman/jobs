@@ -121,8 +121,7 @@
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
         "artifact",
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1",
@@ -162,8 +161,7 @@
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
         "artifact",
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"
@@ -243,8 +241,7 @@
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
         "artifact",
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"
@@ -363,7 +360,6 @@
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
         "decision_rationale",
-        "live_defense",
         "process_trace"
       ],
       "source_refs": [
@@ -440,8 +436,7 @@
       "recency_policy": "rp_behavioral",
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"
@@ -479,8 +474,7 @@
       "recency_policy": "rp_behavioral",
       "proficiency_scale": "scale_default",
       "evidence_types_possible": [
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"

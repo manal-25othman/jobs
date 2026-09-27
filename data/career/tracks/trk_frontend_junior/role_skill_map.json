@@ -1,6 +1,6 @@
 {
   "_label": "DEMO / DRAFT / NOT SME APPROVED",
-  "_note": "Role requirement ≠ user skill. Never copied into evidence. Core = 5.",
+  "_note": "Role requirement ≠ user skill. Never copied into evidence. Core = 5. 0.2.1: OD-3 applied (ui-testing removed from the P1 role map; no replacement task or criterion) · OD-10 applied (live_defense expectation removed from P1).",
   "records": [
     {
       "skill": "skl_html_semantic",
@@ -46,8 +46,7 @@
       "why_required_en": "Every interaction and every data fetch passes through correct JavaScript",
       "evidence_type_expected": [
         "artifact",
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "minimum_evidence_count": 2,
       "can_be_partially_auto_evaluated": true,
@@ -118,8 +117,7 @@
       "why_required_en": "Half of a junior's work is fixing, not building",
       "evidence_type_expected": [
         "artifact",
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "minimum_evidence_count": 1,
       "can_be_partially_auto_evaluated": false,
@@ -154,7 +152,6 @@
       "why_required_en": "The junior joins an existing project, not a blank page",
       "evidence_type_expected": [
         "decision_rationale",
-        "live_defense",
         "process_trace"
       ],
       "minimum_evidence_count": 1,
@@ -189,8 +186,7 @@
       "why_required_ar": "القرار غير المشروح لا يُراجَع ولا يُتعلَّم منه",
       "why_required_en": "An unexplained decision cannot be reviewed or learned from",
       "evidence_type_expected": [
-        "decision_rationale",
-        "live_defense"
+        "decision_rationale"
       ],
       "minimum_evidence_count": 1,
       "can_be_partially_auto_evaluated": false,
@@ -212,23 +208,6 @@
       "minimum_evidence_count": 1,
       "can_be_partially_auto_evaluated": false,
       "human_review_required": true,
-      "source_refs": [
-        "src_naqla_frontend_pack_v0_1"
-      ]
-    },
-    {
-      "skill": "ui-testing",
-      "is_core_for_role": false,
-      "importance": "medium",
-      "target_proficiency": "foundation",
-      "why_required_ar": "اختبار حالات المكوّن هو ما يجعل الإصلاح آمنًا — (مهارة قائمة من سجل الشريحة ١)",
-      "why_required_en": "Testing component states is what makes a fix safe — (existing registry skill from Slice 1)",
-      "evidence_type_expected": [
-        "artifact"
-      ],
-      "minimum_evidence_count": 1,
-      "can_be_partially_auto_evaluated": true,
-      "human_review_required": false,
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"
       ]

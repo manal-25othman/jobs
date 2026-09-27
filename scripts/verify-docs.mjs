@@ -24,7 +24,7 @@ const problems = [];
 const need = (ok, msg) => { if (!ok) problems.push(msg); };
 
 /* 1. versions */
-const srs = read('docs/srs/SRS-001-career-os-functional.md');
+const srs = read('docs/srs/SRS-001-naqla-functional.md');
 const headerVersion = srs.match(/\*\*الإصدار:\*\*\s*([0-9]+\.[0-9]+)/)?.[1];
 const changelogVersions = [...srs.matchAll(/^\| \*\*([0-9]+\.[0-9]+)\*\* \| \d{4}-\d{2}-\d{2} \|/gm)].map((m) => m[1]);
 const newest = changelogVersions.map(Number).sort((a, b) => b - a)[0];
@@ -41,7 +41,8 @@ need(listed.length >= 8, `SRS §0.2 lists ${listed.length} stale files; expected
 for (const f of listed) {
   if (!existsSync(join(ROOT, f))) { problems.push(`SRS §0.2 lists a missing file: ${f}`); continue; }
   const head = read(f).split('\n').slice(0, 6).join('\n');
-  need(/SUPERSEDED|STALE|RETIRED|PHASE 0 MODE/.test(head) && head.includes(`SRS-001 v${headerVersion}`), `${f}: no STALE/SUPERSEDED/RETIRED/PHASE 0 MODE banner naming SRS-001 v${headerVersion} in its first lines`);
+  // The banner names the SRS version that superseded the file; later SRS versions need not re-stamp it.
+  need(/SUPERSEDED|STALE|RETIRED|PHASE 0 MODE/.test(head) && /SRS-001 v\d+\.\d+/.test(head), `${f}: no STALE/SUPERSEDED/RETIRED/PHASE 0 MODE banner naming an SRS-001 version in its first lines`);
 }
 
 /* 3. canonical pack */
