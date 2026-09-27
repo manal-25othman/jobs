@@ -46,13 +46,18 @@ export type CriterionCheck =
   /** All listed artifacts must be present. */
   | { readonly type: 'all_of'; readonly artifactKeys: readonly string[] };
 
+export type CriterionEvaluatorType = 'rule' | 'llm' | 'human';
+
 export interface RubricCriterion {
   readonly key: string;
   readonly label: string;
   readonly maxScore: number;
   /** Which skill this criterion speaks to. */
   readonly skillId: string;
-  readonly check: CriterionCheck;
+  /** Who decides this criterion. Default 'rule'. A 'human' criterion is never scored here. */
+  readonly evaluatorType?: CriterionEvaluatorType;
+  /** The deterministic check. Null only for a criterion no rule can decide. */
+  readonly check: CriterionCheck | null;
   /** A criterion the submission cannot pass without. */
   readonly mandatory: boolean;
   /** Written when the criterion passes / fails. Never generated at runtime. */
@@ -107,6 +112,8 @@ export interface EvaluationRun {
   readonly proposedState: EvidenceState | null;
   /** Always present: why this outcome, in one sentence, for the audit event. */
   readonly reason: string;
+  /** Criteria a person must decide before this run can be finalised. Empty when none. */
+  readonly pendingHumanCriteria: readonly string[];
 }
 
 export interface EvaluatorInput {
@@ -191,6 +198,7 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
 
   const blockingFailure = integrityChecks.find((c) => c.blocking && !c.passed);
   if (blockingFailure) {
+    // Authoritative: no human review can lift a blocking integrity failure.
     return {
       outcome: 'blocked_by_checks',
       rubricVersion: rubric.version,
@@ -201,12 +209,17 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
       maxScore: rubric.criteria.reduce((s, c) => s + c.maxScore, 0),
       proposedState: null,
       reason: `a mandatory integrity check did not pass: ${blockingFailure.key}`,
+      pendingHumanCriteria: [],
     };
   }
 
-  /* 2. Score each criterion. Every score carries its written rationale. */
-  const criteria: EvaluationCriterionScore[] = rubric.criteria.map((c) => {
-    const { met, locator } = runCheck(c.check, artifacts);
+  /* 2. Score each RULE criterion. Every score carries its written rationale.
+        A human/llm criterion is left for a person: it is listed as pending. */
+  const ruleCriteria = rubric.criteria.filter((c) => (c.evaluatorType ?? 'rule') === 'rule');
+  const humanCriteria = rubric.criteria.filter((c) => (c.evaluatorType ?? 'rule') !== 'rule');
+  for (const c of ruleCriteria) if (!c.check) throw new MissingPrerequisite(`criterion ${c.key}`, 'a rule-evaluated criterion needs a deterministic check');
+  const criteria: EvaluationCriterionScore[] = ruleCriteria.map((c) => {
+    const { met, locator } = runCheck(c.check!, artifacts);
     return {
       criterionId: c.key,
       score: met ? c.maxScore : 0,
@@ -219,6 +232,82 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
     };
   });
 
+  if (humanCriteria.length > 0) {
+    // The deterministic layer has said what it can. Nothing is proposed until
+    // every pending criterion carries a human decision (aggregateWithHumanDecisions).
+    return {
+      outcome: 'needs_human_review',
+      rubricVersion: rubric.version,
+      activitySpecVersion: rubric.activitySpecVersion,
+      criteria,
+      integrityChecks,
+      totalScore: criteria.reduce((s, c) => s + c.score, 0),
+      maxScore: rubric.criteria.reduce((s, c) => s + c.maxScore, 0),
+      proposedState: null,
+      reason: `${humanCriteria.length} criterion(s) need a human reviewer: ${humanCriteria.map((c) => c.key).join(', ')}`,
+      pendingHumanCriteria: humanCriteria.map((c) => c.key),
+    };
+  }
+
+  return concludeRun(rubric, criteria, integrityChecks, currentState);
+}
+
+/** A person's decision on one human-evaluated criterion, already validated (human-review.ts). */
+export interface HumanCriterionDecision {
+  readonly criterionKey: string;
+  readonly score: number;
+  readonly rationale: string;
+  readonly supportingExcerpt?: string | null;
+}
+
+/**
+ * Combines the deterministic run with human decisions into a final run.
+ *
+ *  - A blocked run stays blocked: no decision lifts an integrity failure.
+ *  - Deterministic scores are authoritative: a decision on a rule criterion is refused.
+ *  - Every pending criterion needs exactly one decision, or the run cannot finalise.
+ *  - Pure and total: the same inputs give the same outcome, every time.
+ */
+export function aggregateWithHumanDecisions(input: {
+  readonly rubric: PublishedRubric;
+  readonly deterministic: EvaluationRun;
+  readonly decisions: readonly HumanCriterionDecision[];
+  readonly currentState: EvidenceState;
+}): EvaluationRun {
+  const { rubric, deterministic, decisions, currentState } = input;
+  if (deterministic.outcome === 'blocked_by_checks') {
+    throw new InvariantViolation('INV-2', 'a run blocked by an integrity check is final; human review cannot lift it');
+  }
+  if (deterministic.outcome !== 'needs_human_review') {
+    throw new InvariantViolation('INV-2', `only a run awaiting human review can be aggregated (got '${deterministic.outcome}')`);
+  }
+  const pending = new Set(deterministic.pendingHumanCriteria);
+  for (const d of decisions) {
+    if (!pending.has(d.criterionKey)) {
+      throw new InvariantViolation('INV-2', `criterion '${d.criterionKey}' is decided by a rule; a human decision on it is refused`);
+    }
+  }
+  const missing = [...pending].filter((k) => !decisions.some((d) => d.criterionKey === k));
+  if (missing.length > 0) {
+    throw new MissingPrerequisite('decisions', `evaluation cannot finalise: ${missing.length} criterion(s) still await a human decision (${missing.join(', ')})`);
+  }
+  const seen = new Set<string>();
+  for (const d of decisions) { if (seen.has(d.criterionKey)) throw new InvariantViolation('INV-2', `two decisions for '${d.criterionKey}'; a changed judgement supersedes, it does not duplicate`); seen.add(d.criterionKey); }
+
+  const humanScores: EvaluationCriterionScore[] = rubric.criteria
+    .filter((c) => pending.has(c.key))
+    .map((c) => {
+      const d = decisions.find((x) => x.criterionKey === c.key)!;
+      if (d.score < 0 || d.score > c.maxScore) throw new InvariantViolation('INV-2', `score ${d.score} is outside 0..${c.maxScore} for '${c.key}'`);
+      if (!d.rationale?.trim()) throw new MissingPrerequisite('rationale', `a decision on '${c.key}' needs a written rationale`);
+      return { criterionId: c.key, score: d.score, maxScore: c.maxScore, rationale: d.rationale, supportingExcerpt: d.supportingExcerpt ?? null, skillId: c.skillId, confidence: 1 };
+    });
+  // Keep the rubric's order so the result reads like the rubric.
+  const all = rubric.criteria.map((c) => deterministic.criteria.find((s) => s.criterionId === c.key) ?? humanScores.find((s) => s.criterionId === c.key)!);
+  return concludeRun(rubric, all, deterministic.integrityChecks, currentState);
+}
+
+function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCriterionScore[], integrityChecks: readonly IntegrityCheckResult[], currentState: EvidenceState): EvaluationRun {
   const totalScore = criteria.reduce((s, c) => s + c.score, 0);
   const maxScore = criteria.reduce((s, c) => s + c.maxScore, 0);
 
@@ -247,6 +336,7 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
       // claim may still legitimately sit at `practiced`.
       proposedState: null,
       reason: why,
+      pendingHumanCriteria: [],
     };
   }
 
@@ -264,6 +354,7 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
       maxScore,
       proposedState: null,
       reason: `passed, and the claim is already at '${currentState}'; no promotion is earned`,
+      pendingHumanCriteria: [],
     };
   }
 
@@ -277,6 +368,7 @@ export function runDeterministicEvaluation(input: EvaluatorInput): EvaluationRun
     maxScore,
     proposedState: proposed,
     reason: `all mandatory criteria met, ${totalScore}/${maxScore}`,
+    pendingHumanCriteria: [],
   };
 }
 

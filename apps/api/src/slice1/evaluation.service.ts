@@ -9,6 +9,10 @@ import {
   type EvidenceState, type EvaluationRun,
   reestablishmentAllowed,
   type RubricCriterion,
+  aggregateWithHumanDecisions,
+  finalizationAllowed,
+  type ReviewQueueState,
+  MissingPrerequisite,
 } from '@naqla/domain';
 
 /**
@@ -50,13 +54,13 @@ export class EvaluationService {
       }
 
       const already = await c.query(
-        `select id from evaluation where submission_id = $1 and state = 'completed'`,
+        `select id, state from evaluation where submission_id = $1 and state in ('completed','queued_for_human')`,
         [submissionId],
       );
       if (already.rowCount && already.rowCount > 0) {
-        throw new BadRequestException(
-          'this submission already has a completed evaluation; a correction creates a new submission',
-        );
+        throw new BadRequestException(already.rows[0].state === 'queued_for_human'
+          ? 'this submission is awaiting human review; a correction creates a new submission'
+          : 'this submission already has a completed evaluation; a correction creates a new submission');
       }
 
       const rubric = await this.loadPublishedRubric(c, s.activity_spec_id, s.activity_spec_version);
@@ -129,16 +133,30 @@ export class EvaluationService {
         );
       }
 
+      const awaitingHuman = run.outcome === 'needs_human_review';
       await c.query(
-        `update evaluation set state = 'completed', completed_at = now() where id = $1`,
+        awaitingHuman
+          ? `update evaluation set state = 'queued_for_human' where id = $1`
+          : `update evaluation set state = 'completed', completed_at = now() where id = $1`,
         [evaluationId],
       );
 
+      if (awaitingHuman) {
+        // One queue item per human criterion. Deterministic criteria never enter.
+        for (const key of run.pendingHumanCriteria) {
+          const crit = await c.query('select id from rubric_criterion where rubric_version_id = $1 and key = $2', [rubric.rubricVersionId, key]);
+          await c.query(
+            `insert into review_queue_item (evaluation_id, submission_id, activity_spec_id, rubric_version_id, criterion_id, criterion_key)
+             values ($1,$2,$3,$4,$5,$6)`,
+            [evaluationId, submissionId, s.activity_spec_id, rubric.rubricVersionId, crit.rows[0].id, key]);
+        }
+      }
+
       await emitAuditEvent(c, {
-        eventType: 'evaluation.completed',
+        eventType: awaitingHuman ? 'evaluation.queued_for_human' : 'evaluation.completed',
         userId, actorKind: 'system', subjectTable: 'evaluation_result', subjectId: resultId,
         reason: run.reason,
-        payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore },
+        payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, pendingHumanCriteria: run.pendingHumanCriteria },
       });
 
       /* ── 5. verification, then the transition — same transaction ── */
@@ -202,7 +220,88 @@ export class EvaluationService {
         transition,
         reestablishedEvidenceId,
         evaluatedAt: resultRow.rows[0].evaluated_at,
+        humanReview: awaitingHuman ? { pendingCriteria: run.pendingHumanCriteria, completedCriteria: [] as string[] } : null,
       };
+    });
+  }
+
+  /**
+   * Finalises an evaluation whose human criteria have all been decided.
+   *
+   * Deterministic scores and integrity results are copied from the interim
+   * result; human decisions come from the latest criterion_review per queue
+   * item; the DOMAIN aggregates (pure function); the ordinary verification and
+   * transition path runs. The interim result stays; the final one supersedes it.
+   */
+  async finalizeHumanReview(evaluationId: string) {
+    return this.db.asService(async (c) => {
+      const ev = await c.query(
+        `select e.id, e.state, e.submission_id, e.user_id, p.activity_spec_id, p.activity_spec_version, p.id as project_id
+           from evaluation e join submission s on s.id = e.submission_id join project p on p.id = s.project_id where e.id = $1 for update`, [evaluationId]);
+      if (ev.rowCount === 0) throw new NotFoundException('evaluation not found');
+      const e = ev.rows[0];
+      if (e.state !== 'queued_for_human') throw new BadRequestException(`evaluation is ${e.state}, not awaiting human review`);
+
+      const queue = await c.query('select id, criterion_key, state from review_queue_item where evaluation_id = $1', [evaluationId]);
+      const fin = finalizationAllowed(queue.rows.map((q) => ({ state: q.state as ReviewQueueState })));
+      if (!fin.allowed) throw new MissingPrerequisite('reviews', `evaluation cannot finalise: ${fin.pending} criterion review(s) still pending`);
+
+      const interim = await c.query(`select id, rubric_version_id from evaluation_result where evaluation_id = $1 and outcome = 'needs_human_review' order by evaluated_at desc limit 1`, [evaluationId]);
+      if (interim.rowCount === 0) throw new BadRequestException('no interim result to finalise');
+      const rubric = await this.loadPublishedRubric(c, e.activity_spec_id, e.activity_spec_version, interim.rows[0].rubric_version_id);
+      const detScores = await c.query('select criterion_key, score, max_score, rationale, supporting_excerpt, skill_id, confidence from evaluation_criterion_score where evaluation_result_id = $1', [interim.rows[0].id]);
+      const detChecks = await c.query('select check_key, classification, passed from integrity_check where evaluation_result_id = $1', [interim.rows[0].id]);
+      const specs = await this.loadIntegritySpecs(c, e.activity_spec_id);
+      const deterministic: EvaluationRun = {
+        outcome: 'needs_human_review', rubricVersion: rubric.version, activitySpecVersion: rubric.activitySpecVersion,
+        criteria: detScores.rows.map((r) => ({ criterionId: r.criterion_key, score: Number(r.score), maxScore: Number(r.max_score), rationale: r.rationale, supportingExcerpt: r.supporting_excerpt, skillId: r.skill_id, confidence: Number(r.confidence ?? 1) })),
+        integrityChecks: detChecks.rows.map((r) => { const spec = specs.find((x) => x.key === r.check_key); return { key: r.check_key, classification: r.classification, passed: r.passed, blocking: spec?.blocking ?? false, message: r.classification === 'user_facing' ? spec?.userFacingMessage ?? null : null }; }),
+        totalScore: detScores.rows.reduce((a, r) => a + Number(r.score), 0), maxScore: rubric.criteria.reduce((a, r) => a + r.maxScore, 0), proposedState: null, reason: 'interim',
+        pendingHumanCriteria: rubric.criteria.filter((r) => (r.evaluatorType ?? 'rule') !== 'rule').map((r) => r.key),
+      };
+      // The latest decision per queue item is the one that counts; earlier ones stay as history.
+      const decisions = await c.query(
+        `select distinct on (queue_item_id) queue_item_id, criterion_key, score, rationale from criterion_review where queue_item_id = any($1::uuid[]) order by queue_item_id, created_at desc`,
+        [queue.rows.map((q) => q.id)]);
+      const primarySkill = await c.query('select skill_id from submission_claimed_skill where submission_id = $1 limit 1', [e.submission_id]);
+      const primarySkillId: string = primarySkill.rows[0].skill_id;
+      const currentState = await this.currentClaimState(c, e.user_id, primarySkillId);
+
+      const run = aggregateWithHumanDecisions({ rubric, deterministic, decisions: decisions.rows.map((d) => ({ criterionKey: d.criterion_key, score: Number(d.score), rationale: d.rationale })), currentState });
+      assertEvaluationResultValid({ outcome: run.outcome, rubricVersion: run.rubricVersion, activitySpecVersion: run.activitySpecVersion, criteria: run.criteria });
+
+      const resultRow = await c.query(
+        `insert into evaluation_result (evaluation_id, submission_id, user_id, outcome, rubric_version_id, activity_spec_id, activity_spec_version, supersedes_result_id, evaluated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8, now()) returning id, evaluated_at`,
+        [evaluationId, e.submission_id, e.user_id, run.outcome, rubric.rubricVersionId, e.activity_spec_id, e.activity_spec_version, interim.rows[0].id]);
+      const resultId: string = resultRow.rows[0].id;
+      for (const cr of run.criteria) {
+        await c.query(`insert into evaluation_criterion_score (evaluation_result_id, criterion_key, score, max_score, rationale, supporting_excerpt, skill_id, confidence) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [resultId, cr.criterionId, cr.score, cr.maxScore, cr.rationale, cr.supportingExcerpt, cr.skillId, cr.confidence]);
+      }
+      for (const ic of run.integrityChecks) {
+        await c.query(`insert into integrity_check (evaluation_result_id, check_key, classification, passed, signal) values ($1,$2,$3,$4,$5)`, [resultId, ic.key, ic.classification, ic.passed, ic.passed ? null : 'unmet']);
+      }
+      await c.query(`update evaluation set state = 'completed', completed_at = now() where id = $1`, [evaluationId]);
+      await emitAuditEvent(c, { eventType: 'evaluation.completed', userId: e.user_id, actorKind: 'system', subjectTable: 'evaluation_result', subjectId: resultId,
+        reason: `${run.reason} (aggregated from deterministic results and ${decisions.rowCount} human decision(s))`, payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, supersedes: interim.rows[0].id } });
+
+      let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
+      let reestablishedEvidenceId: string | null = null;
+      if (run.proposedState && verificationApplies(run.outcome)) {
+        const decision = decideVerification({ evaluationOutcome: run.outcome, proposedState: run.proposedState, currentState, outcome: 'accepted',
+          reason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})` });
+        await c.query(`insert into verification (evaluation_result_id, user_id, outcome, proposed_state, resulting_state, reason) values ($1,$2,$3,$4,$5,$6)`,
+          [resultId, e.user_id, decision.outcome, run.proposedState, decision.resultingState, decision.reason]);
+        if (decision.resultingState !== currentState) {
+          transition = await this.promote(c, { userId: e.user_id, skillId: primarySkillId, from: currentState, to: decision.resultingState, evaluationResultId: resultId, rubricVersion: run.rubricVersion, projectId: e.project_id, reason: decision.reason });
+        }
+      } else if (run.outcome === 'passed' && !run.proposedState
+                 && reestablishmentAllowed({ currentState, proposedState: rubric.proposesState, primaryEvidenceStanding: await this.primaryEvidenceStanding(c, e.user_id, primarySkillId) })) {
+        reestablishedEvidenceId = await this.reestablish(c, { userId: e.user_id, skillId: primarySkillId, state: currentState, evaluationResultId: resultId, projectId: e.project_id, reason: run.reason });
+      }
+      return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
+        integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId, evaluatedAt: resultRow.rows[0].evaluated_at };
     });
   }
 
@@ -312,14 +411,14 @@ export class EvaluationService {
   }
 
   private async loadPublishedRubric(
-    c: PoolClient, activitySpecId: string, activitySpecVersion: string,
+    c: PoolClient, activitySpecId: string, activitySpecVersion: string, rubricVersionId: string | null = null,
   ): Promise<PublishedRubric> {
     const { rows } = await c.query(
       `select id, version, status, criteria, pass_threshold, proposes_state
          from rubric_version
-        where activity_spec_id = $1 and status = 'published'
+        where activity_spec_id = $1 and status = 'published' and ($2::uuid is null or id = $2::uuid)
         order by created_at desc limit 1`,
-      [activitySpecId],
+      [activitySpecId, rubricVersionId],
     );
     if (rows.length === 0) {
       // INV-2: without a published rubric there is no evaluation to run.
@@ -337,20 +436,15 @@ export class EvaluationService {
       [rv.id],
     );
     if (crit.rows.length > 0) {
-      const nonRule = crit.rows.filter((r) => r.evaluator_type !== 'rule');
-      if (nonRule.length > 0) {
-        // Honest failure: this evaluator is deterministic. A rubric that needs a
-        // human or a model cannot be run by it, and is not silently reduced.
-        throw new BadRequestException(
-          `rubric ${rv.version} has ${nonRule.length} criterion(s) that need a ${nonRule.map((r) => r.evaluator_type).join('/')} evaluator; not runnable deterministically`);
-      }
+      // Human/llm criteria are not run here: the evaluator lists them as pending
+      // and the human review flow decides them (OPEN-041).
       const toCheck = (r: typeof crit.rows[number]): RubricCriterion['check'] => {
         switch (r.check_type) {
           case 'artifact_present': return { type: 'artifact_present', artifactKey: r.check_artifact_key };
           case 'artifact_at_least': return { type: 'artifact_at_least', artifactKey: r.check_artifact_key, min: Number(r.check_min_value) };
           case 'artifact_text': return { type: 'artifact_text', artifactKey: r.check_artifact_key, minLength: Number(r.check_min_length) };
           case 'all_of': return { type: 'all_of', artifactKeys: r.check_artifact_keys };
-          default: throw new BadRequestException(`criterion ${r.key} has no deterministic check`);
+          default: return null;
         }
       };
       if (rv.pass_threshold === null || rv.proposes_state === null) {
@@ -361,7 +455,8 @@ export class EvaluationService {
         passThreshold: Number(rv.pass_threshold), proposesState: rv.proposes_state as EvidenceState,
         criteria: crit.rows.map((r) => ({
           key: r.key, label: r.name_ar, maxScore: Number(r.max_score), skillId: r.linked_skill_id, mandatory: r.mandatory,
-          check: toCheck(r), rationaleWhenMet: r.rationale_when_met_ar, rationaleWhenUnmet: r.rationale_when_unmet_ar,
+          evaluatorType: r.evaluator_type, check: r.evaluator_type === 'rule' ? toCheck(r) : null,
+          rationaleWhenMet: r.rationale_when_met_ar, rationaleWhenUnmet: r.rationale_when_unmet_ar,
         })),
       };
     }
@@ -419,9 +514,10 @@ export class EvaluationService {
                 rv.version as rubric_version
            from evaluation e
            left join evaluation_result r on r.evaluation_id = e.id
+             and not exists (select 1 from evaluation_result n where n.supersedes_result_id = r.id)
            left join rubric_version rv on rv.id = r.rubric_version_id
           where e.submission_id = $1
-          order by e.queued_at desc limit 1`,
+          order by e.queued_at desc, r.evaluated_at desc nulls last limit 1`,
         [submissionId],
       );
       if (rows.length === 0) throw new NotFoundException('no evaluation for this submission');
@@ -448,9 +544,20 @@ export class EvaluationService {
         [r.result_id],
       ) : { rows: [] };
 
+      // What the user may know while a person reviews: which criteria were
+      // checked automatically and which await review. No invented time.
+      let humanReview: { pending: number; completed: number; awaiting: { criterionKey: string; nameAr: string }[] } | null = null;
+      if (r.state === 'queued_for_human') {
+        const q = await this.db.asService((sc) => sc.query(
+          `select q.criterion_key, q.state, rc.name_ar from review_queue_item q join rubric_criterion rc on rc.id = q.criterion_id where q.evaluation_id = $1 order by q.criterion_key`, [r.id]));
+        humanReview = { pending: q.rows.filter((x) => x.state !== 'completed').length, completed: q.rows.filter((x) => x.state === 'completed').length,
+          awaiting: q.rows.filter((x) => x.state !== 'completed').map((x) => ({ criterionKey: x.criterion_key, nameAr: x.name_ar })) };
+      }
+
       return {
         evaluationId: r.id,
         state: r.state,
+        humanReview,
         resultId: r.result_id,
         outcome: r.outcome,
         rubricVersion: r.rubric_version,

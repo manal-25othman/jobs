@@ -197,3 +197,31 @@ describe('agent integration — agents read structured career data or state a li
     assert.equal(ex.warnings.length, 0);
   });
 });
+
+describe('OPEN-040 — demo → canonical promotion never mutates the demo row', () => {
+  test('promote creates a non-demo review copy; the copy walks the review workflow; publishing supersedes the demo and closes the record', async () => {
+    const { promoteDemo, completePromotion, recordCorrection } = await import('../src/career-data/promotion');
+    const demo = (await pool.query(`select id from skill where slug = 'skl_forms_validation' and is_demo_fixture`)).rows[0].id;
+    const r = await promoteDemo(pool, 'skill', demo, 'content author', 'first promotion');
+    const copy = await pool.query('select slug, is_demo_fixture, review_status, promoted_from_id from skill where id = $1', [r.canonicalId]);
+    assert.deepEqual(copy.rows[0], { slug: 'skl_forms_validation', is_demo_fixture: false, review_status: 'curated', promoted_from_id: demo });
+    const demoRow = await pool.query('select is_demo_fixture, review_status from skill where id = $1', [demo]);
+    assert.deepEqual(demoRow.rows[0], { is_demo_fixture: true, review_status: 'draft' }, 'the demo row is untouched and still identifiable as demo');
+    await assert.rejects(() => promoteDemo(pool, 'skill', demo, 'x', null), /already has an open review copy/);
+    await assert.rejects(() => promoteDemo(pool, 'skill', r.canonicalId, 'x', null), /only a DEMO record/);
+    await recordCorrection(pool, r.promotionId, { field: 'label_en', from: 'Forms & input validation', to: 'Forms and input validation', by: 'sme', reason: 'house style' });
+    await assert.rejects(() => completePromotion(pool, r.promotionId), /publish it through the review workflow first/);
+    const sme = '22222222-2222-4222-8222-222222222222';
+    const go = (to: string, role: string, by: string | null) => reviewTransition(pool, { entityKind: 'skill', entityId: r.canonicalId, to: to as never, decidedBy: by, decidedByLabel: by ?? 'R-1', rolePerformed: role as never, reason: `promotion: ${to}`, production: false });
+    await go('sme_reviewed', 'sme', sme); await go('approved', 'sme', sme); await go('published', 'product_owner', null);
+    const done = await completePromotion(pool, r.promotionId);
+    assert.equal(done.reviewLogIds.length, 3);
+    const promo = await pool.query('select step, reviewer_id, approved_at, published_at, canonical_version, corrections from content_promotion where id = $1', [r.promotionId]);
+    assert.equal(promo.rows[0].step, 'published'); assert.equal(promo.rows[0].reviewer_id, sme); assert.ok(promo.rows[0].approved_at); assert.ok(promo.rows[0].published_at); assert.equal(promo.rows[0].corrections.length, 1);
+    assert.equal((await pool.query('select review_status, is_demo_fixture from skill where id = $1', [demo])).rows[0].review_status, 'superseded');
+    assert.equal((await pool.query('select is_demo_fixture from skill where id = $1', [demo])).rows[0].is_demo_fixture, true, 'still demo after supersession');
+    // Q01 does not treat the demo/canonical pair as a duplicate; Q19 flags canonical rows that still point at demo skills.
+    const q = await runQualityChecks(pool);
+    assert.equal(q.results.find((x) => x.id === 'Q01')!.passed, true);
+  });
+});

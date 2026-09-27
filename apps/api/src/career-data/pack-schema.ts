@@ -26,8 +26,8 @@ export interface PackTask { code: string; title_ar: string; title_en: string; de
 export interface PackCheckDef { type: 'artifact_present' | 'artifact_at_least' | 'artifact_text' | 'all_of'; artifactKey?: string; artifactKeys?: string[]; min?: number; minLength?: number; }
 export interface PackIntegrityCheck { key: string; check_type: string; blocking: boolean; location_en: string; expected_user_behavior_en: string; raw_ai_output_behavior_en?: string; user_facing_message_ar?: string; linked_criterion_key?: string; check_definition: PackCheckDef; }
 export interface PackActivity { code: string; version: string; level: 'junior' | 'mid' | 'senior'; title_ar: string; title_en: string; business_context_ar: string; business_context_en: string; objective_ar: string; objective_en: string; ai_usage_mode: 'ai_prohibited' | 'ai_assisted' | 'ai_expected'; estimated_minutes: number; can_yield_demonstrated: boolean; can_yield_verified: boolean; is_validation_activity: boolean; inputs: { key: string; description_ar: string; description_en: string; is_platform_private: boolean; contains_planted_issue: boolean }[]; deliverables: { key: string; format: string; mandatory: boolean; description_ar: string; description_en: string }[]; related_skills: { skill: string; depth: 'primary' | 'secondary' }[]; tasks: string[]; integrity_checks: PackIntegrityCheck[]; rubric: string; source_refs: string[]; }
-export interface PackCriterion { key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
-export interface PackRubric { code: string; activity: string; pass_threshold: number; proposes_state: EvidenceState; scoring_policy_version: string; criteria: PackCriterion[]; source_refs: string[]; }
+export interface PackCriterion { weight_status?: 'approved' | 'proposed' | 'TBD'; threshold_status?: 'approved' | 'proposed' | 'TBD'; key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
+export interface PackRubric { pass_threshold_status?: 'approved' | 'proposed' | 'TBD'; code: string; activity: string; pass_threshold: number; proposes_state: EvidenceState; scoring_policy_version: string; criteria: PackCriterion[]; source_refs: string[]; }
 
 export interface Pack {
   readonly global: { sources: PackSource[]; families: PackFamily[]; scale: PackScale; recency: PackRecency[]; skills: PackSkill[]; synonyms: PackSynonym[]; criteriaLibrary: PackCriterionLib[]; presentationRules: PackPresentationRule[]; resources: PackResource[] };
@@ -187,6 +187,7 @@ export function validatePack(p: Pack): void {
     need(activityCodes.has(r.activity), `${o}: unknown activity`);
     need(r.proposes_state !== 'verified', `${o}: a rubric never proposes verified (D-059)`);
     need(r.pass_threshold > 0 && r.pass_threshold <= 1, `${o}: pass_threshold in (0,1]`);
+    need(r.pass_threshold_status !== 'approved', `${o}: a pack cannot declare its pass threshold approved (OPEN-043)`);
     need(r.criteria.length >= 5, `${o}: at least five criteria`);
     const keys = new Set<string>();
     for (const c of r.criteria) {
@@ -195,6 +196,7 @@ export function validatePack(p: Pack): void {
       need((RUBRIC_DIMENSIONS as readonly string[]).includes(c.dimension), `${co}: bad dimension`);
       need((EVALUATOR_TYPES as readonly string[]).includes(c.evaluator_type), `${co}: bad evaluator_type`);
       need(c.evaluator_type !== 'rule' || !!c.check, `${co}: a rule-evaluated criterion needs a deterministic check`);
+      need(c.weight_status !== 'approved' && c.threshold_status !== 'approved', `${co}: a pack cannot declare its own values approved; approval is an SME decision recorded in the database (OPEN-043)`);
       need(c.evaluator_type === 'rule' || !c.check, `${co}: a human/llm criterion carries no deterministic check`);
       need(c.evaluator_type !== 'human' || c.human_review_required, `${co}: a human criterion requires human review`);
       need(c.levels.length >= 2, `${co}: level definitions are required (a criterion without descriptors is rejected, G-8)`);

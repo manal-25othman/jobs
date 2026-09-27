@@ -43,12 +43,12 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     /* ── Source ── */
     const sourceIds = new Map<string, string>();
     for (const s of pack.global.sources) {
-      const cur = await c.query('select id, review_status from data_source where code = $1', [s.code]);
+      const cur = await c.query('select id, review_status from data_source where code = $1 and is_demo_fixture = $2', [s.code, demo]);
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].review_status)) { skippedFrozen.push(`data_source ${s.code} (${cur.rows[0].review_status})`); sourceIds.set(s.code, cur.rows[0].id); continue; }
       const r = await c.query(
         `insert into data_source (code, source_type, source_name, publisher, jurisdiction, language, url, url_verified, retrieved_at, version, license_or_usage_notes, reliability, is_demo_fixture)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-         on conflict (code) do update set source_type = excluded.source_type, source_name = excluded.source_name, publisher = excluded.publisher, jurisdiction = excluded.jurisdiction,
+         on conflict (code) where is_demo_fixture = ${demo} do update set source_type = excluded.source_type, source_name = excluded.source_name, publisher = excluded.publisher, jurisdiction = excluded.jurisdiction,
            language = excluded.language, url = excluded.url, url_verified = excluded.url_verified, retrieved_at = excluded.retrieved_at, version = excluded.version,
            license_or_usage_notes = excluded.license_or_usage_notes, reliability = excluded.reliability
          returning id`,
@@ -100,23 +100,23 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     /* ── Map: resolve every reference to an internal id; unmapped stops the import ── */
     const unmapped: string[] = [];
     const skillIds = new Map<string, string>();
-    const existingSkills = await c.query('select id, slug, review_status from skill');
+    const existingSkills = await c.query('select id, slug, review_status from skill where is_demo_fixture = $1 or not exists (select 1 from skill s2 where s2.slug = skill.slug and s2.is_demo_fixture = $1)', [demo]);
     for (const r of existingSkills.rows) skillIds.set(r.slug, r.id);
     const familyIds = new Map<string, string>(); const policyIds = new Map<string, string>();
 
     /* ── Write curated layer (draft) — global registries first ── */
     for (const f of pack.global.families) {
       const r = await c.query(`insert into skill_family (code, name_ar, name_en, description_ar, description_en, drafting_aid, is_demo_fixture) values ($1,$2,$3,$4,$5,$6,$7)
-        on conflict (code) do update set name_ar = excluded.name_ar, name_en = excluded.name_en, description_ar = excluded.description_ar, description_en = excluded.description_en
+        on conflict (code) where is_demo_fixture = ${demo} do update set name_ar = excluded.name_ar, name_en = excluded.name_en, description_ar = excluded.description_ar, description_en = excluded.description_en
         where skill_family.review_status in ('draft','curated') returning id`, [f.code, f.name_ar, f.name_en, f.description_ar ?? null, f.description_en ?? null, aid, demo]);
-      const id = r.rows[0]?.id ?? (await c.query('select id from skill_family where code = $1', [f.code])).rows[0].id;
+      const id = r.rows[0]?.id ?? (await c.query('select id from skill_family where code = $1 and is_demo_fixture = $2', [f.code, demo])).rows[0].id;
       familyIds.set(f.code, id); bump('skill_family');
     }
     const sc = pack.global.scale;
     const scaleRow = await c.query(`insert into proficiency_scale (code, version, name_ar, name_en, drafting_aid, is_demo_fixture) values ($1,$2,$3,$4,$5,$6)
-      on conflict (code) do update set version = excluded.version, name_ar = excluded.name_ar, name_en = excluded.name_en where proficiency_scale.review_status in ('draft','curated') returning id`,
+      on conflict (code) where is_demo_fixture = ${demo} do update set version = excluded.version, name_ar = excluded.name_ar, name_en = excluded.name_en where proficiency_scale.review_status in ('draft','curated') returning id`,
       [sc.code, sc.version, sc.name_ar, sc.name_en, aid, demo]);
-    const scaleId: string = scaleRow.rows[0]?.id ?? (await c.query('select id from proficiency_scale where code = $1', [sc.code])).rows[0].id;
+    const scaleId: string = scaleRow.rows[0]?.id ?? (await c.query('select id from proficiency_scale where code = $1 and is_demo_fixture = $2', [sc.code, demo])).rows[0].id;
     for (const l of sc.levels) {
       await c.query(`insert into proficiency_level (scale_id, level_key, ordinal, label_ar, label_en, descriptor_ar, descriptor_en, observable_at_this_level_ar, observable_at_this_level_en)
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (scale_id, level_key) do update set ordinal = excluded.ordinal, label_ar = excluded.label_ar, label_en = excluded.label_en,
@@ -126,11 +126,11 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     bump('proficiency_scale');
     for (const p of pack.global.recency) {
       const r = await c.query(`insert into recency_policy (code, applies_to, current_window_months, aging_window_months, stale_after_months, refresh_method, rationale, policy_version, drafting_aid, is_demo_fixture)
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (code) do update set applies_to = excluded.applies_to, current_window_months = excluded.current_window_months,
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (code) where is_demo_fixture = ${demo} do update set applies_to = excluded.applies_to, current_window_months = excluded.current_window_months,
         aging_window_months = excluded.aging_window_months, stale_after_months = excluded.stale_after_months, refresh_method = excluded.refresh_method, rationale = excluded.rationale,
         policy_version = excluded.policy_version where recency_policy.review_status in ('draft','curated') returning id`,
         [p.code, p.applies_to, p.current_window_months, p.aging_window_months, p.stale_after_months, p.refresh_method, p.rationale, p.policy_version, aid, demo]);
-      policyIds.set(p.code, r.rows[0]?.id ?? (await c.query('select id from recency_policy where code = $1', [p.code])).rows[0].id); bump('recency_policy');
+      policyIds.set(p.code, r.rows[0]?.id ?? (await c.query('select id from recency_policy where code = $1 and is_demo_fixture = $2', [p.code, demo])).rows[0].id); bump('recency_policy');
     }
     for (const s of pack.global.skills) {
       const cur = existingSkills.rows.find((r) => r.slug === s.code);
@@ -139,7 +139,7 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
         `insert into skill (slug, label_ar, label_en, family, skill_family_id, skill_type, description_ar, description_en, observable_indicators_ar, observable_indicators_en,
            common_failure_modes_ar, common_failure_modes_en, ai_substitutability, recency_policy_id, proficiency_scale_id, evidence_types_possible, provenance_class, provenance_source, drafting_aid, is_demo_fixture)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'curated',$17,$18,$19)
-         on conflict (slug) do update set label_ar = excluded.label_ar, label_en = excluded.label_en, family = excluded.family, skill_family_id = excluded.skill_family_id, skill_type = excluded.skill_type,
+         on conflict (slug) where is_demo_fixture = ${demo} do update set label_ar = excluded.label_ar, label_en = excluded.label_en, family = excluded.family, skill_family_id = excluded.skill_family_id, skill_type = excluded.skill_type,
            description_ar = excluded.description_ar, description_en = excluded.description_en, observable_indicators_ar = excluded.observable_indicators_ar, observable_indicators_en = excluded.observable_indicators_en,
            common_failure_modes_ar = excluded.common_failure_modes_ar, common_failure_modes_en = excluded.common_failure_modes_en, ai_substitutability = excluded.ai_substitutability,
            recency_policy_id = excluded.recency_policy_id, proficiency_scale_id = excluded.proficiency_scale_id, evidence_types_possible = excluded.evidence_types_possible,
@@ -161,16 +161,16 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     const libIds = new Map<string, string>();
     for (const l of pack.global.criteriaLibrary) {
       const r = await c.query(`insert into criterion_library (key, name_ar, name_en, dimension, description_ar, description_en, default_evaluator, drafting_aid, is_demo_fixture) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        on conflict (key) do update set name_ar = excluded.name_ar, name_en = excluded.name_en, dimension = excluded.dimension, description_ar = excluded.description_ar, description_en = excluded.description_en,
+        on conflict (key) where is_demo_fixture = ${demo} do update set name_ar = excluded.name_ar, name_en = excluded.name_en, dimension = excluded.dimension, description_ar = excluded.description_ar, description_en = excluded.description_en,
         default_evaluator = excluded.default_evaluator where criterion_library.review_status in ('draft','curated') returning id`, [l.key, l.name_ar, l.name_en, l.dimension, l.description_ar, l.description_en, l.default_evaluator, aid, demo]);
-      libIds.set(l.key, r.rows[0]?.id ?? (await c.query('select id from criterion_library where key = $1', [l.key])).rows[0].id); bump('criterion_library');
+      libIds.set(l.key, r.rows[0]?.id ?? (await c.query('select id from criterion_library where key = $1 and is_demo_fixture = $2', [l.key, demo])).rows[0].id); bump('criterion_library');
     }
     const ruleIds: string[] = [];
     for (const r of pack.global.presentationRules) {
       const row = await c.query(`insert into career_presentation_rule (asset_type, evidence_level, allowed, minimum_source_strength, minimum_evidence_count, requires_verified, allowed_claim_verbs_ar, allowed_claim_verbs_en,
           forbidden_phrases_ar, forbidden_phrases_en, template_pattern_en, numeric_claims_policy_en, ai_disclosure_handling_en, recency_handling_en, language_target, on_user_edit_en, drafting_aid, is_demo_fixture)
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-        on conflict (asset_type, evidence_level) do update set allowed = excluded.allowed, minimum_source_strength = excluded.minimum_source_strength, minimum_evidence_count = excluded.minimum_evidence_count,
+        on conflict (asset_type, evidence_level) where is_demo_fixture = ${demo} do update set allowed = excluded.allowed, minimum_source_strength = excluded.minimum_source_strength, minimum_evidence_count = excluded.minimum_evidence_count,
           requires_verified = excluded.requires_verified, allowed_claim_verbs_ar = excluded.allowed_claim_verbs_ar, allowed_claim_verbs_en = excluded.allowed_claim_verbs_en, forbidden_phrases_ar = excluded.forbidden_phrases_ar,
           forbidden_phrases_en = excluded.forbidden_phrases_en, template_pattern_en = excluded.template_pattern_en, numeric_claims_policy_en = excluded.numeric_claims_policy_en,
           ai_disclosure_handling_en = excluded.ai_disclosure_handling_en, recency_handling_en = excluded.recency_handling_en, language_target = excluded.language_target, on_user_edit_en = excluded.on_user_edit_en
@@ -183,7 +183,7 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
 
     /* ── track: role ── */
     const role = pack.track.role;
-    const roleCur = await c.query('select id, review_status from target_role where slug = $1', [role.code]);
+    const roleCur = await c.query('select id, review_status from target_role where slug = $1 and is_demo_fixture = $2', [role.code, demo]);
     let roleId: string;
     if (roleCur.rowCount && !EDITABLE.includes(roleCur.rows[0].review_status)) { skippedFrozen.push(`target_role ${role.code} (${roleCur.rows[0].review_status})`); roleId = roleCur.rows[0].id; }
     else {
@@ -191,7 +191,7 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
         `insert into target_role (slug, label_ar, label_en, track_id, source_label, provenance_class, provenance_source, is_demo_fixture, family, level, description_ar, description_en, mission_statement_ar, mission_statement_en,
            typical_responsibilities_ar, typical_responsibilities_en, expected_outputs_ar, expected_outputs_en, expected_from_junior_ar, expected_from_junior_en, not_expected_from_junior_ar, not_expected_from_junior_en, region_scope, drafting_aid)
          values ($1,$2,$3,$4,$5,'curated',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
-         on conflict (slug) do update set label_ar = excluded.label_ar, label_en = excluded.label_en, track_id = excluded.track_id, source_label = excluded.source_label, provenance_source = excluded.provenance_source,
+         on conflict (slug) where is_demo_fixture = ${demo} do update set label_ar = excluded.label_ar, label_en = excluded.label_en, track_id = excluded.track_id, source_label = excluded.source_label, provenance_source = excluded.provenance_source,
            family = excluded.family, level = excluded.level, description_ar = excluded.description_ar, description_en = excluded.description_en, mission_statement_ar = excluded.mission_statement_ar, mission_statement_en = excluded.mission_statement_en,
            typical_responsibilities_ar = excluded.typical_responsibilities_ar, typical_responsibilities_en = excluded.typical_responsibilities_en, expected_outputs_ar = excluded.expected_outputs_ar, expected_outputs_en = excluded.expected_outputs_en,
            expected_from_junior_ar = excluded.expected_from_junior_ar, expected_from_junior_en = excluded.expected_from_junior_en, not_expected_from_junior_ar = excluded.not_expected_from_junior_ar,
@@ -225,13 +225,13 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     /* ── tasks ── */
     const taskIds = new Map<string, string>();
     for (const t of pack.track.tasks) {
-      const cur = await c.query('select id, review_status from task where code = $1', [t.code]);
+      const cur = await c.query('select id, review_status from task where code = $1 and is_demo_fixture = $2', [t.code, demo]);
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].review_status)) { skippedFrozen.push(`task ${t.code}`); taskIds.set(t.code, cur.rows[0].id); continue; }
       const r = await c.query(
         `insert into task (code, target_role_id, title_ar, title_en, description_ar, description_en, frequency, complexity, expected_output_ar, expected_output_en, expected_output_kind, typical_inputs_en, common_tools,
            common_failure_modes_ar, common_failure_modes_en, realism_notes_en, drafting_aid, is_demo_fixture)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-         on conflict (code) do update set title_ar = excluded.title_ar, title_en = excluded.title_en, description_ar = excluded.description_ar, description_en = excluded.description_en, frequency = excluded.frequency,
+         on conflict (code) where is_demo_fixture = ${demo} do update set title_ar = excluded.title_ar, title_en = excluded.title_en, description_ar = excluded.description_ar, description_en = excluded.description_en, frequency = excluded.frequency,
            complexity = excluded.complexity, expected_output_ar = excluded.expected_output_ar, expected_output_en = excluded.expected_output_en, expected_output_kind = excluded.expected_output_kind,
            typical_inputs_en = excluded.typical_inputs_en, common_tools = excluded.common_tools, common_failure_modes_ar = excluded.common_failure_modes_ar, common_failure_modes_en = excluded.common_failure_modes_en,
            realism_notes_en = excluded.realism_notes_en, version = task.version + 1
@@ -246,13 +246,13 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     /* ── activities ── */
     const activityIds = new Map<string, string>();
     for (const a of pack.track.activities) {
-      const cur = await c.query('select id, status from activity_spec where slug = $1 and version = $2', [a.code, a.version]);
+      const cur = await c.query('select id, status from activity_spec where slug = $1 and version = $2 and is_demo_fixture = $3', [a.code, a.version, demo]);
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].status)) { skippedFrozen.push(`activity_spec ${a.code}@${a.version} (${cur.rows[0].status})`); activityIds.set(a.code, cur.rows[0].id); continue; }
       const r = await c.query(
         `insert into activity_spec (slug, version, title_ar, title_en, ai_usage_mode, estimated_minutes, target_role_id, level, business_context_ar, business_context_en, objective_ar, objective_en,
            can_yield_demonstrated, can_yield_verified, is_validation_activity, drafting_aid, is_demo_fixture)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14,$15,$16)
-         on conflict (slug, version) do update set title_ar = excluded.title_ar, title_en = excluded.title_en, ai_usage_mode = excluded.ai_usage_mode, estimated_minutes = excluded.estimated_minutes, target_role_id = excluded.target_role_id,
+         on conflict (slug, version) where is_demo_fixture = ${demo} do update set title_ar = excluded.title_ar, title_en = excluded.title_en, ai_usage_mode = excluded.ai_usage_mode, estimated_minutes = excluded.estimated_minutes, target_role_id = excluded.target_role_id,
            level = excluded.level, business_context_ar = excluded.business_context_ar, business_context_en = excluded.business_context_en, objective_ar = excluded.objective_ar, objective_en = excluded.objective_en,
            can_yield_demonstrated = excluded.can_yield_demonstrated, is_validation_activity = excluded.is_validation_activity
          returning id`,
@@ -283,9 +283,9 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
       const cur = await c.query('select id, status from rubric_version where activity_spec_id = $1 and version = $2', [actId, rb.code]);
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].status)) { skippedFrozen.push(`rubric_version ${rb.code} (${cur.rows[0].status})`); continue; }
       const r = await c.query(
-        `insert into rubric_version (activity_spec_id, version, pass_threshold, proposes_state, scoring_policy_version, drafting_aid, is_demo_fixture) values ($1,$2,$3,$4,$5,$6,$7)
-         on conflict (activity_spec_id, version) do update set pass_threshold = excluded.pass_threshold, proposes_state = excluded.proposes_state, scoring_policy_version = excluded.scoring_policy_version returning id`,
-        [actId, rb.code, rb.pass_threshold, rb.proposes_state, rb.scoring_policy_version, aid, demo]);
+        `insert into rubric_version (activity_spec_id, version, pass_threshold, proposes_state, scoring_policy_version, drafting_aid, is_demo_fixture, pass_threshold_status) values ($1,$2,$3,$4,$5,$6,$7,$8)
+         on conflict (activity_spec_id, version) do update set pass_threshold = excluded.pass_threshold, proposes_state = excluded.proposes_state, scoring_policy_version = excluded.scoring_policy_version, pass_threshold_status = excluded.pass_threshold_status returning id`,
+        [actId, rb.code, rb.pass_threshold, rb.proposes_state, rb.scoring_policy_version, aid, demo, rb.pass_threshold_status ?? 'TBD']);
       const rid = r.rows[0].id as string; bump('rubric_version');
       // Criteria are re-created from the pack; their provenance rows go with them (no dangling refs).
       await c.query(`delete from source_ref where entity_kind = 'rubric_criterion' and entity_id in (select id from rubric_criterion where rubric_version_id = $1)`, [rid]);
@@ -296,10 +296,12 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
         const chk = toCheckColumns(cr.check);
         const row = await c.query(
           `insert into rubric_criterion (rubric_version_id, key, position, name_ar, name_en, dimension, linked_skill_id, library_criterion_id, source, weight, max_score, mandatory, threshold_for_skill, evaluator_type, human_review_required,
-             check_type, check_artifact_key, check_min_value, check_min_length, check_artifact_keys, description_ar, description_en, expected_evidence_ar, expected_evidence_en, excerpt_guidance_en, rationale_when_met_ar, rationale_when_unmet_ar)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) returning id`,
+             check_type, check_artifact_key, check_min_value, check_min_length, check_artifact_keys, description_ar, description_en, expected_evidence_ar, expected_evidence_en, excerpt_guidance_en, rationale_when_met_ar, rationale_when_unmet_ar,
+             weight_status, threshold_status)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29) returning id`,
           [rid, cr.key, pos++, cr.name_ar, cr.name_en, cr.dimension, sid, cr.library_criterion ? libIds.get(cr.library_criterion) : null, cr.source, cr.weight, cr.max_score, cr.mandatory, cr.threshold_for_skill, cr.evaluator_type, cr.human_review_required,
-           chk.type, chk.artifactKey, chk.min, chk.minLength, chk.artifactKeys, cr.description_ar, cr.description_en, cr.expected_evidence_ar, cr.expected_evidence_en, cr.excerpt_guidance_en ?? null, cr.rationale_when_met_ar, cr.rationale_when_unmet_ar]);
+           chk.type, chk.artifactKey, chk.min, chk.minLength, chk.artifactKeys, cr.description_ar, cr.description_en, cr.expected_evidence_ar, cr.expected_evidence_en, cr.excerpt_guidance_en ?? null, cr.rationale_when_met_ar, cr.rationale_when_unmet_ar,
+           cr.weight_status ?? 'TBD', cr.threshold_status ?? 'TBD']);
         for (const l of cr.levels) await c.query('insert into rubric_criterion_level (criterion_id, level_key, score, descriptor_ar, descriptor_en, observable_evidence_en) values ($1,$2,$3,$4,$5,$6)', [row.rows[0].id, l.level_key, l.score, l.descriptor_ar, l.descriptor_en, l.observable_evidence_en]);
         bump('rubric_criterion');
         for (const s of rb.source_refs) await sourceRef(c, 'rubric_criterion', row.rows[0].id, sourceIds.get(s)!);
@@ -309,13 +311,13 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     /* ── learning resources (metadata only) ── */
     for (const lr of pack.global.resources) {
       const sid = skillId(lr.skill, `resource ${lr.code}`); const act = activityIds.get(lr.practice_activity); if (!sid || !act) { if (!act) unmapped.push(`resource ${lr.code}: activity '${lr.practice_activity}'`); continue; }
-      const cur = await c.query('select id, review_status from learning_resource where code = $1', [lr.code]);
+      const cur = await c.query('select id, review_status from learning_resource where code = $1 and is_demo_fixture = $2', [lr.code, demo]);
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].review_status)) { skippedFrozen.push(`learning_resource ${lr.code}`); continue; }
       const r = await c.query(
         `insert into learning_resource (code, skill_id, title, title_ar, url, language, provenance_class, provenance_source, provider, resource_type, level, duration_minutes, free_or_paid, why_recommended_ar, why_recommended_en,
            covers_target_level, quality_status, last_checked, practice_activity_spec_id, access_notes_en, drafting_aid, is_demo_fixture)
          values ($1,$2,$3,$4,$5,$6,'curated',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
-         on conflict (code) do update set skill_id = excluded.skill_id, title = excluded.title, title_ar = excluded.title_ar, url = excluded.url, language = excluded.language, provider = excluded.provider, resource_type = excluded.resource_type,
+         on conflict (code) where is_demo_fixture = ${demo} do update set skill_id = excluded.skill_id, title = excluded.title, title_ar = excluded.title_ar, url = excluded.url, language = excluded.language, provider = excluded.provider, resource_type = excluded.resource_type,
            level = excluded.level, duration_minutes = excluded.duration_minutes, free_or_paid = excluded.free_or_paid, why_recommended_ar = excluded.why_recommended_ar, why_recommended_en = excluded.why_recommended_en,
            covers_target_level = excluded.covers_target_level, quality_status = excluded.quality_status, last_checked = excluded.last_checked, practice_activity_spec_id = excluded.practice_activity_spec_id, access_notes_en = excluded.access_notes_en
          returning id`,

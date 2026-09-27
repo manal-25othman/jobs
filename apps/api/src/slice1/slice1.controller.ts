@@ -142,6 +142,8 @@ export class Slice1Controller {
     // The evaluation transaction commits first. Orchestration runs AFTER it,
     // outside it, and its failure is swallowed: agents never break the product.
     const result = await this.evaluations.evaluateSubmission(user.id, id);
+    // Awaiting human review: no agent runs on a partial result. Agents run when the review finalises.
+    if (result.outcome === 'needs_human_review') return { ok: true, data: result };
     const anyUnmet = result.criteria.some((c) => c.score < c.maxScore);
     const skillId = result.criteria[0]?.skillId ?? null;
     if (result.transition?.to === 'demonstrated') {

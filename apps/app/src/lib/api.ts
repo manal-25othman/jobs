@@ -67,6 +67,23 @@ export interface EvaluationResult {
   integrityChecks: { key: string; passed: boolean; message: string | null }[];
   transition: { from: string; to: string; evidenceId: string } | null;
   evaluatedAt: string;
+  /** Present while a person reviews the judgement criteria. No time estimate: there is no SLA yet. */
+  humanReview: { pendingCriteria: string[]; completedCriteria: string[] } | null;
+}
+
+export interface ReviewQueueItem {
+  id: string; state: string; criterionKey: string; createdAt: string; assignedToMe: boolean; conflictOfInterest: boolean;
+  activity: { slug: string; titleAr: string; titleEn: string }; criterion: { nameAr: string; nameEn: string; dimension: string };
+}
+export interface ReviewItem {
+  itemId: string; state: string;
+  activity: { slug: string; titleAr: string; objectiveAr: string; businessContextAr: string; aiUsageMode: string; deliverables: { key: string; mandatory: boolean; descriptionAr: string }[] };
+  criterion: { key: string; nameAr: string; descriptionAr: string; expectedEvidenceAr: string; maxScore: number; mandatory: boolean;
+    levels: { levelKey: string; score: number; descriptorAr: string; observableEvidenceEn: string }[] };
+  submission: { artifacts: { key: string; kind: string; valueBool: boolean | null; valueNumber: number | null; valueText: string | null; locator: string | null }[];
+    files: { name: string; downloadUrl: string; sizeBytes: number }[]; userExplanation: { key: string; text: string | null }[]; aiDisclosure: { declaredUse: string[] } };
+  deterministic: { criteria: { key: string; score: number; maxScore: number; rationale: string }[]; integrityChecks: { key: string; passed: boolean }[] };
+  previousDecisions: { reviewId: string; decision: string; score: number; rationale: string; createdAt: string }[];
 }
 
 export interface CvBulletAsset {

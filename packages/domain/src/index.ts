@@ -25,6 +25,7 @@ export * from './progress.js';
 export * from './uploads.js';
 export * from './withdrawal.js';
 export * from './career-data.js';
+export * from './human-review.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.5.0';
+export const DOMAIN_RULESET_VERSION = '0.6.0';

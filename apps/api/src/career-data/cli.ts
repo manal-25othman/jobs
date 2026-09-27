@@ -12,6 +12,7 @@ import { loadPack } from './pack-loader';
 import { importPack, renderNearDuplicateReport, ImportError } from './pipeline';
 import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition } from './review';
+import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
 
@@ -57,7 +58,20 @@ export async function main(argv: string[], root: string): Promise<number> {
       console.log(`${a1} ${a2}: ${r.from} → ${r.to} (${role}, ${label})`);
       return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review> …'); return 2;
+    if (cmd === 'promote') {
+      const r = await promoteDemo(pool, a1!, a2!, arg(argv, '--by') ?? 'unknown', arg(argv, '--note') ?? null);
+      console.log(`promotion ${r.promotionId}: review copy ${r.canonicalId} created (${Object.entries(r.copied).map(([k, v]) => `${k}=${v}`).join(' ')}); it is curated, non-demo, and now walks the review workflow`);
+      return 0;
+    }
+    if (cmd === 'promotion-correction') {
+      await recordCorrection(pool, a1!, { field: arg(argv, '--field')!, from: arg(argv, '--from'), to: arg(argv, '--to'), by: arg(argv, '--by') ?? 'unknown', reason: arg(argv, '--reason') ?? '' });
+      console.log('correction recorded'); return 0;
+    }
+    if (cmd === 'promotion-complete') {
+      const r = await completePromotion(pool, a1!);
+      console.log(`promotion closed: demo superseded=${r.demoSuperseded}, ${r.reviewLogIds.length} review decision(s) recorded`); return 0;
+    }
+    console.error('usage: career-data <import|validate|near-duplicates|review|promote|promotion-correction|promotion-complete> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

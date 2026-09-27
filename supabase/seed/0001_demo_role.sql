@@ -236,6 +236,10 @@ select c.id, l.level_key, l.score, l.d_ar, l.d_en, l.obs from rubric_criterion c
  where c.rubric_version_id = 'd0000000-0000-4000-8000-000000000001'
 on conflict do nothing;
 
+update rubric_version set pass_threshold_status = 'proposed' where id = 'd0000000-0000-4000-8000-000000000001';
+update rubric_criterion set weight_status = 'proposed', threshold_status = case when threshold_for_skill is null then 'TBD'::value_status else 'proposed'::value_status end
+ where rubric_version_id = 'd0000000-0000-4000-8000-000000000001';
+
 -- Criteria in place: the demo rubric may now be published (DEMO shortcut: curated → published, non-production only).
 update rubric_version set status = 'published' where id = 'd0000000-0000-4000-8000-000000000001' and status = 'curated';
 

@@ -33,6 +33,40 @@ function EvaluationInner() {
   if (error) return <ErrorBanner message={error} />;
   if (!result) return <Loading />;
 
+  if (result.outcome === 'needs_human_review') {
+    // D-057-style honesty: what was checked, what awaits a person, and no invented time.
+    return (
+      <>
+        <Steps current={3} />
+        <h1>نتيجة التقييم</h1>
+        <div className="banner banner--info" role="status">
+          <span className="grow"><strong style={{ fontWeight: 500 }}>التقييم قيد المراجعة</strong>{' · '}الفحوص الآلية اكتملت، وبقيت معايير يقرّرها مراجع/ة.</span>
+        </div>
+        <section className="card">
+          <h2>ما تحقّق آليًا</h2>
+          <ul className="stack" style={{ gap: 6 }}>
+            {result.criteria.map((c) => (
+              <li key={c.criterionId ?? c.criterion_key} className="row" style={{ gap: 10 }}>
+                <span className="term">{c.criterionId ?? c.criterion_key}</span>
+                <span className="num push">{String(c.score)} / {String(c.maxScore ?? c.max_score)}</span>
+              </li>
+            ))}
+            {result.integrityChecks.map((i) => (
+              <li key={i.key} className="row" style={{ gap: 10 }}><span className="term">{i.key}</span><span className={`chip push ${i.passed ? 'chip--success' : 'chip--attention'}`}>{i.passed ? 'مستوفى' : 'غير مستوفى'}</span></li>
+            ))}
+          </ul>
+        </section>
+        <section className="card">
+          <h2>ما ينتظر مراجعة بشرية</h2>
+          <ul className="stack" style={{ gap: 6 }}>
+            {result.humanReview?.pendingCriteria.map((k) => <li key={k} className="term">{k}</li>)}
+          </ul>
+          <p className="body-sm muted">ستظهر النتيجة هنا حين يكتمل قرار المراجعة على كل معيار. لا يوجد وقت متوقَّع معلَن بعد.</p>
+        </section>
+      </>
+    );
+  }
+
   const passed = result.outcome === 'passed';
   const outcomeLabel: Record<string, string> = {
     passed: 'اجتاز',

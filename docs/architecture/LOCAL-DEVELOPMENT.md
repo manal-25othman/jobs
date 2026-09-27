@@ -40,9 +40,12 @@ npm test                    # النطاق + الإعدادات
 | `npm run verify:prototype` | **يفشل** إن تغيّر النموذج المُجمَّد في `apps/web/` |
 | `npm run eval:agents` | منصّة تقييم الوكلاء: ٣٠ سيناريو عبر المُنسّق والبوابة والنطاق بالمزوّد الاختباري، تشغيلان متطابقان، يكتب `packages/agents/eval/last-run.json` |
 | `npm run career:import` | يستورد حزمة `trk_frontend_junior` (DEMO/DRAFT) عبر الخط: مصدر → لقطة L0 → تطبيع → تكرار (اقتراح) → مطابقة → كتابة `draft`؛ متكرّر بلا أثر |
-| `npm run career:validate` | قواعد جودة بيانات المهن (Q01–Q18)؛ **يفشل** بأي FAIL |
+| `npm run career:validate` | قواعد جودة بيانات المهن (Q01–Q21)؛ **يفشل** بأي FAIL |
 | `npm run career:near-duplicates` | يكتب `data/career/reports/near-duplicates.md` — اقتراحات لا قرارات |
 | `node scripts/career-data.mjs review …` | انتقال مراجعة واحد بالاسم والدور والسبب (يكتب `review_log`) |
+| `node scripts/career-data.mjs promote <kind> <demo-uuid> --by <uuid> [--note …]` | ينشئ **نسخة مراجعة غير تجريبية** (`curated`) من صف DEMO وأبنائه دون المساس بالأصل؛ يفتح `content_promotion` (D-096) |
+| `node scripts/career-data.mjs promotion-correction <promotion-uuid> --field … --from … --to … --by … --reason …` | يسجّل تصحيحًا واحدًا على النسخة داخل سجل الترقية |
+| `node scripts/career-data.mjs promotion-complete <promotion-uuid> --by <uuid>` | يغلق الترقية: يشترط النشر واعتماد SME في `review_log`، ثم يجعل الأصل التجريبي `superseded` (يبقى مُعرَّفًا) |
 | `npm run build -w @naqla/api` | يبني الـAPI |
 | `npm run build -w @naqla/app` | يبني تطبيق Next.js |
 | `scripts/db-test.sh` | يطبّق الهجرات ويشغّل إثباتات القاعدة والوصول |
@@ -186,6 +189,16 @@ DATABASE_URL=... npm run test:e2e -w @naqla/api   # 29 اختبار طرف-إل�
 
 
 ---
+
+## ٩ب. تشغيل مسار المراجعة البشرية محليًا
+1. شغّلي نشاطًا برُبريك فيه بنود `human` (حزمة `trk_frontend_junior` بعد `career:import` ونشر demo محليًا، أو `rub_fe_003@0.2.0` في البذرة): التسليم يمرّ بالمرحلة الحتمية ثم يقف على `state = queued_for_human` و`outcome = needs_human_review`؛ المستخدم يرى «التقييم قيد المراجعة» في `/evaluation`.
+2. امنحي مستخدمًا دور المراجع **من الخدمة** (لا مسار عميل لذلك عمدًا):
+```sql
+insert into reviewer_grant (user_id, role_performed, granted_by) values ('<user-uuid>', 'human_reviewer', 'local operator');
+```
+3. بحساب ذلك المستخدم افتحي `/review` في التطبيق (الطابور) ثم عنصرًا (`/review/<id>`): تعيين → قراءة الحمولة العمياء → اختيار مستوى + سبب (≥١٢ حرفًا) → إرسال. المسارات: `GET review/queue` · `POST review/queue/:id/assign` · `GET review/items/:id` · `POST review/items/:id/decision|return|escalate`.
+4. عند اكتمال **كل** عناصر التقييم تُحسب النتيجة النهائية (صف جديد يتجاوز المؤقتة) وتنتقل حالات الدليل، ثم يعمل الوكيلان. قرار ثانٍ على بند مكتمل يحتاج `supersedesReviewId` وإلا `409`.
+**ما لا يمكن محليًا أيضًا:** لا تجاوز لفحص حاجب · لا قرار على بند `rule` · لا `verified` من مراجعة بشرية (قيد قاعدة).
 
 ## ١٠. التشغيل على مشروع Supabase حقيقي
 

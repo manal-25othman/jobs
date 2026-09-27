@@ -25,8 +25,12 @@ const q = (sql: string, map: (r: Record<string, unknown>) => string) => async (c
 
 export const QUALITY_RULES: readonly QualityRule[] = [
   { id: 'Q01', title: 'duplicate canonical skills (normalised name key, ar or en)', severity: 'fail',
-    async run(c) { const { rows } = await c.query(`select slug, label_en, label_ar from skill where status = 'active'`); const out: string[] = [];
-      for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) if (isExactDuplicate({ nameEn: rows[i].label_en, nameAr: rows[i].label_ar }, { nameEn: rows[j].label_en, nameAr: rows[j].label_ar })) out.push(`${rows[i].slug} ≡ ${rows[j].slug}`);
+    async run(c) { const { rows } = await c.query(`select slug, label_en, label_ar, is_demo_fixture from skill where status = 'active' and review_status <> 'superseded'`); const out: string[] = [];
+      for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+        // A demo row and its canonical promotion copy legitimately share a name.
+        if (rows[i].slug === rows[j].slug && rows[i].is_demo_fixture !== rows[j].is_demo_fixture) continue;
+        if (isExactDuplicate({ nameEn: rows[i].label_en, nameAr: rows[i].label_ar }, { nameEn: rows[j].label_en, nameAr: rows[j].label_ar })) out.push(`${rows[i].slug} ≡ ${rows[j].slug}`);
+      }
       return out; } },
   { id: 'Q02', title: 'broken role-skill refs (mapping to a deprecated or merged skill)', severity: 'fail',
     run: q(`select tr.slug as role, s.slug as skill, s.status from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id where s.status <> 'active'`, (r) => `${r.role} → ${r.skill} (${r.status})`) },
@@ -92,6 +96,18 @@ export const QUALITY_RULES: readonly QualityRule[] = [
               where not exists (select 1 from career_presentation_rule r where r.asset_type::text = a.t and r.evidence_level::text = l.l)`, (r) => String(r.label)) },
   { id: 'Q17', title: 'integrity check without a typed purpose (legacy rows)', severity: 'warn',
     run: q(`select a.slug || '/' || i.key as label from integrity_check_spec i join activity_spec a on a.id = i.activity_spec_id where i.check_type is null`, (r) => String(r.label)) },
+  { id: 'Q19', title: 'canonical (non-demo) content that still references a DEMO record', severity: 'fail',
+    run: q(`select 'role_requirement ' || rr.id from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id where not rr.is_demo_fixture and (s.is_demo_fixture or tr.is_demo_fixture)
+            union all select 'activity_skill ' || a.slug || '/' || s.slug from activity_skill ak join activity_spec a on a.id = ak.activity_spec_id join skill s on s.id = ak.skill_id where not a.is_demo_fixture and s.is_demo_fixture
+            union all select 'rubric_criterion ' || rc.key from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id join skill s on s.id = rc.linked_skill_id where not rv.is_demo_fixture and s.is_demo_fixture
+            union all select 'task_skill ' || t.code || '/' || s.slug from task_skill tk join task t on t.id = tk.task_id join skill s on s.id = tk.skill_id where not t.is_demo_fixture and s.is_demo_fixture
+            union all select 'learning_resource ' || coalesce(lr.code, lr.id::text) from learning_resource lr join skill s on s.id = lr.skill_id where not lr.is_demo_fixture and s.is_demo_fixture`, (r) => String(r.label ?? Object.values(r)[0])) },
+  { id: 'Q20', title: 'published non-demo rubric with weights or thresholds not SME-approved (OPEN-043)', severity: 'fail',
+    run: q(`select rv.version || ': pass_threshold ' || rv.pass_threshold_status as label from rubric_version rv where rv.status = 'published' and not rv.is_demo_fixture and rv.pass_threshold_status <> 'approved'
+            union all select rv.version || '/' || rc.key || ': weight ' || rc.weight_status || ', threshold ' || rc.threshold_status from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id
+              where rv.status = 'published' and not rv.is_demo_fixture and (rc.weight_status <> 'approved' or rc.threshold_status <> 'approved')`, (r) => String(r.label)) },
+  { id: 'Q21', title: 'a human-required criterion that could never be reviewed (no levels defined)', severity: 'fail',
+    run: q(`select rv.version || '/' || rc.key as label from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id where rc.evaluator_type <> 'rule' and not exists (select 1 from rubric_criterion_level l where l.criterion_id = rc.id)`, (r) => String(r.label)) },
   { id: 'Q18', title: 'role-skill mapping references a skill the role does not measure through any task or activity', severity: 'warn',
     run: q(`select tr.slug || ' → ' || s.slug as label from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id
              where not exists (select 1 from activity_skill ak join activity_spec a on a.id = ak.activity_spec_id where a.target_role_id = rr.target_role_id and ak.skill_id = rr.skill_id)

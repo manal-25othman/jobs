@@ -21,11 +21,17 @@ node scripts/career-data.mjs import trk_frontend_junior --dry-run
 npm run career:validate          # quality rules; exit 1 on any FAIL
 npm run career:near-duplicates   # writes data/career/reports/near-duplicates.md
 node scripts/career-data.mjs review <kind> <uuid> <to> --role <content_author|sme|product_owner> --by <uuid|-> --label "<name>" --reason "<why>" [--minutes n]
+node scripts/career-data.mjs promote <kind> <demo-uuid> --by <uuid> [--note "<why>"]            # DEMO → نسخة مراجعة كانونية (curated)
+node scripts/career-data.mjs promotion-correction <promotion-uuid> --field <f> --from "<a>" --to "<b>" --by <uuid> --reason "<why>"
+node scripts/career-data.mjs promotion-complete <promotion-uuid> --by <uuid>                    # بعد النشر واعتماد SME: الأصل superseded
 ```
 **التكرار (idempotence) مُختبَر:** استيرادان متتاليان ⇒ نفس الأعداد؛ اللقطات `existing`؛ مراجع الإسناد لا تتضخّم.
 
 ## التحقق قبل الكتابة (`validatePack`)
 يجمع **كل** المشكلات ثم يفشل مرة واحدة: مراجع معطوبة · `source_refs` فارغة · ثنائية اللغة · مهارة بلا مؤشرات · مترادف يخلط الصيغة بالربط · قاعدة عرض تحت الحد الأدنى · مورد بلا نشاط تطبيق أو بـ`url` ومنزلة أعلى من `unverified` · **دور يذكر إطار عمل** · أساسية خارج ٤–٥ · مهام خارج ١٠–١٢ · أنشطة ≠ ٣ · نشاط بلا مدخل خاص/فحص assessment-only/سؤال شرح · `can_yield_verified = true` · بند بلا واصفات · مهارة أساسية بلا مسار دليل.
 
+## الترقية DEMO → كانوني (`OPEN-040` · D-096)
+الخط **لا يعدّل** صفًا تجاوز `curated`، ولا يزيل `is_demo_fixture` من صف قائم. الطريق الوحيد إلى محتوى حقيقي: `promote` ينسخ الصف التجريبي وأبناءه (مثلًا النشاط مع مدخلاته ومخرجاته ومهاراته ومهامه وفحوصه؛ الرُبريك مع بنوده ومستوياته) نسخةً `curated` غير تجريبية تحمل `promoted_from_id`، ويحلّ مراجع المهارات/المهام إلى نسخها الكانونية إن وُجدت (وإلا تبقى تجريبية ويكشفها Q19). كل تصحيح يُسجَّل في `content_promotion.corrections`؛ النسخة تمشي دورة المراجعة العادية (SME مُسمّى ثم نشر المالكة)؛ `promotion-complete` يشترط `published` وسجل اعتماد SME في `review_log` ثم يجعل الأصل `superseded` — **الأصل التجريبي لا يُحذف ولا يفقد وسمه**. الفهارس الفريدة الجزئية لكل `is_demo_fixture` تسمح بالتعايش بالمفتاح نفسه، وعبارات `on conflict` في الخط تسمّي المسند نفسه. مُختبَر e2e (`career-data.e2e.ts`).
+
 ## ما لا يفعله الخط
-لا ينشر · لا يعتمد · لا يدمج مهارتين · لا يخمّن مطابقة · لا يحذف · لا يستورد إشارة سوق · لا يعدّل صفًا تجاوز `curated`.
+لا ينشر · لا يعتمد · لا يدمج مهارتين · لا يخمّن مطابقة · لا يحذف · لا يستورد إشارة سوق · لا يعدّل صفًا تجاوز `curated` · لا يرقّي DEMO إلا نسخةً عبر `promote` · لا يعلن قيمة وزن/عتبة `approved`.
