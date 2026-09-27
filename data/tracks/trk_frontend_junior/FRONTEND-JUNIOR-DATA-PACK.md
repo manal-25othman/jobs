@@ -1,4 +1,5 @@
 # Track Data Pack — Junior Web / Frontend Developer
+> ⚠️ **SUPERSEDED (2026-09-27 · SRS-001 v1.4 §0.2 · D-104).** هذه حزمة Markdown قديمة **ليست المصدر الكانوني**. الحزمة المُنفَّذة والمستوردة إلى القاعدة هي `data/career/tracks/trk_frontend_junior/` (`trk_frontend_junior@0.2.0`). ما هنا يخالف قرارات المنتج: مجموعة أساسية مختلفة (تشمل التصحيح) وتسمّي React مهارة مساندة (`skl_component_patterns`) · أنشطة `act_fe_001..003` مختلفة · تدّعي أن `Verified` ممكن في P1 لثلاث مهارات · أوزان مئوية. **يُحفظ للتاريخ فقط؛ لا يُقرأ كمتطلب ولا يُستورد.**
 **pack_id:** `trk_frontend_junior` · **track_id:** `TRK-01` · **pack_version:** `0.2.0`
 **pack_class:** **`FULL VALIDATION PACK`** — أول مسار تحقق فعلي للمشروع، **وليس Thin Pack ولا Architecture Test فقط**
 **status:** `draft` · **levels_included:** `["junior"]` · **language_coverage:** `["ar","en"]`

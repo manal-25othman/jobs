@@ -110,3 +110,17 @@ describe('OPEN-045 — integrity check evaluation modes', () => {
     assert.equal(integrityClassificationOf('mandatory_deliverables'), 'user_facing');
   });
 });
+
+/* ───────────── D-102: SME approval of a track never makes a submission Verified ───────────── */
+import { verifiedPathStatus, assertStateAvailableInProduction } from './index.js';
+describe('D-102 — Verified stays blocked in P1 whatever the SME approves', () => {
+  test('a fully SME-approved activity with private inputs, integrity checks and an explanation question still cannot yield Verified without an approved verification mechanism', () => {
+    const r = verifiedPathStatus({ hasPrivateInput: true, assessmentOnlyChecks: 3, explanationQuestions: 1, smeApprovedBy: 'sme-uuid', verificationPolicyApproved: false });
+    assert.equal(r.canYieldVerified, false);
+    assert.ok(r.missing.length > 0, 'the missing verification mechanism is named, not silently waived');
+  });
+  test('Demonstrated is the highest state the production path may reach; Verified is refused before any promotion', () => {
+    assert.doesNotThrow(() => assertStateAvailableInProduction('demonstrated'));
+    assert.throws(() => assertStateAvailableInProduction('verified'));
+  });
+});

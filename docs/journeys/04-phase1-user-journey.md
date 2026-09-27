@@ -1,4 +1,5 @@
 # الوثيقة 1 — Phase 1 User Journey
+> ⚠️ **SUPERSEDED IN PART (2026-09-27 · SRS-001 v1.4 §3.1 · §8 · D-102 · D-104).** هدف P1 صار **دليلًا `Demonstrated` + Case Study + اقتراح CV/LinkedIn معتمدًا من المستخدم**؛ `Verified` **محجوب في P1**. المسار الأول `Junior Web / Frontend Developer` لا Data/BI. S15/S16 تُقرأ بهذا السقف. حيث يختلف هذا الملف عن الـSRS، **يسود الـSRS**.
 > من أول زيارة حتى أول **Verified Skill Evidence**. لا تصميم بصري — الوصف سلوكي ومنطقي فقط.
 > يُقرأ مع: `docs/agents/05-master-agent-contract-map.md` · `docs/standards/07-verified-skill-evidence.md` · `docs/standards/08-ai-usage-policy.md`
 

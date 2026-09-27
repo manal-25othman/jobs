@@ -1,6 +1,6 @@
 # SRS-001 — Detailed Requirements Traceability Matrix
-**الإصدار:** 1.2 · **مرتبط بـ:** `SRS-001-career-os-functional.md` **v1.3** · **القرارات:** D-039 · D-043 · D-044
-> **`CHG-005` (اسم المنتج) لا يغيّر أي صف في هذه المصفوفة** — لا متطلب أُضيف ولا حُذف ولا عُدِّل. حُدِّث ربط الإصدار فقط.
+**الإصدار:** 1.3 · **مرتبط بـ:** `SRS-001-career-os-functional.md` **v1.4** · **القرارات:** D-039 · D-043 · D-044 · **D-101 … D-106**
+> **`CHG-006..009` (v1.4)** أضافت **8 متطلبات** (FR-P-038/039/040 · FR-A-013/014/015 · FR-G-021/022) وعدّلت FR-P-023/024 وFR-G-020؛ صفوفها أدناه موسومة. `CHG-005` لم يغيّر صفًا.
 > تتبّع **أمامي وعكسي**. كل `Requirement` بلا مصدر، وكل `Feature` بلا `Requirement`، **يظهر كـGap صريح في §5 ولا يُخفى**.
 > `TC-TBD-xxx` عناصر نائبة — **لا تُكتب حالات الاختبار الكاملة في هذه المرحلة.**
 
@@ -92,7 +92,7 @@
 | FR-P-020 | P-COST | CAP-21 | F-EVL-03 | P1 | MUST | System | رفض شكلي لا يستهلك محاولة | TC-TBD-060 | APPROVED |
 | FR-P-021 | P-COST | CAP-21 | F-EVL-04 | P1 | MUST | System | قبل أي نموذج · فرصة تصحيح واحدة | TC-TBD-061 | APPROVED |
 | FR-P-022 | INV-9 | CAP-26 | F-EVL-10 | P1 | MUST | System | حتمي · الدرجة ≠ المستوى | TC-TBD-062 | APPROVED |
-| FR-P-023 | P-TRUST | CAP-27 | F-EVL-12 | P1 | MUST | System | المحفّزات العشرة تدخل الطابور | TC-TBD-063 | APPROVED |
+| FR-P-023 | P-TRUST | CAP-27 | F-EVL-12 | P1 | MUST | System | طابور **للاستثناءات المعرَّفة وعيّنات المعايرة** لا لكل تسليم | TC-TBD-063 | APPROVED *(CHG-006)* |
 | FR-P-024 | P-TRUST | CAP-27 | F-EVL-16 | P1 | SHOULD | System | قياس الاتفاق — بوابة خروج P1 | TC-TBD-064 | APPROVED |
 | FR-P-030 | P-COST | CAP-37 | F-AI-01 | P1 | MUST | System | حتمي · لا حلقات · أقل سياق | TC-TBD-065 | APPROVED |
 | FR-P-031 | P-COST | CAP-38 | F-AI-05 | P1 | MUST | System | ست طبقات · **القيم TBD** | TC-TBD-066 | APPROVED |
@@ -102,6 +102,9 @@
 | FR-P-035 | P-UX | CAP-33 | F-CMP-08 | P1 | MUST | System | تدرّج ثلاثي · لا توقف | TC-TBD-070 | APPROVED |
 | **FR-P-036** | INV-1 | **CAP-29** | F-WRK-08 · F-EVD-07 | P1 | MUST | System | اشتقاق حتمي · ممنوع بلا دليل · `revoked` بسحب الدليل | TC-TBD-103 | **APPROVED** *(CHG-001)* |
 | **FR-P-037** | P-TRUST | **CAP-27** | F-EVL-13 | P1 | MUST | Reviewer·System | مراجعة عمياء · سجل قرار غير قابل للتعديل + `role_performed` | TC-TBD-104 | **APPROVED** *(CHG-002)* |
+| **FR-P-038** | P-JUDGE | CAP-26 | F-EVL-06 | P1 | MUST | System | بوابة ثقة واتساق بعد المُقيِّم؛ دون العتبة ⇒ تصعيد لا تخمين | TC-TBD-105 | **APPROVED** *(CHG-006)* |
+| **FR-P-039** | P-TRUST | CAP-12 | F-CON-11 | P0/P1 | MUST | Reviewer·SME | Golden/Calibration Set من أحكام بشرية بندًا بندًا؛ لا fine-tuning | TC-TBD-106 | **APPROVED** *(CHG-006)* |
+| **FR-P-040** | P-EVID | CAP-26 | F-EVL-10 | P1 | MUST | System | إصدار `Practiced`/`Demonstrated` آليًا بعد المعايرة؛ `Verified` مستثنى | TC-TBD-107 | **APPROVED** *(CHG-006)* |
 
 # 3. المصفوفة الأمامية — C3: Agentic (FR-A)
 
@@ -114,6 +117,9 @@
 | FR-A-005 | P-JUDGE | CAP-22 | F-EVL-05 | A13 | P1 | MUST | فحص حاسم غير مكتشَف ⇒ سقف `Practiced` | TC-TBD-075 | APPROVED |
 | FR-A-006 | INV-1 | CAP-24 | F-EVL-08 | A14 | P1 | MUST | "لا دليل" نتيجة مشروعة | TC-TBD-076 | APPROVED |
 | FR-A-007 | P-EVID | CAP-30 | F-AST-01/02 | A17 | P1 | MUST | لا اختراع · لا تجاوز للمستوى | TC-TBD-077 | APPROVED |
+| **FR-A-013** | P-EVID | CAP-30 | F-AST-01/02 · F-CAR-06 | recruitment (A17/A04) | P1 | MUST | مُثبَت غائب عن CV/LinkedIn · مُدَّعى بلا دليل · فجوات الدور · صياغة مسنَدة | TC-TBD-108 | **APPROVED** *(CHG-008)* |
+| **FR-A-014** | P-TRUST | CAP-30 | F-AST-01..03 | recruitment | P1 | MUST | `Evidence → Proposed Claim → User Preview → User Approval` | TC-TBD-109 | **APPROVED** *(CHG-008)* |
+| **FR-A-015** | P-EVID | CAP-30 | F-CAR-06 · F-ACT-01 | recruitment | P1 | MUST | لا اختلاق لمهارة بلا دليل؛ التوجيه عبر الفجوة | TC-TBD-110 | **APPROVED** *(CHG-008)* |
 | FR-A-008 | P-EVID | CAP-31 | F-AST-04 | A16 | P1 | MUST | لا اختلاق سياق · إفصاح المحاكاة | TC-TBD-078 | APPROVED |
 | FR-A-009 | P-UX | CAP-33 | F-CMP-06 | A01 | P1 | MUST | يشرح ولا يخطط · لا يقيّم | TC-TBD-079 | APPROVED |
 | FR-A-010 | P-DIR | CAP-35 | F-EVL-07 | A15 | P1 | MUST | نقد العمل لا الشخص · لا تغيير درجة | TC-TBD-080 | APPROVED |
@@ -143,7 +149,9 @@
 | FR-G-017 | P-JUDGE | CAP-22 | F-GOV-10 | P1 | MUST | System·Reviewer | N0–N4 · إشارتان · قابل للاعتراض | TC-TBD-099 | APPROVED |
 | FR-G-018 | P-TRUST | CAP-42 | **F-GOV-12** | P1 | MUST | Admin | لا تأثير تقييمي لـAdmin | TC-TBD-100 | **APPROVED** *(CHG-003)* |
 | FR-G-019 | P-TRUST | CAP-42 | **F-GOV-13** | P1 | MUST | Admin | قراءة بسبب موثّق + حدث تدقيق | TC-TBD-101 | **APPROVED** *(CHG-003)* |
-| FR-G-020 | P-TRUST | CAP-11 | **F-CON-12** | P0/P1 | MUST | SME | لا نشر بلا اعتماد SME | TC-TBD-102 | **APPROVED** *(CHG-004)* |
+| FR-G-020 | P-TRUST | CAP-11 | **F-CON-12** | P0/P1 | MUST | SME | لا نشر بلا اعتماد SME مُسمّى · **اعتماد SME ≠ `Verified`** | TC-TBD-102 | **APPROVED** *(CHG-004 · CHG-009)* |
+| **FR-G-021** | P-EVID | CAP-25 | F-EVL-09 | P1 | MUST | System | `Verified` محجوب بنيويًا في P1 | TC-TBD-111 | **APPROVED** *(CHG-006)* |
+| **FR-G-022** | P-TRUST | CAP-11 | F-CON-12 | P0/P1 | MUST | Author·SME·PO | مؤلف يُعدّ · SME يعتمد · PO ينشر · لا اعتماد ذاتي | TC-TBD-112 | **APPROVED** *(CHG-009)* |
 
 ---
 
@@ -292,6 +300,10 @@
 | `CHG-002` | GAP-03 | `FR-P-037` + تتبّع `F-EVL-13`/CAP-27 | ✅ **مطبَّق** |
 | `CHG-003` | GAP-05 | `F-AI-11` · `F-GOV-12` · `F-GOV-13` في الجرد + تحديث ثلاثة صفوف | ✅ **مطبَّق** |
 | `CHG-004` | GAP-06 | `F-CON-12` في الجرد + تحديث `FR-G-020` | ✅ **مطبَّق** |
+| `CHG-006` | D-101 · D-102 | FR-P-038/039/040 · FR-G-021 · تعديل FR-P-023/024 | ✅ **مطبَّق** (v1.3 من المصفوفة) |
+| `CHG-007` | D-104 | لا صف جديد — نطاق §3.1 وOD-1…12 في الـSRS | ✅ **مطبَّق** |
+| `CHG-008` | D-105 | FR-A-013/014/015 | ✅ **مطبَّق** |
+| `CHG-009` | D-103 | FR-G-022 · تعديل FR-G-020 | ✅ **مطبَّق** |
 
 **الاعتماد:** Product Owner (R-1) · **المبرر:** سدّ فجوات تتبّع لقدرات معتمدة أصلًا — **لا توسعة نطاق**.
 

@@ -1,4 +1,5 @@
 # الوثيقة 5 — Evidence Lifecycle
+> ⚠️ **SUPERSEDED IN PART (2026-09-27 · SRS-001 v1.4 §8 · D-102).** T02/T03 (إلى `Practiced`/`Demonstrated`) تُصدَر **آليًا** لمسار مُعاير (FR-P-040)؛ T04/T05 (إلى `Verified`) **محجوبتان في P1** حتى OPEN-047. `Under Review` حالة استثناء/معايرة لا قاعدة (D-101). **يسود الـSRS.**
 > من `Submission` حتى `Historical Verified`. ملزم بـ D-012 · D-012a · D-015 · D-016 · D-017 · D-018.
 
 ## 1. تمييز أساسي قبل كل شيء

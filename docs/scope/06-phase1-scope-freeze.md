@@ -1,4 +1,5 @@
 # الوثيقة 3 — Phase 1 Scope Freeze
+> ⚠️ **SUPERSEDED IN PART (2026-09-27 · SRS-001 v1.4 §3.1 · D-102 · D-104).** «تعريف اكتمال Phase 1» بـ`Verified Skill Evidence` واحد **مُحدَّث**: دليل `Demonstrated` + Case Study + أصل مهني معتمد؛ `Verified` محجوب في P1. المسار الأول Frontend مبتدئ عام. **يسود الـSRS.**
 > نطاق مُجمَّد قابل للبناء لاحقًا **بلا غموض**. `NOT NOW` **لا تعني محذوف** — كل بند فيها يشير إلى مرحلة لاحقة أو نقطة تمديد.
 > المصدر الملزم للتصنيف: `docs/vision/00-vision-registry.md` · القرارات: `docs/decisions/DECISIONS.md`
 
