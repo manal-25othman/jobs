@@ -1,5 +1,5 @@
 # نَقْلة / NAQLA — Configurable Track Architecture · Assessment & Plan
-**التاريخ:** 2026-10-07 · **الحالة:** **معتمدة** (المالكة، 2026-10-07) · **التنفيذ:** Phase 1 ✅ (معتمدة؛ `PHASE-1-EVIDENCE-SYSTEM-REPORT.md`) · Phase 2 ✅ مُنفَّذة — التقرير `PHASE-2-SKILL-STATUS-MODEL-REPORT.md`؛ Phase 3 بانتظار مراجعة المالكة · *(بنود الموافقة الثلاثة: H6 خلف سياسة معطَّلة افتراضيًا · H4 بيانات · H5 إعداد مُصدَّر)* · **المرجع الحاكم:** `docs/srs/SRS-001-naqla-functional.md` v1.5
+**التاريخ:** 2026-10-07 · **الحالة:** **معتمدة** (المالكة، 2026-10-07) · **التنفيذ:** Phase 1 ✅ (معتمدة؛ `PHASE-1-EVIDENCE-SYSTEM-REPORT.md`) · Phase 2 ✅ (معتمدة؛ `PHASE-2-SKILL-STATUS-MODEL-REPORT.md`) · Phase 3 ✅ مُنفَّذة — التقرير `PHASE-3-STRUCTURED-ASSESSMENT-REPORT.md`؛ Phase 4 بانتظار مراجعة المالكة · *(بنود الموافقة الثلاثة: H6 خلف سياسة معطَّلة افتراضيًا · H4 بيانات · H5 إعداد مُصدَّر)* · **المرجع الحاكم:** `docs/srs/SRS-001-naqla-functional.md` v1.5
 **الهدف:** تشغيل تجربة NAQLA الأساسية (مسار → مهارات → نشاط → دليل → تقييم مُهيكل → تقدّم → ما ينقص → إعادة محاولة → مسودة ادعاء مهني) **دون تثبيت أي قاعدة مهنية تنتظر رأي الخبراء**. كل قاعدة من هذا النوع تُحمَل كـConfiguration مُصدَّرة قابلة للتعديل من Admin.
 
 ---
@@ -123,7 +123,7 @@ blind review · no number without a fact    challenge_policy · track_config_ver
 |---|---|---|---|---|
 | 1 | **Evidence System** ✅ | 0011 · نطاق `evidence-items.ts` · API `me/evidence` (إضافة · قائمة · ربط بمهارات · سحب) · التسليم يُنشئ عناصر من ملفاته/روابطه/نصوصه · المفاتيح من مخرجات النشاط · **انحراف مُعلَن:** سجل `evidence_item` منفصل بدل أعمدة على `evidence` (D-108) | لا (إضافي؛ مُثبَت بـ٩٣ e2e) | لا |
 | 2 | **Skill Status Model** ✅ | 0012 · نطاق `skill-progress.ts` (انتقالات مدخل) · الأحداث (مشروع · مادة · تسليم · تقييم · سحب) تحرّك التقدّم · `me/skill-progress` يُعيد البُعدين و`me/skills` يحمل `progress` (D-109) | لا (إضافي؛ ١٠١ e2e) | لا |
-| 3 | **Structured Assessment + Verification Decision** | 0013 · نطاق `assessment.ts` · التقييم يكتب نتائج مُهيكلة + الخام · قرار التحقق عبر سياسة **مسودة تساوي السلوك الحالي** | لا (المسودة = الحالي) | **نعم لـH6** (دليل لكل مهارة من بنودها) — يُنفَّذ خلف السياسة ومعطَّلًا حتى الموافقة |
+| 3 | **Structured Assessment + Verification Decision** ✅ | 0013 · نطاق `verification-policy.ts` · التقييم يكتب `assessment` مُهيكلًا + الخام · قرار التحقق عبر `verification_policy` **مسودة تساوي السلوك الحالي** (اختبار تطابق شامل) · H6 خلف `per_skill_evidence_derivation=false` (D-110) | لا (مُثبَت؛ ١٠٩ e2e) | H6 مُنفَّذ خلف العلم المعطَّل كما وافقت المالكة |
 | 4 | **Configuration & Policy Layer** | 0014 · سياسات مُصدَّرة + `track_config_version` · مُقيِّمات نقية · التقييم يسجّل إصدار الإعداد · الحزمة تحمل حقول TrackSkill | لا | لا |
 | 5 | **Readiness Engine + Skill pages** | محرك القواعد (أنواع في الكود، قيم بيانات) · `/skills` · `/skills/[id]` | لا | لا |
 | 6 | **AI Usage / Integrity Flow** | استبيان مُهيكل · سجل أنواع التحدي · سياسة التحدي (بلا تحدٍّ نشط) | لا | لا |

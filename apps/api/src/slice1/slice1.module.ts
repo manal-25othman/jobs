@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AgentsModule } from '../agents/agents.module';
 import { EvidenceModule } from '../evidence/evidence.module';
 import { SkillProgressModule } from '../skill-progress/skill-progress.module';
+import { AssessmentModule } from '../assessment/assessment.module';
 import { Slice1Controller, PublicReportController } from './slice1.controller';
 import { CareerService } from './career.service';
 import { SubmissionService } from './submission.service';
@@ -14,7 +15,7 @@ import { WithdrawalService } from './withdrawal.service';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
 
 @Module({
-  imports: [AgentsModule, EvidenceModule, SkillProgressModule],
+  imports: [AgentsModule, EvidenceModule, SkillProgressModule, AssessmentModule],
   controllers: [Slice1Controller, PublicReportController],
   providers: [
     UserProvisioningService, CareerService, SubmissionService,

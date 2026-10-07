@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, type EvaluationResult, type SkillJourney, type SkillJourneyEngine } from '../../lib/api';
+import { api, type EvaluationResult, type SkillJourney, type SkillJourneyEngine, type Assessment } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { CompanionNudge } from '../../components/CompanionNudge';
@@ -13,6 +13,7 @@ function EvaluationInner() {
   const submissionId = params.get('submission');
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [journey, setJourney] = useState<{ items: SkillJourney[]; engine: SkillJourneyEngine } | null>(null);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -26,6 +27,9 @@ function EvaluationInner() {
         setResult(r);
         // Phase 2: the journey dimension, read after the evaluation committed. Shown beside the level, never merged with it.
         setJourney(await api<{ items: SkillJourney[]; engine: SkillJourneyEngine }>('/me/skill-progress', { token }));
+        // Phase 3: the structured assessment and the policy decision, read after the evaluation committed.
+        const a = await api<{ items: Assessment[] }>(`/submissions/${submissionId}/assessment`, { token });
+        setAssessment(a.items[a.items.length - 1] ?? null);
       } catch (e) {
         setError((e as Error).message);
       }
@@ -186,6 +190,36 @@ function EvaluationInner() {
           <a className="link" href="/project">ابدئي تسليمًا جديدًا</a>
         </section>
       )}
+
+      {assessment ? (
+        <section className="card">
+          <h2>ما لوحظ وما تقرّر</h2>
+          <div className="rows">
+            {assessment.criteria.map((cr) => (
+              <div key={cr.key} className="stack" style={{ gap: 4 }}>
+                <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                  <span className="grow term" lang="en" style={{ fontWeight: 500 }}>{cr.key}</span>
+                  <span className={`chip ${cr.status === 'met' ? 'chip--success' : cr.status === 'pending_human' ? 'chip--info' : 'chip--attention'}`}>
+                    {cr.status === 'met' ? 'مستوفى' : cr.status === 'partially_met' ? 'مستوفى جزئيًا' : cr.status === 'pending_human' ? 'بانتظار مراجع' : cr.status === 'not_applicable' ? 'لا ينطبق' : 'غير مستوفى'}
+                  </span>
+                </div>
+                {cr.evidenceUsed.length ? <span className="micro muted">الدليل المستخدم: <span className="term" lang="en">{cr.evidenceUsed.join(' · ')}</span></span> : null}
+                {cr.evidenceMissing.length ? <span className="micro muted">ما ينقص: <span className="term" lang="en">{cr.evidenceMissing.join(' · ')}</span></span> : null}
+                {cr.recommendedNextAction ? <span className="body-sm">الخطوة التالية: <span className="term" lang="en">{cr.recommendedNextAction}</span></span> : null}
+              </div>
+            ))}
+          </div>
+          {assessment.decisions.map((d) => (
+            <p key={d.id} className="body-sm">
+              قرار التحقق: <span className="term" lang="en">{d.decision}</span> · من <span className="term" lang="en">{d.previousState}</span> إلى <span className="term" lang="en">{d.resultingState}</span>
+              {' '}· السياسة <span className="term" lang="en">{d.policy.key}@{d.policy.version}</span> {d.policy.validated ? '' : '(DRAFT / NOT VALIDATED)'} · قرّرتها {d.decidedByKind === 'human' ? 'مراجِع مُسمّى' : 'السياسة'}، لا نموذج لغوي.
+            </p>
+          ))}
+          <p className="disclaimer">
+            ما لوحظ (التقييم) وما تقرّر (قرار التحقق) سجلّان منفصلان. القرار يذكر السياسة وإصدارها دائمًا، ولا يغيّر أهلية السيرة أو لينكدإن تلقائيًا.
+          </p>
+        </section>
+      ) : null}
 
       {journey && journey.items.length > 0 ? (
         <section className="card">

@@ -4,9 +4,11 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
+import { AssessmentRecorderService } from '../assessment/assessment-recorder.service';
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
-  assertEvaluationResultValid, decideVerification, verificationApplies, assertStateAvailableInProduction,
+  assertEvaluationResultValid, assertStateAvailableInProduction, skillsEvidencedByRun, evidenceOrdinal, DOMAIN_RULESET_VERSION,
+  type VerificationPolicy, type PolicyDecision,
   type PublishedRubric, type SubmissionArtifact, type IntegrityCheckSpec,
   type EvidenceState, type EvaluationRun,
   reestablishmentAllowed,
@@ -33,7 +35,7 @@ import {
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
 
-  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine) {}
+  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine, private readonly assessments: AssessmentRecorderService) {}
 
   async evaluateSubmission(userId: string, submissionId: string) {
     return this.db.asService(async (c) => {
@@ -135,6 +137,12 @@ export class EvaluationService {
         );
       }
 
+      // Phase 3: the structured assessment — what the evaluator observed — beside the result.
+      const assessment = await this.assessments.recordAssessment(c, {
+        evaluationResultId: resultId, evaluationId, submissionId, userId, evaluatorKind: 'rule',
+        evaluatorRef: `deterministic-evaluator@${DOMAIN_RULESET_VERSION}`, rubric, run, artifacts,
+      });
+
       const awaitingHuman = run.outcome === 'needs_human_review';
       await c.query(
         awaitingHuman
@@ -165,47 +173,16 @@ export class EvaluationService {
       let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
       let reestablishedEvidenceId: string | null = null;
 
-      if (run.proposedState && verificationApplies(run.outcome)) {
-        const decision = decideVerification({
-          evaluationOutcome: run.outcome,
-          proposedState: run.proposedState,
-          currentState,
-          // The deterministic path accepts what the rubric supports. A human
-          // reviewer can still downgrade later through the verification table.
-          outcome: 'accepted',
-          reason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
-        });
-
-        await c.query(
-          `insert into verification
-             (evaluation_result_id, user_id, outcome, proposed_state, resulting_state, reason)
-           values ($1,$2,$3,$4,$5,$6)`,
-          [resultId, userId, decision.outcome, run.proposedState, decision.resultingState, decision.reason],
-        );
-
-        if (decision.resultingState !== currentState) {
-          transition = await this.promote(c, {
-            userId,
-            skillId: primarySkillId,
-            from: currentState,
-            to: decision.resultingState,
-            evaluationResultId: resultId,
-            rubricVersion: run.rubricVersion,
-            projectId: s.project_id,
-            reason: decision.reason,
-          });
-        }
-      } else if (run.outcome === 'passed' && !run.proposedState
-                 && reestablishmentAllowed({ currentState, proposedState: rubric.proposesState,
-                      primaryEvidenceStanding: await this.primaryEvidenceStanding(c, userId, primarySkillId) })) {
-        // D-077: the claim is already at this state but its evidence was
-        // withdrawn; this pass earns the same state again. New evidence, no
-        // transition, no state change — the ladder stays forward-only.
-        reestablishedEvidenceId = await this.reestablish(c, {
-          userId, skillId: primarySkillId, state: currentState, evaluationResultId: resultId,
-          projectId: s.project_id, reason: run.reason,
-        });
-      }
+      // Phase 3: the decision comes from the named verification policy (the seeded
+      // draft equals the pre-Phase-3 rule exactly). The legacy `verification` row
+      // and the promotion are written exactly as before; the structured decision
+      // is recorded beside them with the policy and ruleset versions it used.
+      const outcome = await this.decideAndApply(c, {
+        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, evaluatorKind: 'rule',
+        resultId, userId, skillId: primarySkillId, claimedSkillIds: skillIds, currentState, run, rubric, projectId: s.project_id,
+        acceptedReason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
+      });
+      transition = outcome.transition; reestablishedEvidenceId = outcome.reestablishedEvidenceId;
 
       // Phase 1: the run is recorded in the evidence ledger and, when it produced an
       // evaluated fact, bridged to the material it was derived from. Additive only.
@@ -305,21 +282,20 @@ export class EvaluationService {
       await c.query(`update evaluation set state = 'completed', completed_at = now() where id = $1`, [evaluationId]);
       await emitAuditEvent(c, { eventType: 'evaluation.completed', userId: e.user_id, actorKind: 'system', subjectTable: 'evaluation_result', subjectId: resultId,
         reason: `${run.reason} (aggregated from deterministic results and ${decisions.rowCount} human decision(s))`, payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, supersedes: interim.rows[0].id } });
+      // Phase 3: the aggregate assessment (rule facts + human criterion decisions) beside the final result.
+      const assessment = await this.assessments.recordAssessment(c, {
+        evaluationResultId: resultId, evaluationId, submissionId: e.submission_id, userId: e.user_id, evaluatorKind: 'human',
+        evaluatorRef: `human-review:${evaluationId}`, rubric, run, artifacts: await this.loadArtifacts(c, e.submission_id),
+        humanDecisions: decisions.rows.map((d) => ({ criterionKey: d.criterion_key as string, score: Number(d.score), rationale: d.rationale as string })),
+      });
 
-      let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
-      let reestablishedEvidenceId: string | null = null;
-      if (run.proposedState && verificationApplies(run.outcome)) {
-        const decision = decideVerification({ evaluationOutcome: run.outcome, proposedState: run.proposedState, currentState, outcome: 'accepted',
-          reason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})` });
-        await c.query(`insert into verification (evaluation_result_id, user_id, outcome, proposed_state, resulting_state, reason) values ($1,$2,$3,$4,$5,$6)`,
-          [resultId, e.user_id, decision.outcome, run.proposedState, decision.resultingState, decision.reason]);
-        if (decision.resultingState !== currentState) {
-          transition = await this.promote(c, { userId: e.user_id, skillId: primarySkillId, from: currentState, to: decision.resultingState, evaluationResultId: resultId, rubricVersion: run.rubricVersion, projectId: e.project_id, reason: decision.reason });
-        }
-      } else if (run.outcome === 'passed' && !run.proposedState
-                 && reestablishmentAllowed({ currentState, proposedState: rubric.proposesState, primaryEvidenceStanding: await this.primaryEvidenceStanding(c, e.user_id, primarySkillId) })) {
-        reestablishedEvidenceId = await this.reestablish(c, { userId: e.user_id, skillId: primarySkillId, state: currentState, evaluationResultId: resultId, projectId: e.project_id, reason: run.reason });
-      }
+      const claimed = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1', [e.submission_id]);
+      const outcome = await this.decideAndApply(c, {
+        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, evaluatorKind: 'human',
+        resultId, userId: e.user_id, skillId: primarySkillId, claimedSkillIds: claimed.rows.map((r) => r.skill_id as string), currentState, run, rubric, projectId: e.project_id,
+        acceptedReason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
+      });
+      const transition = outcome.transition; const reestablishedEvidenceId = outcome.reestablishedEvidenceId;
       await this.ledger.recordEvaluation(c, {
         userId: e.user_id, submissionId: e.submission_id, projectId: e.project_id, activitySpecId: e.activity_spec_id, evaluationResultId: resultId,
         outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore,
@@ -331,6 +307,84 @@ export class EvaluationService {
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
         integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId, evaluatedAt: resultRow.rows[0].evaluated_at };
     });
+  }
+
+  /**
+   * Phase 3 — verification through the named policy, then the legacy writes
+   * exactly as before (verification row, promotion or re-establishment), then
+   * the structured decision. Per-skill derivation (H6) runs only when the
+   * policy enables it; the seeded draft does not.
+   */
+  private async decideAndApply(c: PoolClient, p: {
+    policyKey: string; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
+    resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; currentState: EvidenceState;
+    run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string;
+  }): Promise<{ transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null; reestablishedEvidenceId: string | null; policy: VerificationPolicy }> {
+    const policy = await this.assessments.loadPolicy(c, p.policyKey);
+    const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, p.skillId]);
+    const pd = this.assessments.decide(policy, {
+      evaluationOutcome: p.run.outcome, proposedState: p.run.proposedState, currentState: p.currentState, assessmentEvaluatorKind: p.evaluatorKind,
+      assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n), reason: p.acceptedReason,
+    });
+    let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
+    let reestablishedEvidenceId: string | null = null;
+    let verificationId: string | null = null;
+    let record: Parameters<AssessmentRecorderService['recordDecision']>[1]['decision'] = pd;
+
+    if (pd.legacyOutcome) {
+      // Unchanged legacy write: at most one verification per result.
+      const v = await c.query(
+        `insert into verification (evaluation_result_id, user_id, outcome, proposed_state, resulting_state, reason)
+         values ($1,$2,$3,$4,$5,$6) returning id`,
+        [p.resultId, p.userId, pd.legacyOutcome, p.run.proposedState, pd.resultingState, pd.reason]);
+      verificationId = v.rows[0].id;
+      if (pd.resultingState !== p.currentState) {
+        transition = await this.promote(c, { userId: p.userId, skillId: p.skillId, from: p.currentState, to: pd.resultingState,
+          evaluationResultId: p.resultId, rubricVersion: p.run.rubricVersion, projectId: p.projectId, reason: pd.reason });
+      }
+    } else if (p.run.outcome === 'passed' && !p.run.proposedState
+               && reestablishmentAllowed({ currentState: p.currentState, proposedState: p.rubric.proposesState,
+                    primaryEvidenceStanding: await this.primaryEvidenceStanding(c, p.userId, p.skillId) })) {
+      // D-077: the claim is already at this state but its evidence was withdrawn;
+      // this pass earns the same state again. New evidence, no transition.
+      reestablishedEvidenceId = await this.reestablish(c, { userId: p.userId, skillId: p.skillId, state: p.currentState,
+        evaluationResultId: p.resultId, projectId: p.projectId, reason: p.run.reason });
+      record = { decision: 'evidence_reestablished', previousState: p.currentState, proposedState: null, resultingState: p.currentState, reason: p.run.reason };
+    }
+    await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId: p.skillId, policy,
+      decision: record, confidence: p.assessmentConfidence, verificationId, evidenceId: transition?.evidenceId ?? reestablishedEvidenceId });
+
+    // H6 — per-skill evidence derivation from criteria. Behind the policy flag; the draft default keeps it off.
+    if (policy.perSkillEvidenceDerivation && pd.legacyOutcome === 'accepted' && p.run.proposedState) {
+      await this.deriveEvidencePerSkill(c, { ...p, policy, proposedState: p.run.proposedState });
+    }
+    return { transition, reestablishedEvidenceId, policy };
+  }
+
+  /** H6 (policy-gated): every OTHER claimed skill whose skill_evidence criteria were all met earns the same decision. */
+  private async deriveEvidencePerSkill(c: PoolClient, p: {
+    policy: VerificationPolicy; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
+    resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string; proposedState: EvidenceState;
+  }): Promise<void> {
+    const evidenced = skillsEvidencedByRun(p.rubric, p.run);
+    for (const skillId of new Set(p.claimedSkillIds)) {
+      if (skillId === p.skillId || !evidenced.includes(skillId)) continue;
+      const current = await this.currentClaimState(c, p.userId, skillId);
+      if (evidenceOrdinal(p.proposedState) <= evidenceOrdinal(current)) continue;
+      const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, skillId]);
+      const pd: PolicyDecision = this.assessments.decide(p.policy, {
+        evaluationOutcome: p.run.outcome, proposedState: p.proposedState, currentState: current, assessmentEvaluatorKind: p.evaluatorKind,
+        assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n),
+        reason: `${p.acceptedReason}; per-skill derivation (policy ${p.policy.key}@${p.policy.version}): every skill_evidence criterion of this skill was met`,
+      });
+      let evidenceId: string | null = null;
+      if (pd.legacyOutcome === 'accepted' && pd.resultingState !== current) {
+        evidenceId = (await this.promote(c, { userId: p.userId, skillId, from: current, to: pd.resultingState, evaluationResultId: p.resultId,
+          rubricVersion: p.run.rubricVersion, projectId: p.projectId, reason: pd.reason })).evidenceId;
+      }
+      await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId, policy: p.policy,
+        decision: pd, confidence: p.assessmentConfidence, verificationId: null, evidenceId });
+    }
   }
 
   /**

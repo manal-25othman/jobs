@@ -147,6 +147,19 @@ export interface EvidenceItem {
   claimEffect: 'none';
 }
 
+/* ─────────────────────── structured assessment (Phase 3) ─────────────────── */
+
+/** What an evaluator observed. Never a verdict; the verdict is in `decisions`. */
+export interface Assessment {
+  id: string; evaluationResultId: string; evaluatorKind: 'rule' | 'human' | 'llm'; evaluatorRef: string;
+  versions: { rubric: string | null; activitySpec: string | null; domainRuleset: string; contextPolicy: string | null };
+  inputsUsed: Record<string, unknown>; outcome: string; totalScore: number; maxScore: number; confidence: number | null; createdAt: string;
+  criteria: { key: string; kind: string; skillId: string | null; status: 'met' | 'partially_met' | 'not_met' | 'pending_human' | 'not_applicable'; score: number; maxScore: number;
+    evidenceUsed: string[]; evidenceMissing: string[]; observations: string; strengths: string[]; gaps: string[]; confidence: number | null; evaluatorKind: string; reason: string; recommendedNextAction: string | null }[];
+  decisions: { id: string; skillId: string; policy: { key: string; version: number; status: string; validated: boolean }; domainRulesetVersion: string; decidedByKind: 'policy' | 'human'; decidedByRef: string | null;
+    decision: string; previousState: string; proposedState: string | null; resultingState: string; confidence: number | null; reason: string; verificationId: string | null; evidenceId: string | null; humanOverrideOf: string | null; decidedAt: string }[];
+}
+
 /* ─────────────────────────── uploads (signed only) ─────────────────────── */
 
 export interface UploadIntent {

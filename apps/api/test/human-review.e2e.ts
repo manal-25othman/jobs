@@ -179,6 +179,10 @@ describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability,
     assert.equal(fin.outcome, 'passed'); assert.equal(fin.transition?.to, 'demonstrated', '14 — an approved review contributed to Demonstrated');
     const results = await pool.query('select outcome, supersedes_result_id from evaluation_result where evaluation_id = $1 order by evaluated_at', [ev.evaluationId]);
     assert.deepEqual(results.rows.map((x) => x.outcome), ['needs_human_review', 'passed']); assert.ok(results.rows[1].supersedes_result_id, 'the interim result is kept and superseded, never rewritten');
+    // Phase 3: the interim run has a rule assessment with a not_applicable decision; the final run has a human (aggregate) assessment decided by the draft policy.
+    const asm = await pool.query(`select a.evaluator_kind, a.outcome, d.decision, d.policy_key, d.policy_version, d.policy_status, d.decided_by_kind from assessment a join verification_decision d on d.assessment_id = a.id where a.evaluation_id = $1 order by a.created_at`, [ev.evaluationId]);
+    assert.deepEqual(asm.rows.map((x) => [x.evaluator_kind, x.outcome, x.decision, x.decided_by_kind]), [['rule', 'needs_human_review', 'not_applicable', 'policy'], ['human', 'passed', 'accepted', 'policy']]);
+    assert.deepEqual([asm.rows[1].policy_key, Number(asm.rows[1].policy_version), asm.rows[1].policy_status], ['default', 1, 'draft']);
     const scores = await pool.query('select criterion_key, score from evaluation_criterion_score where evaluation_result_id = (select id from evaluation_result where evaluation_id = $1 and outcome = $2) order by criterion_key', [ev.evaluationId, 'passed']);
     assert.equal(scores.rowCount, 8); assert.equal(Number(scores.rows.find((s) => s.criterion_key === 'explanation_clarity')!.score), 2, 'the superseding re-review (solid) counted, not the first decision (partial)');
     // 11 — reproducible: the recorded decisions imply exactly this total.
