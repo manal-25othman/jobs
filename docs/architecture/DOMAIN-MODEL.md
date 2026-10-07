@@ -323,8 +323,24 @@
 | **ما لا يفعله** | لا يغيّر أهلية CV/LinkedIn (`career_presentation_rule`/`presentationFor` كما هما — Phase 7) · لا يمسّ `evaluation_result` ولا `verification` ولا `evidence_transition`. |
 
 ---
+## ١٣ج. `Track Configuration` وطبقة السياسات — الإعداد كبيانات مُصدَّرة *(Phase 4 — Configurable Track Architecture)*
 
+> كل صف إعداد محكوم يحمل بُعدين مستقلين: **`review_status`** (المصادقة الخبيرة) و**`activation`** (هل يستعمله المنتج): `inactive` (الافتراضي لكل صف جديد؛ لا يُستشار) · `development_only` (خارج الإنتاج فقط) · **`legacy_baseline`** (السلوك الذي كان قائمًا قبل الطبقة؛ يعمل في الإنتاج **لهذا السبب وحده لا لأنه مُصادَق عليه**؛ لا يُنشئه إلا migration — `baseline_of` مجمَّد عند الإدراج) · `production_active` (ترقية صريحة مُدقَّقة لصف **مُصادَق عليه**). صف نشط واحد لكل مفتاح؛ صف جديد لا يحلّ محل نشط بالصدفة.
 
+| | |
+|---|---|
+| **`Track Configuration Version`** | الإعداد المُجمَّع لمسار: أي إصدار من سياسة التحقق وسياسة السياق وسياسة الادعاء وسياسة التحدي، وإصدار قواعد الرحلة، **ولقطة** حقول TrackSkill وقت الإنشاء. `v1 legacy_baseline` للمسارات التي سبقت الهجرة؛ المسار المستورد لاحقًا يأخذ `v1 draft` (`development_only` خارج الإنتاج، `inactive` فيه). **المحتوى ثابت منذ أول تفعيل؛ التغيير إصدار جديد.** لا قاعدة جاهزية بعد (قيد يمنع ربطها حتى Phase 5). |
+| **`Assessment Context Policy`** | لكل نوع مدخل: `required` · `optional` · `excluded` (أدوات التسليم · المادة · الإفصاح · المحاولات السابقة · قرارات المراجعين · **الهوية والملف الشخصي مستبعدان بقيد قاعدة وبالكود معًا**). `default@1 legacy_baseline` = ما كان المُقيِّم يراه قبل الطبقة. كل `assessment` جديد يسجّل `context_policy_version` و`context_policy_id`. |
+| **`Claim Policy`** | لكل نوع ادعاء (CV bullet · LinkedIn skill/project/headline/about · summary · case study · profile · report): المستوى الأدنى · عدد الأدلة · قوة المصدر · هل يلزم قرار تحقق · **`requires_user_approval = true` بقيد لا يُعطَّل** (BR-021). **مُسجَّلة لا مُستهلَكة:** `presentationFor()`/`career_presentation_rule` يقرّران الأهلية حتى Phase 7 (H4). كلها `draft` `inactive`. |
+| **`Challenge Policy` + `Verification Challenge Type`** | سجل أنواع التحدي (سؤال استيضاح · شرح · تعديل لاحق · قراءة كود · عرض حي) **معطَّل غير مُصادَق**؛ سياسة `default@1` `draft` `inactive` بقاعدة تشغيل `{}` = لا تحدٍّ. **لا مُشغِّل تحدٍّ في المنتج** (`CHALLENGE_RUNNER_EXISTS = false`). |
+| **TrackSkill** (`role_requirement`) | حقول عرض/إعداد: `category` · `display_order` · `expected_level` · `readiness_contribution` (`null` = غير محسوم؛ لا عتبة) · `enabled` · **`classification_status`** (`pending_expert_validation` افتراضيًا؛ `approved` يشترط مراجعًا). **`is_core` لا يُعرض «أساسية» قبل الاعتماد** (`trackSkillBadge`). |
+| **`Config Change`** | سجل إضافة فقط لكل تغيير تفعيل/حالة مصادقة، بفاعل وسبب إلزاميين؛ القاعدة ترفض التغيير بلا `naqla.config_actor`/`naqla.config_reason`. الأفعال: `config-approve` · `config-activate` · `config-new-version` (CLI؛ واجهة الإدارة Phase 8). |
+| **الثوابت في الكود** | `resolveActiveConfig`: الإنتاج يستشير `production_active` ثم `legacy_baseline` **ولا يستشير مسودة أبدًا**؛ `production_active` غير المُصادَق عليه ⇒ خطأ ثابت لا استعمال · `assertActivationAllowed` · الهوية مستبعدة · موافقة المستخدم على الادعاء لا تُعطَّل · لا قاعدة جاهزية (`READINESS_RULES_EXIST = false`). |
+| **التاريخ** | `assessment` و`verification_decision` يسجّلان `track_config_version_id` و`context_policy_id` و`config_resolution`؛ الصفوف السابقة `null` = ما قبل 0014 وتبقى كما هي (ثابتة). **لا تعديل إعداد يُعيد حساب نتيجة تاريخية.** |
+
+---
+
+## ١٤. `Evaluation Criterion` — بند التقييم
 
 | | |
 |---|---|
