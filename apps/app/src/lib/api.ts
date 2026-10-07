@@ -111,6 +111,29 @@ export interface EvidenceReport {
   scopeNote: string;
 }
 
+/* ─────────────────────────── evidence ledger (Phase 1) ─────────────────── */
+
+/** A registry row. `validated` is false for every seeded type: DRAFT / NOT VALIDATED. */
+export interface EvidenceType {
+  code: string; labelAr: string; labelEn: string; descriptionEn: string;
+  channel: 'url' | 'file' | 'text' | 'activity' | 'system';
+  userAddable: boolean; reviewStatus: string; validated: boolean; validationNote: string;
+}
+
+/** Material the user or the system put forward. `claimEffect` is always 'none': an item never moves a claim. */
+export interface EvidenceItem {
+  id: string; typeCode: string; typeLabelAr: string; typeLabelEn: string; channel: EvidenceType['channel'];
+  typeReviewStatus: string; source: 'user_direct' | 'user_submission' | 'system';
+  title: string; description: string | null; url: string | null; uploadId: string | null; artifactKey: string | null;
+  projectId: string | null; submissionId: string | null; evaluationResultId: string | null; parentItemId: string | null;
+  status: 'draft' | 'submitted' | 'withdrawn' | 'superseded'; submittedAt: string | null; attemptNumber: number;
+  supersedesItemId: string | null; withdrawnAt: string | null; withdrawnReason: string | null;
+  metadata: Record<string, unknown>; createdAt: string;
+  skills: { skillId: string; role: string; linkedBy: 'user' | 'system'; labelAr: string; labelEn: string }[];
+  derivations: { evidenceId: string; kind: 'evaluated_from' | 'recorded_as' }[];
+  claimEffect: 'none';
+}
+
 /* ─────────────────────────── uploads (signed only) ─────────────────────── */
 
 export interface UploadIntent {

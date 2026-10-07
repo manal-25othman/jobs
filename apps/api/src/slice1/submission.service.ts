@@ -3,6 +3,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { assertModeRespected, assertExternalUrlValid, type AiUsageMode } from '@naqla/domain';
 import { UploadService } from './upload.service';
+import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 
 export interface SubmissionArtifactInput {
   key: string;
@@ -22,7 +23,7 @@ export interface SubmissionArtifactInput {
  */
 @Injectable()
 export class SubmissionService {
-  constructor(private readonly db: DbService, private readonly uploads: UploadService) {}
+  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService) {}
 
   async createSubmission(userId: string, projectId: string, input: {
     skillIds: string[];
@@ -50,7 +51,7 @@ export class SubmissionService {
 
     return this.db.asService(async (c) => {
       const project = await c.query(
-        `select p.id, p.user_id, p.activity_spec_id, s.ai_usage_mode
+        `select p.id, p.user_id, p.activity_spec_id, p.title, s.ai_usage_mode
            from project p
            left join activity_spec s on s.id = p.activity_spec_id
           where p.id = $1 and p.deleted_at is null`,
@@ -86,13 +87,17 @@ export class SubmissionService {
         );
       }
 
+      // The artifact key is what the rubric checks. It comes from the activity's
+      // declared deliverables (format 'source file', by position). The demo
+      // convention (file 0 = component, file 1 = test) remains the named fallback
+      // for an activity that declares none, so existing behaviour is unchanged.
+      const deliverables = await this.ledger.loadDeliverables(c, project.rows[0].activity_spec_id);
+      const fileKeys = this.ledger.fileArtifactKeys(deliverables, input.uploadIds?.length ?? 0, (input.artifacts ?? []).map((a) => a.key));
+      const ledgerFiles: { uploadId: string; key: string; declaredName: string; contentType: string | null }[] = [];
       let fileIndex = 0;
       for (const uploadId of input.uploadIds ?? []) {
         const up = await this.uploads.assertOwnedConfirmed(c, userId, uploadId);
-        // The artifact key is what the rubric checks. The first file is the
-        // component, the second the test — a convention of the demo rubric,
-        // recorded as the locator so a reviewer sees which file was which.
-        const key = fileIndex === 0 ? 'file.component' : fileIndex === 1 ? 'file.test' : `file.extra_${fileIndex}`;
+        const { key } = fileKeys[fileIndex]!;
         fileIndex++;
         await c.query(
           `insert into submission_artifact
@@ -100,14 +105,19 @@ export class SubmissionService {
            values ($1,$2,$3,'file',$4,$5,$6)`,
           [submissionId, userId, key, up.declared_name, up.declared_name, up.id],
         );
+        const ct = await c.query('select content_type from upload where id = $1', [up.id]);
+        ledgerFiles.push({ uploadId: up.id, key, declaredName: up.declared_name, contentType: ct.rows[0]?.content_type ?? null });
       }
+      const ledgerLinks: { key: string; url: string }[] = [];
       let linkIndex = 0;
       for (const url of input.externalUrls ?? []) {
+        const key = linkIndex === 0 ? 'link.repository' : `link.extra_${linkIndex}`;
         await c.query(
           `insert into submission_artifact (submission_id, user_id, key, kind, value_text, locator)
            values ($1,$2,$3,'link',$4,$5)`,
-          [submissionId, userId, linkIndex === 0 ? 'link.repository' : `link.extra_${linkIndex}`, url, url],
+          [submissionId, userId, key, url, url],
         );
+        ledgerLinks.push({ key, url });
         linkIndex++;
       }
 
@@ -134,6 +144,16 @@ export class SubmissionService {
       for (const skillId of input.skillIds) {
         await this.ensurePracticedClaim(c, userId, skillId, projectId, submissionId);
       }
+
+      // Phase 1: the submission is also recorded in the evidence ledger (typed
+      // items, skill links, attempt number). The ledger moves no claim.
+      await this.ledger.recordSubmission(c, {
+        userId, submissionId, projectId, projectTitle: project.rows[0].title, activitySpecId: project.rows[0].activity_spec_id,
+        skillIds: input.skillIds, files: ledgerFiles, links: ledgerLinks,
+        texts: (input.artifacts ?? []).filter((a) => a.kind === 'text' && (a.valueText ?? '').trim().length > 0)
+          .map((a) => ({ key: a.key, text: a.valueText as string, locator: a.locator ?? null })),
+        disclosure: { mode, declaredUse: input.aiDisclosure.declaredUse },
+      });
 
       await emitAuditEvent(c, {
         eventType: 'submission.created',

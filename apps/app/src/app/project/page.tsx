@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, uploadEvidenceFile, type Project } from '../../lib/api';
+import { api, uploadEvidenceFile, type Project, type EvidenceItem } from '../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { deliverableProgress } from '@naqla/domain';
@@ -21,6 +21,7 @@ const DELIVERABLES = [
 export default function ProjectPage() {
   const { token, loading } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
   const [title, setTitle] = useState('متتبّع عادات');
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [componentFile, setComponentFile] = useState<File | null>(null);
@@ -36,6 +37,10 @@ export default function ProjectPage() {
     if (!token) return;
     void api<{ items: Project[] }>('/projects', { token })
       .then((p) => setProjects(p.items))
+      .catch((e) => setError((e as Error).message));
+    // Phase 1: what the ledger holds for this user. Material, not proof.
+    void api<{ items: EvidenceItem[] }>('/me/evidence', { token })
+      .then((r) => setEvidenceItems(r.items))
       .catch((e) => setError((e as Error).message));
   }, [token]);
 
@@ -180,6 +185,29 @@ export default function ProjectPage() {
           </button>
         </div>
       </div>
+
+      {evidenceItems.length > 0 ? (
+        <section className="card">
+          <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <h2>الأدلة المسجّلة</h2>
+            <span className="chip push"><span className="num">{evidenceItems.length}</span> عنصر</span>
+          </div>
+          <div className="rows">
+            {evidenceItems.filter((i) => i.parentItemId === null).map((i) => (
+              <div key={i.id} className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <span className="grow body-sm">{i.title}</span>
+                <span className="chip">{i.typeLabelAr}</span>
+                {i.attemptNumber > 1 ? <span className="chip chip--info">محاولة <span className="num">{i.attemptNumber}</span></span> : null}
+                <span className="chip">{i.status === 'submitted' ? 'مُسجَّل' : i.status === 'superseded' ? 'استُبدل' : i.status === 'withdrawn' ? 'مسحوب' : 'مسودة'}</span>
+              </div>
+            ))}
+          </div>
+          <p className="disclaimer">
+            هذه مادة مسجّلة، لا إثبات: لا يغيّر أي عنصر هنا حالة مهارة قبل التقييم.
+            وأنواع الأدلة قيد التحقق من الخبراء (DRAFT / NOT VALIDATED).
+          </p>
+        </section>
+      ) : null}
 
       {projects.length > 0 ? (
         <section className="card">

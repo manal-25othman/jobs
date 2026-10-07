@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
+import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
   assertEvaluationResultValid, decideVerification, verificationApplies, assertStateAvailableInProduction,
@@ -31,7 +32,7 @@ import {
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
 
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService) {}
 
   async evaluateSubmission(userId: string, submissionId: string) {
     return this.db.asService(async (c) => {
@@ -205,6 +206,14 @@ export class EvaluationService {
         });
       }
 
+      // Phase 1: the run is recorded in the evidence ledger and, when it produced an
+      // evaluated fact, bridged to the material it was derived from. Additive only.
+      await this.ledger.recordEvaluation(c, {
+        userId, submissionId, projectId: s.project_id, activitySpecId: s.activity_spec_id, evaluationResultId: resultId,
+        outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore,
+        evidenceId: transition?.evidenceId ?? reestablishedEvidenceId, skillId: primarySkillId,
+      });
+
       return {
         evaluationId,
         resultId,
@@ -304,6 +313,11 @@ export class EvaluationService {
                  && reestablishmentAllowed({ currentState, proposedState: rubric.proposesState, primaryEvidenceStanding: await this.primaryEvidenceStanding(c, e.user_id, primarySkillId) })) {
         reestablishedEvidenceId = await this.reestablish(c, { userId: e.user_id, skillId: primarySkillId, state: currentState, evaluationResultId: resultId, projectId: e.project_id, reason: run.reason });
       }
+      await this.ledger.recordEvaluation(c, {
+        userId: e.user_id, submissionId: e.submission_id, projectId: e.project_id, activitySpecId: e.activity_spec_id, evaluationResultId: resultId,
+        outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore,
+        evidenceId: transition?.evidenceId ?? reestablishedEvidenceId, skillId: primarySkillId,
+      });
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
         integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId, evaluatedAt: resultRow.rows[0].evaluated_at };
     });
