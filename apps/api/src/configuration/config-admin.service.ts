@@ -43,7 +43,7 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
   if (cur.rowCount === 0) throw new NotFoundException(`${p.table} ${p.id} not found`);
   const g = governedFromRow(cur.rows[0]);
   assertActivationAllowed({ from: g.activation, to: p.activation, reviewStatus: g.reviewStatus, approvedBy: g.approvedBy, baselineOf: g.baselineOf, production: isProduction() });
-  const scope = p.table === 'track_config_version' ? 'target_role_id' : p.table === 'claim_policy' ? 'key, claim_kind' : 'key';
+  const scope = p.table === 'track_config_version' ? 'target_role_id' : p.table === 'claim_policy' ? 'key, claim_kind' : p.table === 'readiness_rule_set' ? "coalesce(target_role_id, '00000000-0000-0000-0000-000000000000'::uuid), key" : 'key';
   if (p.activation !== 'inactive') {
     const clash = await c.query(`select id, version, activation from ${p.table} where (${scope}) = (select ${scope} from ${p.table} where id = $1) and id <> $1 and activation <> 'inactive'`, [p.id]);
     if (clash.rowCount) throw new BadRequestException(`${p.table} already has an active row (${clash.rows[0].activation} v${clash.rows[0].version}); deactivate it explicitly first — a new row never replaces an active one by accident`);
@@ -69,6 +69,28 @@ export async function createTrackConfigVersion(c: PoolClient, p: { targetRoleId:
      values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce((select max(version) from skill_progress_transition), 1), track_skill_config_snapshot($1), $9, $10) returning id, version`,
     [p.targetRoleId, Number(next.rows[0].v), p.label, p.packVersion, vpId.rows[0].id, cxId.rows[0].id, p.claimPolicyRef, chId, p.notes, p.createdBy]);
   return { id: r.rows[0].id as string, version: Number(r.rows[0].version) };
+}
+
+/** A new DRAFT readiness rule set (inactive). Rule types are code constants; every value here is configuration. */
+export async function createReadinessRuleSet(c: PoolClient, p: { key: string; targetRoleId: string | null; labelAr: string; labelEn: string; description: string; createdBy: string;
+  rules: { type: string; params: Record<string, unknown>; skillId?: string | null; labelAr: string; labelEn: string }[] }) {
+  const { assertReadinessRuleSetSane, readinessRuleFromRow } = await import('@naqla/domain');
+  const next = await c.query('select coalesce(max(version), 0) + 1 as v from readiness_rule_set where key = $1', [p.key]);
+  const set = await c.query(
+    `insert into readiness_rule_set (key, version, target_role_id, label_ar, label_en, description_en, created_by) values ($1,$2,$3,$4,$5,$6,$7) returning id, version`,
+    [p.key, Number(next.rows[0].v), p.targetRoleId, p.labelAr, p.labelEn, p.description, p.createdBy]);
+  const rules = [];
+  let pos = 0;
+  for (const r of p.rules) {
+    const row = await c.query(`insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en, position) values ($1,$2,$3,$4,$5,$6,$7) returning id, rule_type, params, skill_id, label_ar, label_en, enabled, position`,
+      [set.rows[0].id, r.type, JSON.stringify(r.params), r.skillId ?? null, r.labelAr, r.labelEn, pos++]);
+    rules.push(readinessRuleFromRow(row.rows[0]));
+  }
+  assertReadinessRuleSetSane({ id: set.rows[0].id, key: p.key, version: Number(set.rows[0].version), reviewStatus: 'draft', activation: 'inactive', baselineOf: null, approvedBy: null, targetRoleId: p.targetRoleId, labelAr: p.labelAr, labelEn: p.labelEn, rules });
+  return { id: set.rows[0].id as string, version: Number(set.rows[0].version), rules: rules.length };
+}
+export async function cliCreateReadinessSet(pool: Pool, p: Parameters<typeof createReadinessRuleSet>[1]) {
+  const c = await pool.connect(); try { await c.query('begin'); const r = await createReadinessRuleSet(c, p); await c.query('commit'); return r; } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
 }
 
 /** Pool-based wrappers for the CLI (no Nest). */

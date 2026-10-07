@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { resolveActiveConfig, configIsValidated, trackSkillBadge, trackSkillConfigFromSnapshot, type GovernedConfig, type ConfigActivation } from '@naqla/domain';
 
-export const GOVERNED_TABLES = ['verification_policy', 'assessment_context_policy', 'claim_policy', 'challenge_policy', 'track_config_version'] as const;
+export const GOVERNED_TABLES = ['verification_policy', 'assessment_context_policy', 'claim_policy', 'challenge_policy', 'track_config_version', 'readiness_rule_set'] as const;
 export type GovernedTable = (typeof GOVERNED_TABLES)[number];
 
 export function isProduction(): boolean { return process.env['NODE_ENV'] === 'production'; }

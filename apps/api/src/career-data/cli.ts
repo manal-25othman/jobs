@@ -8,6 +8,7 @@
  *   config-approve <table> <id> --by <uuid> --label <name> --reason "<why>"            Phase 4: validate a configuration row (never a legacy baseline in place)
  *   config-activate <table> <id> --activation <inactive|development_only|production_active> --by <name> --reason "<why>"   audited; production_active needs an approved row; an active row is never replaced by accident
  *   config-new-version <role-uuid> --label <l> --verification key@v --context key@v --claim key@v [--challenge key@v] [--pack v] --by <name>   next DRAFT track configuration version (inactive)
+ *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
 import { Pool } from 'pg';
 import { writeFileSync } from 'node:fs';
@@ -18,7 +19,8 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
-import { cliApprove, cliActivate, cliCreateTrackVersion } from '../configuration/config-admin.service';
+import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet } from '../configuration/config-admin.service';
+import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
 
@@ -97,12 +99,18 @@ export async function main(argv: string[], root: string): Promise<number> {
       const r = await cliActivate(pool, { table: a1!, id: a2!, activation, actor: by, reason });
       console.log(`${a1} ${r.key}@${r.version}: activation ${r.activation} (recorded in config_change)`); return 0;
     }
+    if (cmd === 'readiness-new-set') {
+      const file = arg(argv, '--rules'); if (!file) { console.error('readiness-new-set needs --rules <file.json>'); return 2; }
+      const rules = JSON.parse(readFileSync(file, 'utf8')) as Parameters<typeof cliCreateReadinessSet>[1]['rules'];
+      const r = await cliCreateReadinessSet(pool, { key: a1!, targetRoleId: arg(argv, '--role') ?? null, labelAr: arg(argv, '--label-ar') ?? a1!, labelEn: arg(argv, '--label-en') ?? a1!, description: arg(argv, '--description') ?? 'DRAFT / NOT VALIDATED', createdBy: arg(argv, '--by') ?? 'unknown', rules });
+      console.log(`readiness_rule_set ${r.id}: ${a1}@${r.version} created as an inactive DRAFT with ${r.rules} rule(s)`); return 0;
+    }
     if (cmd === 'config-new-version') {
       const r = await cliCreateTrackVersion(pool, { targetRoleId: a1!, label: arg(argv, '--label') ?? 'draft', verificationPolicy: arg(argv, '--verification') ?? 'default@1', assessmentContextPolicy: arg(argv, '--context') ?? 'default@1',
         claimPolicyRef: arg(argv, '--claim') ?? 'default@1', challengePolicy: arg(argv, '--challenge') ?? null, packVersion: arg(argv, '--pack') ?? null, notes: arg(argv, '--notes') ?? null, createdBy: arg(argv, '--by') ?? 'unknown' });
       console.log(`track_config_version ${r.id}: v${r.version} created as an inactive DRAFT`); return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version> …'); return 2;
+    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version|readiness-new-set> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

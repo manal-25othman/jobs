@@ -187,3 +187,35 @@ export async function uploadEvidenceFile(file: File, token: string): Promise<str
 export async function revokeShareLink(id: string, token: string): Promise<void> {
   await api(`/share-links/${id}`, { method: 'DELETE', token });
 }
+
+/* ───────────────────────── readiness + skill pages (Phase 5) ───────────────────────── */
+
+export type ReadinessStatus = 'not_yet_configured' | 'pending_validation' | 'evaluated';
+export interface ReadinessReport {
+  status: ReadinessStatus; headlineAr: string;
+  ruleSet: { id: string; key: string; version: number; reviewStatus: string; validated: boolean; resolution: string } | null;
+  rules: { ruleId: string; type: string; labelAr: string; labelEn: string; outcome: 'satisfied' | 'not_satisfied' | 'indeterminate'; detailEn: string; nonCompensable: boolean; skillIds: string[] }[];
+  summary: { satisfied: number; notSatisfied: number; indeterminate: number; total: number };
+  overall: 'meets_rule_set' | 'does_not_meet_rule_set' | null;
+  verificationEffect: 'none';
+}
+/** One TrackSkill with its four separate dimensions. */
+export interface TrackSkillView {
+  skillId: string; labelAr: string; labelEn: string;
+  progress: { state: string; labelAr: string; labelEn: string } | null;
+  verification: { level: SkillClaim['state']; stateReason: string | null; hasClaim: boolean };
+  evidence: { standingEvaluatedCount: number; submittedMaterialCount: number };
+  readiness: { configured: boolean; rulesNamingSkill: { ruleId: string; labelAr: string; outcome: string; nonCompensable: boolean }[]; expectedLevel: string | null;
+    expectedLevelStatus: 'pending_expert_validation' | 'approved' | 'undecided'; readinessContribution: 'counts' | 'informational' | 'undecided';
+    badge: 'core' | 'supporting' | 'pending_expert_validation' | 'disabled'; classificationStatus: string; category: string | null; displayOrder: number | null; enabled: boolean };
+  verificationEffectOfReadiness: 'none';
+}
+export interface TrackSkillsPage { role: { id: string; labelAr: string; labelEn: string } | null; items: TrackSkillView[]; readiness: ReadinessReport }
+export interface TrackSkillDetail {
+  role: TrackSkillsPage['role']; skill: TrackSkillView; readinessStatus: ReadinessStatus; readinessHeadlineAr: string; ruleSetValidated: boolean;
+  materials: { id: string; typeCode: string; typeLabelAr: string; title: string; status: string; attemptNumber: number; submittedAt: string | null; source: string }[];
+  evaluatedEvidence: { id: string; sourceStrength: string; evaluationResultId: string | null; projectId: string | null; createdAt: string; withdrawnAt: string | null }[];
+  decisions: { id: string; decision: string; previousState: string; proposedState: string | null; resultingState: string; policy: string; policyStatus: string; policyResolution: string | null; trackConfigVersionId: string | null; decidedAt: string }[];
+  journeyEvents: { trigger: string; from: string; to: string | null; applied: boolean; outcome: string; reason: string; at: string }[];
+  activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];
+}

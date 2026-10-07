@@ -246,7 +246,7 @@ function EvaluationInner() {
       ) : null}
 
       <CompanionNudge token={token} />
-      <p className="body-sm"><a className="link" href="/proposals">اقتراحات الرفيق المهني ←</a></p>
+      <p className="body-sm"><a className="link" href="/proposals">اقتراحات الرفيق المهني ←</a> · <a className="link" href="/skills">مهارات المسار ←</a></p>
       <p className="disclaimer">
         هذا التقييم حتمي بالكامل: نفس المدخلات تعطي نفس النتيجة، ولم يُستدعَ أي نموذج لغوي.
       </p>
