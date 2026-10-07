@@ -212,11 +212,15 @@ function EvaluationInner() {
           {assessment.decisions.map((d) => (
             <p key={d.id} className="body-sm">
               قرار التحقق: <span className="term" lang="en">{d.decision}</span> · من <span className="term" lang="en">{d.previousState}</span> إلى <span className="term" lang="en">{d.resultingState}</span>
-              {' '}· السياسة <span className="term" lang="en">{d.policy.key}@{d.policy.version}</span> {d.policy.validated ? '' : '(DRAFT / NOT VALIDATED)'} · قرّرتها {d.decidedByKind === 'human' ? 'مراجِع مُسمّى' : 'السياسة'}، لا نموذج لغوي.
+              {' '}· السياسة <span className="term" lang="en">{d.policy.key}@{d.policy.version}</span> {d.policy.resolution === 'legacy_baseline' ? '(LEGACY BASELINE — غير مُصادَق عليها من الخبراء)' : d.policy.validated ? '' : '(DRAFT / NOT VALIDATED)'} · قرّرتها {d.decidedByKind === 'human' ? 'مراجِع مُسمّى' : 'السياسة'}، لا نموذج لغوي.
             </p>
           ))}
+          <p className="micro muted">
+            إعداد المسار: {assessment.versions.trackConfigVersion !== null ? <>الإصدار <span className="num">{assessment.versions.trackConfigVersion}</span> ({assessment.versions.configResolution})</> : 'لا إعداد مفعَّل مُسجَّل'}
+            {' '}· سياسة السياق <span className="term" lang="en">{assessment.versions.contextPolicy ?? '—'}</span> · الهوية مستبعدة من مدخلات التقييم.
+          </p>
           <p className="disclaimer">
-            ما لوحظ (التقييم) وما تقرّر (قرار التحقق) سجلّان منفصلان. القرار يذكر السياسة وإصدارها دائمًا، ولا يغيّر أهلية السيرة أو لينكدإن تلقائيًا.
+            ما لوحظ (التقييم) وما تقرّر (قرار التحقق) سجلّان منفصلان. القرار يذكر السياسة وإصدارها وإعداد المسار الذي أنتجه دائمًا، ولا يغيّر أهلية السيرة أو لينكدإن تلقائيًا.
           </p>
         </section>
       ) : null}

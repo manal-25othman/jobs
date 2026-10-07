@@ -5,6 +5,9 @@
  *   near-duplicates <packId>           write data/career/reports/near-duplicates.md
  *   review <kind> <id> <to> --role <r> --by <uuid|-> --label <name> --reason "<why>" [--minutes n]
  *   approve-values <rubric-version-uuid> --by <uuid> --label <name> --reason "<why>"   the ONE recorded SME act that lets weight/threshold statuses become approved (OPEN-043)
+ *   config-approve <table> <id> --by <uuid> --label <name> --reason "<why>"            Phase 4: validate a configuration row (never a legacy baseline in place)
+ *   config-activate <table> <id> --activation <inactive|development_only|production_active> --by <name> --reason "<why>"   audited; production_active needs an approved row; an active row is never replaced by accident
+ *   config-new-version <role-uuid> --label <l> --verification key@v --context key@v --claim key@v [--challenge key@v] [--pack v] --by <name>   next DRAFT track configuration version (inactive)
  */
 import { Pool } from 'pg';
 import { writeFileSync } from 'node:fs';
@@ -15,6 +18,8 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
+import { cliApprove, cliActivate, cliCreateTrackVersion } from '../configuration/config-admin.service';
+import type { ConfigActivation } from '@naqla/domain';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
 
 function arg(argv: string[], name: string): string | undefined { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; }
@@ -80,7 +85,24 @@ export async function main(argv: string[], root: string): Promise<number> {
       const r = await completePromotion(pool, a1!);
       console.log(`promotion closed: demo superseded=${r.demoSuperseded}, ${r.reviewLogIds.length} review decision(s) recorded`); return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete> …'); return 2;
+    if (cmd === 'config-approve') {
+      const by = arg(argv, '--by'); const label = arg(argv, '--label') ?? by ?? 'unknown'; const reason = arg(argv, '--reason') ?? '';
+      if (!by || !reason.trim()) { console.error('config-approve needs --by <uuid> and --reason'); return 2; }
+      const r = await cliApprove(pool, { table: a1!, id: a2!, approvedBy: by, approvedByLabel: label, reason });
+      console.log(`${a1} ${r.key}@${r.version}: ${r.reviewStatus} (recorded in config_change)`); return 0;
+    }
+    if (cmd === 'config-activate') {
+      const by = arg(argv, '--by'); const reason = arg(argv, '--reason') ?? ''; const activation = arg(argv, '--activation') as ConfigActivation;
+      if (!by || !reason.trim() || !activation) { console.error('config-activate needs --activation, --by <name> and --reason'); return 2; }
+      const r = await cliActivate(pool, { table: a1!, id: a2!, activation, actor: by, reason });
+      console.log(`${a1} ${r.key}@${r.version}: activation ${r.activation} (recorded in config_change)`); return 0;
+    }
+    if (cmd === 'config-new-version') {
+      const r = await cliCreateTrackVersion(pool, { targetRoleId: a1!, label: arg(argv, '--label') ?? 'draft', verificationPolicy: arg(argv, '--verification') ?? 'default@1', assessmentContextPolicy: arg(argv, '--context') ?? 'default@1',
+        claimPolicyRef: arg(argv, '--claim') ?? 'default@1', challengePolicy: arg(argv, '--challenge') ?? null, packVersion: arg(argv, '--pack') ?? null, notes: arg(argv, '--notes') ?? null, createdBy: arg(argv, '--by') ?? 'unknown' });
+      console.log(`track_config_version ${r.id}: v${r.version} created as an inactive DRAFT`); return 0;
+    }
+    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

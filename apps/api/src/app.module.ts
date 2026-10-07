@@ -10,6 +10,7 @@ import { ReviewModule } from './review/review.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { SkillProgressModule } from './skill-progress/skill-progress.module';
 import { AssessmentModule } from './assessment/assessment.module';
+import { ConfigurationModule } from './configuration/configuration.module';
 
 /**
  * Vertical Slice 1 only.
@@ -18,7 +19,7 @@ import { AssessmentModule } from './assessment/assessment.module';
  * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
-  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule],
+  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

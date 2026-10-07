@@ -352,6 +352,8 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     for (const r of resolutions) applied.push(await applyDuplicateResolution(c, r, skillIds, primarySource, snapshotId));
 
     if (unmapped.length) throw new ImportError('map', 'unmapped references; nothing was written', unmapped);
+    // Phase 4: a track imported after migration 0014 gets its first DRAFT configuration version — development_only outside production, inactive in production. Never a baseline.
+    await c.query('select ensure_track_config_version($1, $2, $3, $4)', [roleId, m.pack_version, `career-data import ${m.pack_id}@${m.pack_version}`, process.env['NODE_ENV'] === 'production' ? 'inactive' : 'development_only']);
     if (opts.dryRun) await c.query('rollback'); else await c.query('commit');
     return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: demo, snapshots, normalizedRecords: normalized, nearDuplicates, resolutions: applied, written, skippedFrozen, unmapped };
   } catch (e) {

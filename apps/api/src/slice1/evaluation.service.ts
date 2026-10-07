@@ -8,7 +8,7 @@ import { AssessmentRecorderService } from '../assessment/assessment-recorder.ser
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
   assertEvaluationResultValid, assertStateAvailableInProduction, skillsEvidencedByRun, evidenceOrdinal, DOMAIN_RULESET_VERSION,
-  type VerificationPolicy, type PolicyDecision,
+  type VerificationPolicy, type PolicyDecision, type ConfigResolution,
   type PublishedRubric, type SubmissionArtifact, type IntegrityCheckSpec,
   type EvidenceState, type EvaluationRun,
   reestablishmentAllowed,
@@ -178,7 +178,7 @@ export class EvaluationService {
       // and the promotion are written exactly as before; the structured decision
       // is recorded beside them with the policy and ruleset versions it used.
       const outcome = await this.decideAndApply(c, {
-        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, evaluatorKind: 'rule',
+        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'rule',
         resultId, userId, skillId: primarySkillId, claimedSkillIds: skillIds, currentState, run, rubric, projectId: s.project_id,
         acceptedReason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
       });
@@ -291,7 +291,7 @@ export class EvaluationService {
 
       const claimed = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1', [e.submission_id]);
       const outcome = await this.decideAndApply(c, {
-        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, evaluatorKind: 'human',
+        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'human',
         resultId, userId: e.user_id, skillId: primarySkillId, claimedSkillIds: claimed.rows.map((r) => r.skill_id as string), currentState, run, rubric, projectId: e.project_id,
         acceptedReason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
       });
@@ -316,11 +316,11 @@ export class EvaluationService {
    * policy enables it; the seeded draft does not.
    */
   private async decideAndApply(c: PoolClient, p: {
-    policyKey: string; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
+    policyKey: string; assessmentId: string; assessmentConfidence: number | null; trackConfigVersionId: string | null; evaluatorKind: 'rule' | 'human';
     resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; currentState: EvidenceState;
     run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string;
   }): Promise<{ transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null; reestablishedEvidenceId: string | null; policy: VerificationPolicy }> {
-    const policy = await this.assessments.loadPolicy(c, p.policyKey);
+    const { policy, resolution } = await this.assessments.loadPolicy(c, p.policyKey);
     const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, p.skillId]);
     const pd = this.assessments.decide(policy, {
       evaluationOutcome: p.run.outcome, proposedState: p.run.proposedState, currentState: p.currentState, assessmentEvaluatorKind: p.evaluatorKind,
@@ -351,19 +351,19 @@ export class EvaluationService {
         evaluationResultId: p.resultId, projectId: p.projectId, reason: p.run.reason });
       record = { decision: 'evidence_reestablished', previousState: p.currentState, proposedState: null, resultingState: p.currentState, reason: p.run.reason };
     }
-    await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId: p.skillId, policy,
+    await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId: p.skillId, policy, policyResolution: resolution, trackConfigVersionId: p.trackConfigVersionId,
       decision: record, confidence: p.assessmentConfidence, verificationId, evidenceId: transition?.evidenceId ?? reestablishedEvidenceId });
 
     // H6 — per-skill evidence derivation from criteria. Behind the policy flag; the draft default keeps it off.
     if (policy.perSkillEvidenceDerivation && pd.legacyOutcome === 'accepted' && p.run.proposedState) {
-      await this.deriveEvidencePerSkill(c, { ...p, policy, proposedState: p.run.proposedState });
+      await this.deriveEvidencePerSkill(c, { ...p, policy, policyResolution: resolution, proposedState: p.run.proposedState });
     }
     return { transition, reestablishedEvidenceId, policy };
   }
 
   /** H6 (policy-gated): every OTHER claimed skill whose skill_evidence criteria were all met earns the same decision. */
   private async deriveEvidencePerSkill(c: PoolClient, p: {
-    policy: VerificationPolicy; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
+    policy: VerificationPolicy; policyResolution: ConfigResolution; trackConfigVersionId: string | null; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
     resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string; proposedState: EvidenceState;
   }): Promise<void> {
     const evidenced = skillsEvidencedByRun(p.rubric, p.run);
@@ -382,7 +382,7 @@ export class EvaluationService {
         evidenceId = (await this.promote(c, { userId: p.userId, skillId, from: current, to: pd.resultingState, evaluationResultId: p.resultId,
           rubricVersion: p.run.rubricVersion, projectId: p.projectId, reason: pd.reason })).evidenceId;
       }
-      await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId, policy: p.policy,
+      await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId, policy: p.policy, policyResolution: p.policyResolution, trackConfigVersionId: p.trackConfigVersionId,
         decision: pd, confidence: p.assessmentConfidence, verificationId: null, evidenceId });
     }
   }

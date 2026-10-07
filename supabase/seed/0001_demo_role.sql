@@ -262,3 +262,6 @@ select 'rubric_criterion', id, 'e0000000-0000-4000-8000-000000000001', 'demo fix
 on conflict do nothing;
 
 commit;
+
+-- Phase 4: the demo track's first configuration version (DRAFT, development only; never production).
+select ensure_track_config_version('b0000000-0000-4000-8000-000000000001', '0.2.0', 'seed 0001_demo_role', 'development_only');

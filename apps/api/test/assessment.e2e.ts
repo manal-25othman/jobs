@@ -54,7 +54,8 @@ describe('verification policy — data, DRAFT, llm structurally excluded', () =>
     const user = await bootstrapped();
     const items = (await http.get('/v1/verification-policies').set(auth(user)).expect(200)).body.data.items as Record<string, unknown>[];
     const d = items.find((p) => p['key'] === 'default' && p['version'] === 1)!;
-    assert.equal(d['reviewStatus'], 'draft'); assert.equal(d['validated'], false); assert.match(String(d['validationNote']), /DRAFT \/ NOT VALIDATED/);
+    assert.equal(d['reviewStatus'], 'draft'); assert.equal(d['validated'], false); assert.match(String(d['validationNote']), /LEGACY BASELINE — NOT EXPERT-VALIDATED/);
+    assert.equal(d['activation'], 'legacy_baseline'); assert.equal(d['isLegacyBaseline'], true);
     assert.deepEqual(d['appliesOutcomes'], ['passed']); assert.equal(d['acceptRubricProposal'], true); assert.equal(d['maxResultingState'], null);
     assert.equal(d['minAssessmentConfidence'], null); assert.equal(d['minIndependentEvidence'], null); assert.equal(d['perSkillEvidenceDerivation'], false);
     assert.deepEqual(d['decisionActors'], ['policy', 'human']);
@@ -63,9 +64,9 @@ describe('verification policy — data, DRAFT, llm structurally excluded', () =>
     const c = await pool.connect();
     try {
       await c.query('begin');
-      await expectRejected(c, `update verification_policy set decision_actors = '{policy,llm}' where key = 'default'`, [], /llm_never_decides|check constraint/);
-      await expectRejected(c, `update verification_policy set decision_actors = '{agent}' where key = 'default'`, [], /llm_never_decides|actors_known|check constraint/);
-      await expectRejected(c, `update verification_policy set review_status = 'approved' where key = 'default'`, [], /approved_is_recorded|check constraint/);
+      await expectRejected(c, `insert into verification_policy (key, version, description_en, decision_actors) values ('default', 95, 'x', '{policy,llm}')`, [], /llm_never_decides|check constraint/);
+      await expectRejected(c, `insert into verification_policy (key, version, description_en, decision_actors) values ('default', 95, 'x', '{agent}')`, [], /llm_never_decides|actors_known|check constraint/);
+      await expectRejected(c, `insert into verification_policy (key, version, description_en, review_status) values ('default', 95, 'x', 'approved')`, [], /approved_is_recorded|approved\/published requires|check constraint/);
       await expectRejected(c, `insert into verification_policy (key, version, description_en, decision_actors) values ('x', 1, 'x', '{}')`, [], /actors_known|check constraint/);
       await c.query('rollback');
     } finally { c.release(); }
@@ -87,12 +88,13 @@ describe('legacy behaviour preserved exactly through the draft policy', () => {
     assert.equal(a.evaluatorKind, 'rule'); assert.equal(a.evaluatorRef, `deterministic-evaluator@${DOMAIN_RULESET_VERSION}`);
     assert.equal(a.versions.domainRuleset, DOMAIN_RULESET_VERSION); assert.equal(a.versions.rubric, ev.body.data.criteria.length ? a.versions.rubric : a.versions.rubric);
     assert.equal(a.outcome, 'passed'); assert.equal(a.confidence, 1); assert.equal(a.inputsUsed.identity_excluded, true);
-    assert.ok(a.inputsUsed.artifact_keys.includes('file.component') && a.inputsUsed.evidence_item_ids.length >= 5);
+    const used = a.inputsUsed as unknown as { submission_artifacts: string[]; evidence_items: string[]; context_policy: string };
+    assert.ok(used.submission_artifacts.includes('file.component') && used.evidence_items.length >= 5); assert.equal(used.context_policy, 'default@1');
     assert.deepEqual(a.criteria.map((cr) => [cr.key, cr.status]), [['empty_state_test', 'met'], ['loading_state_test', 'met'], ['error_message_visible', 'met'], ['coverage_note', 'met']]);
     assert.deepEqual(a.criteria[0]!.evidenceUsed, ['test.empty_state']); assert.deepEqual(a.criteria[0]!.evidenceMissing, []); assert.equal(a.criteria[0]!.recommendedNextAction, null);
     assert.equal(a.decisions.length, 1);
     const d = a.decisions[0]!;
-    assert.deepEqual(d.policy, { key: 'default', version: 1, status: 'draft', validated: false });
+    assert.deepEqual(d.policy, { key: 'default', version: 1, status: 'draft', validated: false, resolution: 'legacy_baseline' });
     assert.equal(d.domainRulesetVersion, DOMAIN_RULESET_VERSION); assert.equal(d.decidedByKind, 'policy'); assert.equal(d.decision, 'accepted');
     assert.deepEqual([d.previousState, d.proposedState, d.resultingState], ['practiced', 'demonstrated', 'demonstrated']);
     assert.equal(d.evidenceId, ev.body.data.transition.evidenceId); assert.ok(d.verificationId, 'the decision points at the legacy verification row');
@@ -145,7 +147,17 @@ describe('per-skill evidence derivation (H6) stays behind the policy flag', () =
     assert.deepEqual(a!.decisions.map((d) => d.skillId), [SKILL]);
     assert.equal((await pool.query('select count(*)::int as n from evidence where user_id = $1', [user.id])).rows[0].n, 1);
 
-    await pool.query(`update verification_policy set per_skill_evidence_derivation = true where key = 'default' and enabled`);
+    // Phase 4: an active policy's content is immutable; the flag is turned on through a NEW version activated for development only,
+    // after the baseline is explicitly deactivated (an audited act). Both steps are reverted at the end.
+    const admin = async (sql: string, params: unknown[] = []) => {
+      const c = await pool.connect();
+      try { await c.query('begin'); await c.query("select set_config('naqla.config_actor', 'e2e', true), set_config('naqla.config_reason', 'H6 negative test', true)"); const r = await c.query(sql, params); await c.query('commit'); return r; }
+      catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+    };
+    const base = (await pool.query(`select id from verification_policy where key = 'default' and activation = 'legacy_baseline'`)).rows[0].id;
+    const v2 = (await admin(`insert into verification_policy (key, version, description_en, per_skill_evidence_derivation) values ('default', 99, 'e2e: H6 on (development only)', true) returning id`)).rows[0].id;
+    await admin(`update verification_policy set activation = 'inactive' where id = $1`, [base]);
+    await admin(`update verification_policy set activation = 'development_only' where id = $1`, [v2]);
     try {
       const u2 = await bootstrapped();
       const s2 = await submitted(u2, COMPLETE_ARTIFACTS, { skillIds: [SKILL, SECONDARY] });
@@ -153,11 +165,13 @@ describe('per-skill evidence derivation (H6) stays behind the policy flag', () =
       const [a2] = await assessmentOf(u2, s2.sid);
       // The demo rubric's skill_evidence criteria all belong to SKILL; SECONDARY has none met, so it earns nothing even with the flag on.
       assert.deepEqual(a2!.decisions.map((d) => d.skillId), [SKILL]);
+      assert.equal(a2!.decisions[0]!.policy.version, 99, 'the development-only v99 decided (outside production)');
       assert.equal((await pool.query('select count(*)::int as n from evidence where user_id = $1', [u2.id])).rows[0].n, 1);
       const claim = await pool.query('select state from skill_claim where user_id = $1 and skill_id = $2', [u2.id, SECONDARY]);
       assert.equal(claim.rows[0].state, 'practiced', 'no derivation without criteria of its own');
     } finally {
-      await pool.query(`update verification_policy set per_skill_evidence_derivation = false where key = 'default' and enabled`);
+      await admin(`update verification_policy set activation = 'inactive' where id = $1`, [v2]);
+      await admin(`update verification_policy set activation = 'legacy_baseline' where id = $1`, [base]);
     }
   });
 });
@@ -176,7 +190,7 @@ describe('records are immutable and private; CV/LinkedIn eligibility is not touc
     await asAuthenticatedUser(pool, user.id, async (c) => {
       assert.equal((await c.query(`update verification_decision set resulting_state = 'verified' where user_id = $1`, [user.id])).rowCount, 0);
       await expectRejected(c, `insert into verification_decision (assessment_id, evaluation_result_id, user_id, skill_id, policy_id, policy_key, policy_version, policy_status, domain_ruleset_version, decided_by_kind, decision, previous_state, resulting_state, reason)
-        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and enabled), 'default', 1, 'draft', 'x', 'policy', 'accepted', 'practiced', 'demonstrated', 'me' from assessment where id = $1`,
+        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and activation <> 'inactive'), 'default', 1, 'draft', 'x', 'policy', 'accepted', 'practiced', 'demonstrated', 'me' from assessment where id = $1`,
         [a!.id, SKILL], /row-level security/);
     });
     const c = await pool.connect();
@@ -185,10 +199,10 @@ describe('records are immutable and private; CV/LinkedIn eligibility is not touc
       await expectRejected(c, `update assessment set confidence = 0.1 where id = $1`, [a!.id], /immutable/);
       await expectRejected(c, `delete from verification_decision where assessment_id = $1`, [a!.id], /immutable/);
       await expectRejected(c, `insert into verification_decision (assessment_id, evaluation_result_id, user_id, skill_id, policy_id, policy_key, policy_version, policy_status, domain_ruleset_version, decided_by_kind, decision, previous_state, resulting_state, reason)
-        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and enabled), 'default', 1, 'draft', 'x', 'llm', 'accepted', 'practiced', 'demonstrated', 'me' from assessment where id = $1`,
+        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and activation <> 'inactive'), 'default', 1, 'draft', 'x', 'llm', 'accepted', 'practiced', 'demonstrated', 'me' from assessment where id = $1`,
         [a!.id, SKILL], /decided_by_kind|check constraint/);
       await expectRejected(c, `insert into verification_decision (assessment_id, evaluation_result_id, user_id, skill_id, policy_id, policy_key, policy_version, policy_status, domain_ruleset_version, decided_by_kind, decision, previous_state, proposed_state, resulting_state, reason)
-        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and enabled), 'default', 1, 'draft', 'x', 'policy', 'accepted', 'practiced', 'demonstrated', 'verified', 'raise' from assessment where id = $1`,
+        select $1, evaluation_result_id, user_id, $2, (select id from verification_policy where key = 'default' and activation <> 'inactive'), 'default', 1, 'draft', 'x', 'policy', 'accepted', 'practiced', 'demonstrated', 'verified', 'raise' from assessment where id = $1`,
         [a!.id, SKILL], /never_raises|check constraint/);
       await c.query('rollback');
     } finally { c.release(); }

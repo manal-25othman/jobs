@@ -29,6 +29,7 @@ export * from './human-review.js';
 export * from './evidence-items.js';
 export * from './skill-progress.js';
 export * from './verification-policy.js';
+export * from './configuration.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.10.0';
+export const DOMAIN_RULESET_VERSION = '0.11.0';
