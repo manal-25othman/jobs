@@ -82,6 +82,7 @@
 | `audit_event.payload` | أشكال الأحداث تختلف — **والحقول القابلة للاستعلام رُقِّيت أعمدة** |
 | `job.payload` | حمولة طابور عامة عمدًا، ليبقى المحرّك قابلًا للاستبدال |
 | `evidence_item_type.required_fields` · `match_rule` | **سجل أنواع كبيانات** (Phase 1): الحقول المطلوبة وقواعد التصنيف لكل نوع تُعدَّل كصف لا كهجرة؛ مُقيَّدة بـ`jsonb_typeof` ويفحصها مُحفِّز الشكل |
+| `skill_progress_transition.guard` · `skill_progress_event.facts` | **قاعدة انتقال كبيانات** (Phase 2): شرط تصريحي صغير (`value` · `{"not"}` · `{"in"}`) يفسّره النطاق وحده، ووقائع الحدث كما وصلت — لتدقيق لماذا تحرّكت الرحلة أو لم تتحرّك |
 | `evidence_item.metadata` | وصف إضافي يختلف بالنوع (مفتاح المخرَج · نتيجة الفحص · الإفصاح) — **الحقول القابلة للاستعلام أعمدة** (`url` · `upload_id` · `submission_id` · `evaluation_result_id` · `attempt_number` · `status`) |
 
 **ولم تُستخدم `jsonb` لأي كيان نطاق أساسي.** `case_study` أقسامها **أعمدة** لأن الأقسام الأربعة قاعدة منتج: لو كانت `jsonb` لأمكن نشر دراسة حالة بثلاثة أقسام.
@@ -96,7 +97,7 @@
 | المحتوى | `activity_spec` · `rubric_version` |
 | العمل | `project` · `work_item` · `submission` · `submission_file` · `ai_disclosure` |
 | التقييم | `evaluation` · `evaluation_result` · `evaluation_criterion_score` · `integrity_check` · `human_review` |
-| الدليل | `evidence` · `skill_claim` · `evidence_transition` · **سجل المادة (0011):** `evidence_item_type` · `evidence_item` · `evidence_item_skill` · `evidence_derivation` |
+| الدليل | `evidence` · `skill_claim` · `evidence_transition` · **سجل المادة (0011):** `evidence_item_type` · `evidence_item` · `evidence_item_skill` · `evidence_derivation` · **رحلة المهارة (0012):** `skill_progress_state` · `skill_progress_trigger` · `skill_progress_transition` · `skill_progress` · `skill_progress_event` |
 | الأصول والدرجات | `professional_asset` · `asset_evidence` · `cv_version` · `readiness_score` · `score_component` · `cv_assessment` · `linkedin_assessment` · `case_study` · `recruiter_report` · `recruiter_report_item` |
 | النشر والخصوصية | `public_profile` · `share_link` · `consent` |
 | التعلّم | `learning_gap` · `learning_resource` · `practice_activity` |

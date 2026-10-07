@@ -53,7 +53,20 @@ export interface SkillClaim {
   skillId: string; skillName: string; skillNameAr: string;
   state: 'gap' | 'self_reported' | 'practiced' | 'demonstrated' | 'verified';
   stateReason: string; evidenceCount: number; primaryEvidenceId: string | null;
+  /** Phase 2 (additive): the journey dimension. Null when no journey was recorded. Never a verification. */
+  progress: { state: string; stateLabelAr: string; stateLabelEn: string; lastEventAt: string | null } | null;
 }
+
+/* ─────────────────────────── skill journey (Phase 2) ─────────────────────── */
+
+/** One skill's two dimensions side by side. `verification` is null when there is no claim (= gap). */
+export interface SkillJourney {
+  skillId: string; skillName: string; skillNameAr: string;
+  progress: { state: string; stateLabelAr: string; stateLabelEn: string; stateReviewStatus: string; reason: string; lastTrigger: string | null; lastEventAt: string | null; updatedAt: string; targetRoleId: string | null };
+  verification: { state: SkillClaim['state']; stateReason: string } | null;
+  verificationEffectOfProgress: 'none';
+}
+export interface SkillJourneyEngine { active: boolean; reason: string | null; production: boolean; enabledRules: number; validatedRules: number; verificationEffect: 'none' }
 
 export interface EvaluationCriterion {
   criterionId?: string; criterion_key?: string;

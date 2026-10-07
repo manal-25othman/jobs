@@ -228,7 +228,26 @@
 
 ---
 
-## ١٢. `Evaluation` — التقييم
+## ١١ب. `Skill Progress` — رحلة المهارة *(Phase 2 — Configurable Track Architecture)*
+
+> **بُعد ثانٍ منفصل عن حالة الدليل.** `Evidence State` (§١١) = **مستوى التحقق**: ما أثبته التقييم. `Skill Progress` = **موقع المستخدم في الرحلة** على المهارة: لم تبدأ · قيد العمل · مُسلَّمة · قيد المراجعة البشرية · تحتاج دليلًا إضافيًا · سُجِّل دليل مُقيَّم. **لا يُشتق أحدهما من الآخر، ولا يحرّك أحدهما الآخر.** إكمال نشاط يحرّك الرحلة ولا يرفع مستوى التحقق أبدًا.
+
+| | |
+|---|---|
+| **الغرض** | إجابة «أين أنا في هذه المهارة وما الخطوة التالية؟» دون أن تُقرأ إثباتًا. |
+| **المُعرِّف** | `skill_progress.id` — صف واحد لكل (مستخدم، مهارة) |
+| **الملكية** | المستخدم يقرأ؛ **المحرّك وحده يكتب** (service role) داخل معاملة الحدث المُنتِج |
+| **الحالات** | صفوف `skill_progress_state` (**بيانات لا enum**)؛ قيد يرفض أي رمز من سلّم الدليل (`gap/self_reported/practiced/demonstrated/verified`)؛ حالة ابتدائية واحدة مفعَّلة |
+| **المحفّزات** | صفوف `skill_progress_trigger` — `project.created` · `evidence_item.added` · `submission.created` · `evaluation.queued_for_human` · `evaluation.completed` · `evidence.withdrawn`؛ و`more_evidence.requested` مسجَّل **بلا مُنتِج** (`active = false`) |
+| **قواعد الانتقال** | صفوف `skill_progress_transition` (`from` · `to` · `trigger` · `guard` تصريحي `{"produced_evidence": true}` / `{"x": {"not": …}}` / `{"x": {"in": […]}}` · `version` · `review_status`) — **١٤ قاعدة مبذورة كلها `draft` = DRAFT / NOT VALIDATED**؛ `approved` يشترط `approved_by/at` |
+| **القرار** | `nextProgress(rules, current, trigger, facts)` نقي في النطاق: قاعدة مفعَّلة واحدة تطابق؛ **قاعدتان = خطأ بيانات يُرمى**؛ لا قاعدة = «لا انتقال» صريح يُسجَّل |
+| **السجل** | `skill_progress_event` **إضافة فقط**: كل إصدار محفّز يُسجَّل، طُبِّق أم لا (`transitioned` · `no_matching_rule` · `rules_inactive` · `backfilled`) مع رقم إصدار القاعدة والوقائع ومرجع الحدث |
+| **الإنتاج** | قواعد `draft` **لا تُطبَّق** في الإنتاج؛ المحرّك يسجّل `rules_inactive` ويُعلن السبب في الـAPI (`engine.active=false`) بدل الصمت |
+| **الثابت المُسمّى** | `verificationEffectOfProgress() === 'none'` — يُعاد مع كل صف |
+
+---
+
+
 
 | | |
 |---|---|

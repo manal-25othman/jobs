@@ -3,6 +3,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { UploadService } from '../slice1/upload.service';
 import { EvidenceLedgerService } from './evidence-ledger.service';
+import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import {
   assertEvidenceItemShape, assertEvidenceItemTransition, findEvidenceType, userMayCreateType, evidenceTypeIsValidated,
   claimEffectOfEvidenceItem, DomainError,
@@ -17,7 +18,7 @@ import {
  */
 @Injectable()
 export class EvidenceService {
-  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService) {}
+  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine) {}
 
   /** The registry, with its validation state visible: nothing seeded is approved. */
   async listTypes() {
@@ -68,6 +69,8 @@ export class EvidenceService {
       for (const skillId of skillIds) {
         await c.query(`insert into evidence_item_skill (evidence_item_id, skill_id, user_id, link_role, linked_by) values ($1,$2,$3,'primary','user')`, [id, skillId, userId]);
       }
+      await this.progress.applyAll(c, skillIds, { userId, trigger: 'evidence_item.added', facts: { type_code: type.code },
+        eventRef: { table: 'evidence_item', id }, reason: 'material was added to the skill', actorKind: 'user' });
       await emitAuditEvent(c, {
         eventType: 'evidence_item.created', userId, actorKind: 'user', actorId: userId,
         subjectTable: 'evidence_item', subjectId: id,
@@ -88,6 +91,8 @@ export class EvidenceService {
         await this.assertActiveSkill(c, skillId);
         await c.query(`insert into evidence_item_skill (evidence_item_id, skill_id, user_id, link_role, linked_by) values ($1,$2,$3,'primary','user') on conflict do nothing`, [itemId, skillId, userId]);
       }
+      await this.progress.applyAll(c, skillIds, { userId, trigger: 'evidence_item.added', facts: { linked: true },
+        eventRef: { table: 'evidence_item', id: itemId }, reason: 'material was linked to the skill', actorKind: 'user' });
       await emitAuditEvent(c, {
         eventType: 'evidence_item.skills_linked', userId, actorKind: 'user', actorId: userId,
         subjectTable: 'evidence_item', subjectId: itemId,

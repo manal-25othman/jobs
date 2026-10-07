@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StorageModule } from '../storage/storage.module';
+import { SkillProgressModule } from '../skill-progress/skill-progress.module';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
 import { UploadService } from '../slice1/upload.service';
 import { EvidenceLedgerService } from './evidence-ledger.service';
@@ -11,7 +12,7 @@ import { EvidenceController } from './evidence.controller';
  * and evaluation flows write ledger items inside their own transactions.
  */
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, SkillProgressModule],
   controllers: [EvidenceController],
   providers: [UserProvisioningService, UploadService, EvidenceLedgerService, EvidenceService],
   exports: [EvidenceLedgerService],

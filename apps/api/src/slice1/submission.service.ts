@@ -4,6 +4,7 @@ import { emitAuditEvent } from '../infra/audit';
 import { assertModeRespected, assertExternalUrlValid, type AiUsageMode } from '@naqla/domain';
 import { UploadService } from './upload.service';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
+import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 
 export interface SubmissionArtifactInput {
   key: string;
@@ -23,7 +24,7 @@ export interface SubmissionArtifactInput {
  */
 @Injectable()
 export class SubmissionService {
-  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService) {}
+  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine) {}
 
   async createSubmission(userId: string, projectId: string, input: {
     skillIds: string[];
@@ -154,6 +155,10 @@ export class SubmissionService {
           .map((a) => ({ key: a.key, text: a.valueText as string, locator: a.locator ?? null })),
         disclosure: { mode, declaredUse: input.aiDisclosure.declaredUse },
       });
+
+      // Phase 2: the journey of each claimed skill records the submission. The claim ceiling above is untouched.
+      await this.progress.applyAll(c, input.skillIds, { userId, trigger: 'submission.created', facts: { project_id: projectId },
+        eventRef: { table: 'submission', id: submissionId }, reason: 'work was submitted for evaluation', actorKind: 'user' });
 
       await emitAuditEvent(c, {
         eventType: 'submission.created',

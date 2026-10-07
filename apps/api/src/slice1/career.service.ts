@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
+import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 
 /**
  * Career goal and project.
@@ -10,7 +11,7 @@ import { emitAuditEvent } from '../infra/audit';
  */
 @Injectable()
 export class CareerService {
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly progress: SkillProgressEngine) {}
 
   async listTargetRoles(userId: string) {
     return this.db.asUser(userId, async (c) => {
@@ -95,9 +96,12 @@ export class CareerService {
                 (select count(*) from evidence e
                   where e.user_id = sc.user_id and e.skill_id = sc.skill_id
                     and e.withdrawn_at is null) as evidence_count,
-                sc.primary_evidence_id
+                sc.primary_evidence_id,
+                sp.state_code as progress_state, st.label_ar as progress_label_ar, st.label_en as progress_label_en, sp.last_event_at as progress_at
            from skill_claim sc
            join skill sk on sk.id = sc.skill_id
+           left join skill_progress sp on sp.user_id = sc.user_id and sp.skill_id = sc.skill_id
+           left join skill_progress_state st on st.code = sp.state_code
           order by evidence_ordinal(sc.state) desc, sk.label_en`,
       );
       return rows.map((r) => ({
@@ -108,6 +112,8 @@ export class CareerService {
         stateReason: r.state_reason,
         evidenceCount: Number(r.evidence_count),
         primaryEvidenceId: r.primary_evidence_id,
+        // Phase 2 (additive): the journey dimension beside the verification level. Null when no journey was recorded.
+        progress: r.progress_state ? { state: r.progress_state, stateLabelAr: r.progress_label_ar, stateLabelEn: r.progress_label_en, lastEventAt: r.progress_at } : null,
       }));
     });
   }
@@ -151,6 +157,14 @@ export class CareerService {
         subjectTable: 'project', subjectId: rows[0].id,
         reason: `the user created a ${input.kind}`,
       });
+      // Phase 2: a platform activity starts the journey of the skills it declares. No claim is touched.
+      if (specId) {
+        const linked = await c.query('select skill_id, depth from activity_skill where activity_spec_id = $1', [specId]);
+        for (const l of linked.rows) {
+          await this.progress.apply(c, { userId, skillId: l.skill_id, trigger: 'project.created', facts: { depth: l.depth, activity_spec_id: specId },
+            eventRef: { table: 'project', id: rows[0].id }, reason: `project created on activity ${specVersion}`, actorKind: 'user' });
+        }
+      }
       return rows[0];
     });
   }

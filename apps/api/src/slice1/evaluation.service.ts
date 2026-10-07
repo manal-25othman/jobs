@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
+import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
   assertEvaluationResultValid, decideVerification, verificationApplies, assertStateAvailableInProduction,
@@ -32,7 +33,7 @@ import {
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
 
-  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService) {}
+  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine) {}
 
   async evaluateSubmission(userId: string, submissionId: string) {
     return this.db.asService(async (c) => {
@@ -214,6 +215,12 @@ export class EvaluationService {
         evidenceId: transition?.evidenceId ?? reestablishedEvidenceId, skillId: primarySkillId,
       });
 
+      // Phase 2: the journey records the run; produced_evidence is a fact, not a verdict.
+      await this.progress.apply(c, { userId, skillId: primarySkillId,
+        trigger: awaitingHuman ? 'evaluation.queued_for_human' : 'evaluation.completed',
+        facts: { outcome: run.outcome, produced_evidence: (transition?.evidenceId ?? reestablishedEvidenceId) !== null },
+        eventRef: { table: 'evaluation_result', id: resultId }, reason: run.reason, actorKind: 'system' });
+
       return {
         evaluationId,
         resultId,
@@ -318,6 +325,9 @@ export class EvaluationService {
         outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore,
         evidenceId: transition?.evidenceId ?? reestablishedEvidenceId, skillId: primarySkillId,
       });
+      await this.progress.apply(c, { userId: e.user_id, skillId: primarySkillId, trigger: 'evaluation.completed',
+        facts: { outcome: run.outcome, produced_evidence: (transition?.evidenceId ?? reestablishedEvidenceId) !== null },
+        eventRef: { table: 'evaluation_result', id: resultId }, reason: run.reason, actorKind: 'system' });
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
         integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId, evaluatedAt: resultRow.rows[0].evaluated_at };
     });

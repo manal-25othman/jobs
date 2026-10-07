@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
+import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import {
   effectOfWithdrawal, assertRelinkAllowed, assertAssetTransition, MissingPrerequisite,
   type EvidenceState, type AssetLifecycleState,
@@ -19,12 +20,12 @@ import { loadDomainFacts } from '../agents/domain-facts';
  */
 @Injectable()
 export class WithdrawalService {
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly progress: SkillProgressEngine) {}
 
   async withdraw(userId: string, evidenceId: string, reason: string) {
     if (!reason?.trim()) throw new MissingPrerequisite('reason', 'withdrawing evidence needs a recorded reason');
     return this.db.asService(async (c) => {
-      const ev = await c.query('select id, user_id, withdrawn_at from evidence where id = $1', [evidenceId]);
+      const ev = await c.query('select id, user_id, skill_id, withdrawn_at from evidence where id = $1', [evidenceId]);
       if (ev.rowCount === 0 || ev.rows[0].user_id !== userId) throw new NotFoundException('evidence not found');
       if (ev.rows[0].withdrawn_at) throw new BadRequestException('this evidence is already withdrawn');
 
@@ -56,6 +57,11 @@ export class WithdrawalService {
 
       await emitAuditEvent(c, { eventType: 'evidence.withdrawn', userId, actorKind: 'user', actorId: userId, subjectTable: 'evidence', subjectId: evidenceId,
         reason: reason.trim(), payload: { affectedAssets: affected.map((a) => a.id) } });
+
+      // Phase 2: the journey learns how much evidence still stands. The claim state is not touched here (D-077).
+      const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [userId, ev.rows[0].skill_id]);
+      await this.progress.apply(c, { userId, skillId: ev.rows[0].skill_id, trigger: 'evidence.withdrawn', facts: { standing_evidence_count: standing.rows[0].n },
+        eventRef: { table: 'evidence', id: evidenceId }, reason: `evidence withdrawn: ${reason.trim()}`, actorKind: 'user' });
 
       return { evidenceId, withdrawn: true as const, affectedAssets: affected };
     });

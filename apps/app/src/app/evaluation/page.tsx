@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, type EvaluationResult } from '../../lib/api';
+import { api, type EvaluationResult, type SkillJourney, type SkillJourneyEngine } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { CompanionNudge } from '../../components/CompanionNudge';
@@ -12,6 +12,7 @@ function EvaluationInner() {
   const params = useSearchParams();
   const submissionId = params.get('submission');
   const [result, setResult] = useState<EvaluationResult | null>(null);
+  const [journey, setJourney] = useState<{ items: SkillJourney[]; engine: SkillJourneyEngine } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -23,6 +24,8 @@ function EvaluationInner() {
           method: 'POST', token,
         });
         setResult(r);
+        // Phase 2: the journey dimension, read after the evaluation committed. Shown beside the level, never merged with it.
+        setJourney(await api<{ items: SkillJourney[]; engine: SkillJourneyEngine }>('/me/skill-progress', { token }));
       } catch (e) {
         setError((e as Error).message);
       }
@@ -183,6 +186,26 @@ function EvaluationInner() {
           <a className="link" href="/project">ابدئي تسليمًا جديدًا</a>
         </section>
       )}
+
+      {journey && journey.items.length > 0 ? (
+        <section className="card">
+          <h2>رحلة المهارة</h2>
+          <div className="rows">
+            {journey.items.map((j) => (
+              <div key={j.skillId} className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <span className="grow body-sm">{j.skillNameAr}</span>
+                <span className="chip chip--info">{j.progress.stateLabelAr}</span>
+                {j.verification ? <EvidenceState state={j.verification.state} /> : <span className="chip">لا ادعاء بعد</span>}
+              </div>
+            ))}
+          </div>
+          <p className="disclaimer">
+            حالة الرحلة (أين أنتِ في العمل على المهارة) ومستوى التحقق (ما أثبته التقييم) بُعدان منفصلان:
+            إكمال نشاط لا يرفع مستوى التحقق. قواعد الرحلة قيد التحقق من الخبراء (DRAFT / NOT VALIDATED)
+            {journey.engine.active ? null : <> — وهي غير مفعَّلة حاليًا: {journey.engine.reason}</>}.
+          </p>
+        </section>
+      ) : null}
 
       <CompanionNudge token={token} />
       <p className="body-sm"><a className="link" href="/proposals">اقتراحات الرفيق المهني ←</a></p>
