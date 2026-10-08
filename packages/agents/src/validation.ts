@@ -90,8 +90,21 @@ export interface DomainFacts {
    * unsupported, whatever the wording implies.
    */
   readonly approvedTechnologies: ReadonlySet<string>;
+  /**
+   * Phase 7: the approved technologies behind EACH piece of evidence (its
+   * project and that project's submissions). A wording that cites evidence may
+   * name only technologies declared for the work it cites — a technology
+   * declared on another project is not evidence for this claim.
+   */
+  readonly approvedTechnologiesByEvidence: ReadonlyMap<string, ReadonlySet<string>>;
   /** The technology vocabulary (data, seeded from track packs), with aliases. */
   readonly knownTechnologies: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Phase 7: the skill vocabulary (skillId → labels), so a skill written into
+   * the wording counts as asserted even when the proposal does not name it.
+   * Labels that are also technology terms are governed by D-076 instead.
+   */
+  readonly knownSkills: ReadonlyMap<string, readonly string[]>;
   /**
    * Numbers a wording may contain, as strings: recorded scores, maxima and
    * met-criterion counts of the user's evaluations. Any other number in a
@@ -106,6 +119,11 @@ export function numbersIn(text: string): string[] {
   return ascii.match(/\d+(?:\.\d+)?/g) ?? [];
 }
 
+/** Arabic matching form: no diacritics or tatweel, alef variants folded, ta marbuta/alef maqsura kept. */
+export function normalizeArabic(text: string): string {
+  return text.replace(/[ً-ْٰـ]/g, '').replace(/[أإآ]/g, 'ا');
+}
+
 /** Finds vocabulary terms present in the text, by term or alias, word-bounded. */
 export function technologiesMentioned(text: string, known: ReadonlyMap<string, readonly string[]>): string[] {
   const found: string[] = [];
@@ -118,6 +136,31 @@ export function technologiesMentioned(text: string, known: ReadonlyMap<string, r
   return found;
 }
 
+/**
+ * Skills whose label is written into the text (Arabic normalised, English
+ * word-bounded). A label that is also a technology term is skipped: naming a
+ * declared technology is D-076's question, not a skill assertion.
+ */
+export function skillsMentioned(text: string, skills: ReadonlyMap<string, readonly string[]>, technologies: ReadonlyMap<string, readonly string[]>): string[] {
+  const techTerms = new Set([...technologies].flatMap(([t, a]) => [t, ...a]).map((x) => x.toLowerCase()));
+  // Longest label first, and a matched span is consumed: "إدارة حالة الواجهة والتفاعل"
+  // is one skill, not also the shorter "إدارة حالة الواجهة" it begins with.
+  const labels = [...skills].flatMap(([skillId, ls]) => ls.map((l) => ({ skillId, label: normalizeArabic(l.trim()) })))
+    .filter((x) => x.label.length >= 3 && !techTerms.has(x.label.toLowerCase()))
+    .sort((a, b) => b.label.length - a.label.length);
+  let rest = normalizeArabic(text);
+  const found = new Set<string>();
+  for (const { skillId, label } of labels) {
+    const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(^|[^A-Za-z0-9\\u0600-\\u06FF])${esc}(?=[^A-Za-z0-9\\u0600-\\u06FF]|$)`, 'gi');
+    if (re.test(rest)) { found.add(skillId); rest = rest.replace(re, (_m, pre: string) => `${pre} `); }
+  }
+  return [...found];
+}
+
+const AR_B = '(^|[\\s،,.؛;:\'"«»(])';
+const AR_E = '($|[\\s،,.؛;:\'"«»)])';
+
 const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\b(at|for)\s+[A-Z][A-Za-z]+\s+(Inc|Ltd|LLC|Corp|Company|Bank|Group)\b/, 'an employer'],
   [/\bcertif(ied|ication|icate)\b/i, 'a certification'],
@@ -128,63 +171,178 @@ const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\bworked at\b/i, 'employment'],
 ];
 
+/**
+ * Phase 7 — a completed learning activity is not professional work. Clients,
+ * production use, real users and employment have no evidence path in this
+ * product, so a wording that asserts them is unsupported. Matched on the
+ * normalised text; the list is reviewable data, not a model.
+ */
+export const PROFESSIONAL_WORK_PATTERNS: readonly (readonly [RegExp, string])[] = [
+  [/\b(for|with)\s+(a|an|the|our|my|their)?\s*(clients?|customers?|employers?)\b/i, 'a client or employer'],
+  [new RegExp(`${AR_B}(لعميل|للعميل|للعملاء|لعملاء|لصالح\\s+(شركة|عميل|جهة))`), 'a client or employer'],
+  [/\b(in|to|into|for)\s+production\b|\bproduction (users|traffic|environment)\b/i, 'production use'],
+  [/(بيئة\s+الانتاج|في\s+الانتاج|للانتاج)/, 'production use'],
+  [/\b(real|paying|active|live)\s+(users|customers|clients)\b/i, 'real users'],
+  [/(مستخدمين\s+حقيقيين|مستخدمون\s+حقيقيون|عملاء\s+حقيقيين|عملاء\s+فعليين)/, 'real users'],
+  [/\b(internship|intern at|employed (at|by)|full-time|part-time|freelanc\w*|professional experience|work experience)\b/i, 'employment'],
+  [new RegExp(`${AR_B}(تدريب\\s+(تعاوني|ميداني)|متدربة?\\s+في|عملت\\s+في\\s+شركة|موظفة?\\s+في|خبرة\\s+(مهنية|عملية|وظيفية)|عمل\\s+حر)`), 'employment'],
+];
+
+/**
+ * Phase 7 / REC-006 — outcome claims. No recorded fact in this product
+ * measures an effect on users, a team or a business, so a wording that claims
+ * one ("which made onboarding smoother", "ما جعل … أسلس") is unsupported with
+ * or without a number. Deterministic and provider-independent: the lexicon is
+ * reviewable data. Its limit is a paraphrase outside the lexicon (reported).
+ */
+export const OUTCOME_PATTERNS: readonly RegExp[] = [
+  // connective + effect verb: "which made", "that helped", "thereby reduced". Functional
+  // descriptions of the artefact ("a form that lets users add habits") are not matched.
+  /\b(which|that|this|thereby|so that)\s+(\w+\s+){0,2}?(made|led|resulted|helped|improved|improves|reduced|reduces|increased|increases|cut|boosted|boosts|saved|lowered|raised|drove|eased)\b/i,
+  /\b(resulting in|leading to|led to|contributed to|helping to|which means)\b/i,
+  // effect verb + business/user object
+  /\b(improv|reduc|increas|boost|cut|sav|lower|rais|optimi[sz]|streamlin|accelerat|enhanc|doubl|halv|minimi[sz]|maximi[sz])\w*\b[^.;]{0,40}\b(performance|speed|load(ing)? times?|efficiency|conversions?|engagement|retention|satisfaction|revenue|sales|costs?|tickets|complaints|churn|onboarding|productivity|user experience|bounce|traffic|downloads|adoption|errors? rates?)\b/i,
+  // comparative outcome adjectives
+  /\b(smoother|faster|easier|more (efficient|intuitive|engaging|reliable|stable|performant|user-friendly|productive))\b/i,
+  // reactions of people who are not in the evidence
+  /\b(users?|customers?|clients?|stakeholders?|visitors?|the team)\s+(\w+\s+)?(loved|liked|praised|adopted|preferred|appreciated|reported|found it)\b/i,
+  // Arabic: connective + effect verb ("ما جعل", "مما أدى")
+  new RegExp(`${AR_B}(ما|مما)\\s+(جعل|جعلت|ادى|ادت|ساعد|ساعدت|ساهم|ساهمت|اسهم|اسهمت|حسن|حسنت|قلل|قللت|خفض|خفضت|زاد|زادت|رفع|رفعت|سرع|سرعت|وفر|وفرت|سهل|سهلت)${AR_E}`),
+  /(ادى|ادت|ادي)\s+(ذلك\s+)?الى/,
+  /(ساهم|ساهمت|اسهم|اسهمت)\s+في\s+(تحسين|تقليل|زيادة|رفع|خفض|تسريع|تسهيل|توفير)/,
+  // Arabic: comparative outcome adjectives
+  new RegExp(`${AR_B}(اسلس|اسرع|اسهل|اكثر\\s+(سلاسة|كفاءة|سهولة|موثوقية|استقرارا|فعالية|انتاجية))${AR_E}`),
+  // Arabic: effect verb + business/user object
+  /(حسنت|حسن|تحسين|قللت|قلل|تقليل|خفضت|خفض|تخفيض|زدت|زاد|زيادة|رفعت|رفع|سرعت|تسريع|وفرت|توفير|ضاعفت|مضاعفة)\s+(\S+\s+){0,2}?(الاداء|الكفاءة|السرعة|التحويل|التفاعل|الاحتفاظ|الرضا|الايرادات|المبيعات|التكاليف|التكلفة|التذاكر|تذاكر|الشكاوى|الانتاجية|تجربة\s+المستخدم|الزيارات|التنزيلات|زمن\s+التحميل|وقت\s+التحميل)/,
+  // Arabic: reactions
+  /(المستخدمون|المستخدمين|العملاء|الفريق)\s+(\S+\s+)?(احبوا|اشادوا|فضلوا|تبنوا|استحسنوا)/,
+];
+
+export function outcomeClaimIn(text: string): string | null {
+  const t = normalizeArabic(text);
+  for (const re of OUTCOME_PATTERNS) { const m = re.exec(t); if (m) return m[0].trim(); }
+  return null;
+}
+
+/** One named grounding check and its result, recorded with a claim draft so the user sees what was checked. */
+export interface GroundingCheck { readonly check: string; readonly passed: boolean; readonly detail: string }
+
+type Check = readonly [string, () => string | null];
+
+function domainChecks(
+  p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'> & Partial<Pick<AgentProposal, 'summary' | 'rationale'>>,
+  facts: DomainFacts,
+): Check[] {
+  const payload = p.structuredPayload;
+  const checks: Check[] = [];
+
+  // D-076 for EVERY proposal, wording or not: a technology term anywhere in
+  // the text needs an approved source. Technical feedback that says "your
+  // React component" infers a framework the user never declared.
+  checks.push(['technology_sources', () => {
+    const everywhere = [p.summary ?? '', p.rationale ?? '', JSON.stringify(payload)].join(' ');
+    for (const t of technologiesMentioned(everywhere, facts.knownTechnologies)) {
+      if (!facts.approvedTechnologies.has(t)) return `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`;
+    }
+    return null;
+  }]);
+
+  if (payload.kind !== 'wording') return checks;
+  const texts = [payload.suggestedValueAr, payload.suggestedValueEn ?? ''];
+
+  // Every claim needs evidence that exists.
+  checks.push(['evidence_exists', () => {
+    if (WORDING_PROPOSAL_TYPES.has(p.proposalType) && p.proposalType !== 'linkedin_headline' && p.proposalType !== 'professional_summary' && p.proposalType !== 'linkedin_about') {
+      if (p.evidenceRefs.length === 0) return 'a wording proposal with no evidence reference is an unsupported claim';
+      for (const ref of p.evidenceRefs) {
+        if (!facts.existingEvidence.has(ref)) return `evidence '${ref}' does not exist or was withdrawn`;
+      }
+    }
+    return null;
+  }]);
+  // No skill presented above its state — named by id OR written into the text
+  // (Phase 7: a submitted project is not a demonstrated skill, however worded).
+  checks.push(['skill_levels', () => {
+    const asserted = new Set([...payload.namedSkillIds, ...texts.flatMap((t) => skillsMentioned(t, facts.knownSkills, facts.knownTechnologies))]);
+    for (const skillId of asserted) {
+      const state = facts.skillStates[skillId] ?? 'gap';
+      if (evidenceOrdinal(state) < evidenceOrdinal('demonstrated')) {
+        return `skill '${skillId}' is '${state}'; it cannot be presented as a supported claim`;
+      }
+    }
+    return null;
+  }]);
+  // D-076: a technology may appear only with an approved source. Named ones
+  // and ones merely written into the text are checked the same way, against
+  // the data-driven vocabulary — no hard-coded blacklist. Phase 7: when the
+  // wording cites evidence, the source must be the cited work itself.
+  checks.push(['technology_grounding', () => {
+    const mentioned = new Set([...payload.namedTechnologies, ...texts.flatMap((t) => technologiesMentioned(t, facts.knownTechnologies))]);
+    for (const t of mentioned) {
+      if (!facts.approvedTechnologies.has(t)) return `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`;
+      if (p.evidenceRefs.length > 0 && !p.evidenceRefs.some((ref) => facts.approvedTechnologiesByEvidence.get(ref)?.has(t))) {
+        return `technology '${t}' is not declared on the work behind the cited evidence; a technology declared elsewhere is not evidence for this claim`;
+      }
+    }
+    return null;
+  }]);
+  // Invented employer, title, years or certification: none of these has an
+  // evidence path in this product, so any such assertion is unsupported.
+  checks.push(['no_invented_credentials', () => {
+    for (const [re, what] of INVENTED_PATTERNS) {
+      if (texts.some((t) => re.test(t))) return `the wording asserts ${what}, which no evidence records`;
+    }
+    return null;
+  }]);
+  // Phase 7: a completed activity is not a professional achievement.
+  checks.push(['no_professional_work_claim', () => {
+    for (const [re, what] of PROFESSIONAL_WORK_PATTERNS) {
+      if (texts.some((t) => re.test(normalizeArabic(t)))) return `the wording presents a learning activity as professional work (${what}), which no evidence records`;
+    }
+    return null;
+  }]);
+  // No invented metric, no mastery language — the domain's own guard.
+  checks.push(['no_mastery_or_metric_language', () => {
+    try { assertNoUnsupportedLanguage(payload.suggestedValueAr, payload.suggestedValueEn ?? ''); return null; } catch (e) {
+      if (e instanceof InvariantViolation) return e.message;
+      throw e;
+    }
+  }]);
+  // INV-4, generically: a number is a metric. A wording may carry only
+  // numbers that are recorded facts — not "2x faster", not "from 3s to 1s".
+  checks.push(['numbers_are_recorded_facts', () => {
+    for (const n of new Set(texts.flatMap((t) => numbersIn(t)))) {
+      if (!facts.numericFacts.has(n)) return `the wording contains the number ${n}, which no recorded fact supports; a metric needs a measured source`;
+    }
+    return null;
+  }]);
+  // REC-006: an outcome without a number is still an outcome claim.
+  checks.push(['no_unsupported_outcome', () => {
+    for (const t of texts) {
+      const hit = outcomeClaimIn(t);
+      if (hit) return `the wording claims an unsupported outcome ("${hit}"): no recorded fact measures an effect on users, a team or a business; describe what was built and evaluated instead`;
+    }
+    return null;
+  }]);
+  return checks;
+}
+
+/** Runs every check and reports each; used to record what a claim draft was grounded against. */
+export function groundingChecks(
+  p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'> & Partial<Pick<AgentProposal, 'summary' | 'rationale'>>,
+  facts: DomainFacts,
+): GroundingCheck[] {
+  return domainChecks(p, facts).map(([check, run]) => { const fail = run(); return { check, passed: fail === null, detail: fail ?? 'passed' }; });
+}
+
 export function validateAgainstDomain(
   p: Pick<AgentProposal, 'proposalType' | 'structuredPayload' | 'evidenceRefs'> & Partial<Pick<AgentProposal, 'summary' | 'rationale'>>,
   facts: DomainFacts,
 ): void {
   const payload = p.structuredPayload;
-
-  // D-076 for EVERY proposal, wording or not: a technology term anywhere in
-  // the text needs an approved source. Technical feedback that says "your
-  // React component" infers a framework the user never declared.
-  const everywhere = [p.summary ?? '', p.rationale ?? '', JSON.stringify(payload)].join(' ');
-  for (const t of technologiesMentioned(everywhere, facts.knownTechnologies)) {
-    if (!facts.approvedTechnologies.has(t)) throw new ProposalRejected('domain', `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`);
-  }
-
-  if (payload.kind === 'wording') {
-    // Every claim needs evidence that exists.
-    if (WORDING_PROPOSAL_TYPES.has(p.proposalType) && p.proposalType !== 'linkedin_headline' && p.proposalType !== 'professional_summary' && p.proposalType !== 'linkedin_about') {
-      if (p.evidenceRefs.length === 0) throw new ProposalRejected('domain', 'a wording proposal with no evidence reference is an unsupported claim');
-      for (const ref of p.evidenceRefs) {
-        if (!facts.existingEvidence.has(ref)) throw new ProposalRejected('domain', `evidence '${ref}' does not exist or was withdrawn`);
-      }
-    }
-    // No skill presented above its state.
-    for (const skillId of payload.namedSkillIds) {
-      const state = facts.skillStates[skillId] ?? 'gap';
-      if (evidenceOrdinal(state) < evidenceOrdinal('demonstrated')) {
-        throw new ProposalRejected('domain', `skill '${skillId}' is '${state}'; it cannot be presented as a supported claim`);
-      }
-    }
-    // D-076: a technology may appear only with an approved source. Named ones
-    // and ones merely written into the text are checked the same way, against
-    // the data-driven vocabulary — no hard-coded blacklist.
-    const mentioned = new Set([
-      ...payload.namedTechnologies,
-      ...technologiesMentioned(payload.suggestedValueAr, facts.knownTechnologies),
-      ...technologiesMentioned(payload.suggestedValueEn ?? '', facts.knownTechnologies),
-    ]);
-    for (const t of mentioned) {
-      if (!facts.approvedTechnologies.has(t)) throw new ProposalRejected('domain', `technology '${t}' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred`);
-    }
-    // Invented employer, title, years or certification: none of these has an
-    // evidence path in this product, so any such assertion is unsupported.
-    for (const [re, what] of INVENTED_PATTERNS) {
-      if (re.test(payload.suggestedValueAr) || re.test(payload.suggestedValueEn ?? '')) throw new ProposalRejected('domain', `the wording asserts ${what}, which no evidence records`);
-    }
-    // No invented metric, no mastery language — the domain's own guard.
-    try {
-      assertNoUnsupportedLanguage(payload.suggestedValueAr, payload.suggestedValueEn ?? '');
-    } catch (e) {
-      if (e instanceof InvariantViolation) throw new ProposalRejected('domain', e.message);
-      throw e;
-    }
-    // INV-4, generically: a number is a metric. A wording may carry only
-    // numbers that are recorded facts — not "2x faster", not "from 3s to 1s".
-    for (const n of new Set([...numbersIn(payload.suggestedValueAr), ...numbersIn(payload.suggestedValueEn ?? '')])) {
-      if (!facts.numericFacts.has(n)) throw new ProposalRejected('domain', `the wording contains the number ${n}, which no recorded fact supports; a metric needs a measured source`);
-    }
+  for (const [, run] of domainChecks(p, facts)) {
+    const fail = run();
+    if (fail) throw new ProposalRejected('domain', fail);
   }
 
   if (payload.kind === 'validation_activity' && payload.wouldPropose) {

@@ -28,7 +28,7 @@
  */
 
 import { DomainError, InvariantViolation, MissingPrerequisite } from './errors.js';
-import { EVIDENCE_STATES, type EvidenceState } from './evidence-state.js';
+import { EVIDENCE_STATES, SOURCE_STRENGTHS, type EvidenceState, type EvidenceSourceStrength } from './evidence-state.js';
 
 export const CONFIG_ACTIVATIONS = ['inactive', 'development_only', 'legacy_baseline', 'production_active'] as const;
 export type ConfigActivation = (typeof CONFIG_ACTIVATIONS)[number];
@@ -140,13 +140,15 @@ export function buildAssessmentContext(policy: AssessmentContextPolicy, availabl
 
 /* ───────────────────────────────── claim policy ───────────────────────────────── */
 
-export const CLAIM_KINDS = ['cv_bullet', 'linkedin_skill', 'linkedin_project', 'linkedin_headline', 'linkedin_about', 'professional_summary', 'case_study', 'professional_profile', 'evidence_report'] as const;
+/** Phase 7 adds `project_description`: the CV line presentationFor() called 'project_description_only'. */
+export const CLAIM_KINDS = ['cv_bullet', 'project_description', 'linkedin_skill', 'linkedin_project', 'linkedin_headline', 'linkedin_about', 'professional_summary', 'case_study', 'professional_profile', 'evidence_report'] as const;
 export type ClaimKind = (typeof CLAIM_KINDS)[number];
 
 export interface ClaimPolicy extends GovernedConfig {
   claimKind: ClaimKind;
   minEvidenceLevel: EvidenceState;
   minEvidenceCount: number | null;
+  minSourceStrength: EvidenceSourceStrength | null;
   requiresVerificationDecision: boolean;
   requiresUserApproval: true;
   lockUntilGrounded: boolean;
@@ -157,10 +159,16 @@ export function assertClaimPolicySane(p: ClaimPolicy): void {
   if (!(EVIDENCE_STATES as readonly string[]).includes(p.minEvidenceLevel)) throw new DomainError(`claim policy ${p.claimKind}: unknown level '${p.minEvidenceLevel}'`);
   if (p.requiresUserApproval !== true) throw new InvariantViolation('INV-3', 'a professional claim always needs the user\'s approval (BR-021); a policy cannot waive it');
   if (p.minEvidenceCount !== null && (!Number.isInteger(p.minEvidenceCount) || p.minEvidenceCount < 1)) throw new DomainError(`claim policy ${p.claimKind}: evidence count must be a positive integer`);
+  if (p.minSourceStrength !== null && !(SOURCE_STRENGTHS as readonly string[]).includes(p.minSourceStrength)) throw new DomainError(`claim policy ${p.claimKind}: unknown source strength '${p.minSourceStrength}'`);
 }
 
-/** Phase 4 states it explicitly: claim policies are recorded, not consumed. presentationFor() decides until Phase 7. */
-export const CLAIM_POLICY_CONSUMED = false as const;
+/**
+ * Phase 7: claim policies decide claim eligibility (career-claims.ts). The
+ * migration-created `legacy_presentation@1` baseline reproduces presentationFor()
+ * exactly (exhaustive equivalence test); presentationFor() stays as the frozen
+ * reference and the rollback target.
+ */
+export const CLAIM_POLICY_CONSUMED = true as const;
 
 /* ───────────────────────────────── challenge policy ───────────────────────────────── */
 

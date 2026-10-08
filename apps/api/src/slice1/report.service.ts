@@ -129,10 +129,13 @@ export class ReportService {
 
       // Only ACTIVE, approved, evidence-backed assets. A draft is not a claim
       // yet, and a `needs_review` asset is kept but never presented (D-077).
+      // Phase 7: CV bullets only — what the report has always listed. Other
+      // claim kinds (headline, About, case study…) are the user's own channels;
+      // the recruiter report's own claim policy (evidence_report) is not active.
       const assets = await c.query(
         `select body, user_approved_at from professional_asset
           where user_id = $1 and lifecycle_state = 'active' and evidence_backed = true
-            and user_approved_at is not null
+            and user_approved_at is not null and kind = 'cv_bullet'
           order by created_at`,
         [userId],
       );

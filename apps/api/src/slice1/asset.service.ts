@@ -92,7 +92,7 @@ export class AssetService {
       const { rows } = await c.query(
         `select id, kind, title, body, body_en, status, lifecycle_state,
                 evidence_backed, review_reason, review_at,
-                user_approved_at, created_at
+                user_approved_at, created_at, claim_policy_ref
            from professional_asset order by created_at desc`,
       );
       return rows;

@@ -61,11 +61,11 @@ describe('assessment context — identity never passes', () => {
 
 describe('claim and challenge policies are recorded, not consumed', () => {
   test('a claim policy can never waive user approval; constants state the gaps', () => {
-    const cp: ClaimPolicy = { ...row({}), claimKind: 'cv_bullet', minEvidenceLevel: 'demonstrated', minEvidenceCount: null, requiresVerificationDecision: false, requiresUserApproval: true, lockUntilGrounded: true };
+    const cp: ClaimPolicy = { ...row({}), claimKind: 'cv_bullet', minEvidenceLevel: 'demonstrated', minEvidenceCount: null, minSourceStrength: null, requiresVerificationDecision: false, requiresUserApproval: true, lockUntilGrounded: true };
     assert.doesNotThrow(() => assertClaimPolicySane(cp));
     assert.throws(() => assertClaimPolicySane({ ...cp, requiresUserApproval: false as unknown as true }), InvariantViolation);
     assert.throws(() => assertClaimPolicySane({ ...cp, minEvidenceCount: 0 }), DomainError);
-    assert.equal(CLAIM_POLICY_CONSUMED, false); assert.equal(CHALLENGE_RUNNER_EXISTS, false); assert.equal(READINESS_RULES_EXIST, false);
+    assert.equal(CLAIM_POLICY_CONSUMED, true); assert.equal(CHALLENGE_RUNNER_EXISTS, false); assert.equal(READINESS_RULES_EXIST, false);
   });
   test('a challenge policy is inert while inactive or without a trigger', () => {
     const base = { ...row({ activation: 'development_only' }), triggerRule: {}, challengeTypes: ['explanation_question'], maxChallenges: null };

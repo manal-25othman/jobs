@@ -9,6 +9,7 @@
  * NODE_ENV=production.
  */
 
+import { CLAIM_KIND_LABEL_AR, type DraftableClaimKind } from '@naqla/domain';
 import type { AgentProvider, ProviderRequest, ProviderResponse } from './provider.js';
 
 export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 'scripted';
@@ -17,7 +18,7 @@ export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 's
 export interface ScriptedOutput { readonly candidates: readonly unknown[]; }
 
 /** Bumped whenever a template changes, so a harness run names what it ran against. */
-export const LOCAL_TEST_PROVIDER_VERSION = '0.3.0';
+export const LOCAL_TEST_PROVIDER_VERSION = '0.4.0';
 
 export class LocalTestProvider implements AgentProvider {
   readonly name = 'local-test';
@@ -62,6 +63,8 @@ export class LocalTestProvider implements AgentProvider {
 /* The templates below copy context facts; they never add a fact. */
 
 function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const claimRequest = ctx['claimRequest'] as ClaimRequest | undefined;
+  if (claimRequest) return claimDraftCandidates(claimRequest);
   // Mode C — ambiguity: incomplete or conflicting input yields a limitation
   // and a request for clarification, never wording.
   const amb = ctx['ambiguity'] as { kind: string; detail: string } | undefined;
@@ -210,4 +213,108 @@ function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] 
     });
   }
   return out;
+}
+
+/* ───────────── Phase 7: user-requested claim drafts (facts only) ───────────── */
+
+interface ClaimRequest {
+  readonly kind: string;
+  readonly current: string | null;
+  readonly evidence: { id: string; skillId: string; skillLabelAr: string; skillLabelEn: string; state: string; projectTitle: string;
+    evaluationResultId: string | null; criteriaMet: string[]; totalScore: number; maxScore: number } | null;
+  readonly demonstratedSkills: readonly { skillId: string; labelAr: string; labelEn: string }[];
+  readonly roleLabelAr: string | null;
+  readonly roleLabelEn: string | null;
+  readonly approvedTechnologies: readonly string[];
+}
+
+const PROPOSAL_TYPE_FOR_KIND: Readonly<Record<string, string>> = {
+  cv_bullet: 'cv_bullet', project_description: 'project_description', professional_summary: 'professional_summary', linkedin_headline: 'linkedin_headline',
+  linkedin_about: 'linkedin_about', linkedin_skill: 'linkedin_skill', linkedin_project: 'linkedin_project', case_study: 'case_study',
+};
+
+/**
+ * One template per claim kind. Each clause copies a fact from the request:
+ * the project title, the skill label, the met-criterion count and recorded
+ * score, the user-declared technologies, the demonstrated skills. Nothing is
+ * added — no outcome, no employer, no number that was not recorded.
+ */
+function claimDraftCandidates(r: ClaimRequest): unknown[] {
+  const proposalType = PROPOSAL_TYPE_FOR_KIND[r.kind];
+  if (!proposalType) return [];
+  const ev = r.evidence;
+  const skillsAr = r.demonstratedSkills.map((x) => x.labelAr).join('، ');
+  const skillsEn = r.demonstratedSkills.map((x) => x.labelEn).join(', ');
+  const techs = [...r.approvedTechnologies];
+  const needsEvidence = !['professional_summary', 'linkedin_headline', 'linkedin_about'].includes(r.kind);
+  if (needsEvidence && !ev) return [nothingToDraft(r.kind, 'this claim kind needs a piece of evidence and none was given')];
+  if (!needsEvidence && r.demonstratedSkills.length === 0) return [nothingToDraft(r.kind, 'no demonstrated skill exists yet, so a summary would have nothing to stand on')];
+
+  let ar: string; let en: string; let namedSkillIds: string[] = []; let namedTechnologies: string[] = [];
+  const sources: { kind: string; ref: string }[] = [];
+  if (ev) sources.push({ kind: 'evidence', ref: ev.id }, { kind: 'project', ref: ev.projectTitle });
+  switch (r.kind) {
+    case 'cv_bullet':
+      ar = `عملتُ على «${ev!.projectTitle}»، وأثبتُّ ${ev!.skillLabelAr} عبر ${ev!.criteriaMet.length} من المعايير المُقيَّمة بنتيجة ${ev!.totalScore}/${ev!.maxScore}.`;
+      en = `Worked on "${ev!.projectTitle}", demonstrating ${ev!.skillLabelEn} across ${ev!.criteriaMet.length} evaluated criteria, scoring ${ev!.totalScore}/${ev!.maxScore}.`;
+      namedSkillIds = [ev!.skillId]; namedTechnologies = techs;
+      sources.push({ kind: 'skill', ref: ev!.skillId }, ...ev!.criteriaMet.map((c) => ({ kind: 'criterion', ref: c })));
+      break;
+    case 'project_description':
+      ar = techs.length ? `«${ev!.projectTitle}» — مشروع قدّمتُه وقُيِّم وفق معيار منشور (التقنيات المُعلَنة: ${techs.join('، ')}).` : `«${ev!.projectTitle}» — مشروع قدّمتُه وقُيِّم وفق معيار منشور.`;
+      en = techs.length ? `"${ev!.projectTitle}" — a project I submitted, evaluated against a published rubric (declared technologies: ${techs.join(', ')}).` : `"${ev!.projectTitle}" — a project I submitted, evaluated against a published rubric.`;
+      namedTechnologies = techs;
+      break;
+    case 'linkedin_project':
+      ar = `مشروع «${ev!.projectTitle}»: عمل قدّمتُه وقُيِّم وفق معيار منشور.`;
+      en = `Project "${ev!.projectTitle}": work I submitted, evaluated against a published rubric.`;
+      break;
+    case 'linkedin_skill':
+      ar = ev!.skillLabelAr; en = ev!.skillLabelEn; namedSkillIds = [ev!.skillId];
+      sources.push({ kind: 'skill', ref: ev!.skillId });
+      break;
+    case 'case_study':
+      ar = `دراسة حالة: «${ev!.projectTitle}». المهارة المُثبَتة: ${ev!.skillLabelAr} — ${ev!.criteriaMet.length} من المعايير المُقيَّمة مستوفاة.`;
+      en = `Case study: "${ev!.projectTitle}". Demonstrated skill: ${ev!.skillLabelEn} — ${ev!.criteriaMet.length} evaluated criteria met.`;
+      namedSkillIds = [ev!.skillId];
+      sources.push({ kind: 'skill', ref: ev!.skillId }, ...ev!.criteriaMet.map((c) => ({ kind: 'criterion', ref: c })));
+      break;
+    case 'professional_summary':
+      ar = `مهارات أثبتُّها بأعمال مُقيَّمة: ${skillsAr}.`; en = `Skills I demonstrated through evaluated work: ${skillsEn}.`;
+      namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
+      sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
+      break;
+    case 'linkedin_headline':
+      ar = r.roleLabelAr ? `مسار ${r.roleLabelAr} · ${skillsAr} مُثبَتة بعمل مُقيَّم` : `${skillsAr} مُثبَتة بعمل مُقيَّم`;
+      en = r.roleLabelEn ? `${r.roleLabelEn} track · ${skillsEn} demonstrated in evaluated work` : `${skillsEn} demonstrated in evaluated work`;
+      namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
+      sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
+      break;
+    default: // linkedin_about
+      ar = `${r.roleLabelAr ? `أتعلّم في مسار ${r.roleLabelAr}. ` : ''}مهارات أثبتُّها بأعمال مُقيَّمة: ${skillsAr}. كل مهارة هنا مرتبطة بدليل يمكن الرجوع إليه.`;
+      en = `${r.roleLabelEn ? `Learning in the ${r.roleLabelEn} track. ` : ''}Skills I demonstrated through evaluated work: ${skillsEn}. Each one links to evidence.`;
+      namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
+      sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
+  }
+  return [{
+    proposalType, subjectType: ev ? 'evidence' : 'career_goal', subjectId: ev ? ev.id : 'profile',
+    summary: `صياغة مقترحة — ${CLAIM_KIND_LABEL_AR[r.kind as DraftableClaimKind]}`,
+    structuredPayload: { kind: 'wording', currentValue: r.current, suggestedValueAr: ar, suggestedValueEn: en, supportingSources: sources,
+      reason: ev ? 'every clause copies a recorded fact: the project, the evaluated criteria, the declared technologies' : 'every clause names a skill that is demonstrated by evaluated work',
+      unsupportedRisk: 'none', limitationNote: 'wording only; it says what was built and evaluated, not an effect on users or a business',
+      namedSkillIds, namedTechnologies },
+    evidenceRefs: ev ? [ev.id] : [],
+    sourceRefs: ev ? [{ kind: 'evidence', id: ev.id }, ...(ev.evaluationResultId ? [{ kind: 'evaluation_result', id: ev.evaluationResultId }] : [])] : [],
+    rationale: 'the user asked for this claim; the draft uses existing evidence only and waits for the user\'s preview and approval',
+    warnings: [], requiresUserApproval: true,
+  }];
+}
+
+function nothingToDraft(kind: string, why: string): unknown {
+  return {
+    proposalType: 'recruiter_next_action', subjectType: 'career_goal', subjectId: 'claim-request',
+    summary: 'لا توجد أدلة كافية لهذه الصياغة بعد',
+    structuredPayload: { kind: 'action', action: `complete an evaluated activity before drafting a ${kind}`, why, estimatedMinutes: null },
+    evidenceRefs: [], sourceRefs: [], rationale: 'no wording without a support path', warnings: [], requiresUserApproval: false,
+  };
 }

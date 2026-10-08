@@ -11,7 +11,7 @@
  * Version of the proposal envelope and payload contract. Bumped when a field,
  * payload kind or validation-relevant semantic changes. Recorded by the harness.
  */
-export const PROPOSAL_SCHEMA_VERSION = '1.2.0';
+export const PROPOSAL_SCHEMA_VERSION = '1.3.0';
 
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
@@ -33,6 +33,8 @@ export interface AgentDefinition {
 export const RECRUITMENT_PROPOSAL_TYPES = [
   'cv_rewrite', 'cv_bullet', 'professional_summary', 'linkedin_headline', 'linkedin_about',
   'linkedin_skill', 'linkedin_project', 'linkedin_featured', 'profile_gap', 'recruiter_next_action',
+  // Phase 7 (schema 1.3.0): the CV project line and the portfolio / case-study statement.
+  'project_description', 'case_study',
 ] as const;
 
 export const TECHNICAL_PROPOSAL_TYPES = [
@@ -46,7 +48,7 @@ export type ProposalType = (typeof PROPOSAL_TYPES)[number];
 /** Proposals that change professional wording. These ALWAYS need the user. */
 export const WORDING_PROPOSAL_TYPES: ReadonlySet<ProposalType> = new Set([
   'cv_rewrite', 'cv_bullet', 'professional_summary', 'linkedin_headline', 'linkedin_about',
-  'linkedin_skill', 'linkedin_project', 'linkedin_featured',
+  'linkedin_skill', 'linkedin_project', 'linkedin_featured', 'project_description', 'case_study',
 ]);
 
 export const AGENTS: readonly AgentDefinition[] = [
@@ -58,6 +60,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'approvedTechnologies', 'ambiguity', 'skillId', 'skillState',
       // Career Data Foundation: published role requirements (never user evidence).
       'roleRequirements',
+      // Phase 7: a user-requested claim draft — the kind, the current wording and the facts it may use.
+      'claimRequest',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },

@@ -27,9 +27,12 @@ const need = (ok, msg) => { if (!ok) problems.push(msg); };
 const srs = read('docs/srs/SRS-001-naqla-functional.md');
 const headerVersion = srs.match(/\*\*الإصدار:\*\*\s*([0-9]+\.[0-9]+)/)?.[1];
 const changelogVersions = [...srs.matchAll(/^\| \*\*([0-9]+\.[0-9]+)\*\* \| \d{4}-\d{2}-\d{2} \|/gm)].map((m) => m[1]);
-const newest = changelogVersions.map(Number).sort((a, b) => b - a)[0];
+// Versions are major.minor with an integer minor (1.10 follows 1.9): compare as integer pairs, never as decimals.
+const vkey = (v) => v.split('.').map(Number);
+const vcmp = (a, b) => { const [am, an] = vkey(a); const [bm, bn] = vkey(b); return am - bm || an - bn; };
+const newest = [...changelogVersions].sort((a, b) => vcmp(b, a))[0];
 need(headerVersion !== undefined, 'SRS: no header version found');
-need(Number(headerVersion) === newest, `SRS: header says v${headerVersion} but the newest changelog row is v${newest}`);
+need(headerVersion !== undefined && newest !== undefined && vcmp(headerVersion, newest) === 0, `SRS: header says v${headerVersion} but the newest changelog row is v${newest}`);
 need(srs.includes(`— v${headerVersion}`), `SRS: the status blocks do not name v${headerVersion}`);
 const matrix = read('docs/srs/SRS-001-traceability-matrix.md');
 need(matrix.includes(`**v${headerVersion}**`), `traceability matrix is not linked to SRS v${headerVersion}`);

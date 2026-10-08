@@ -150,7 +150,7 @@ describe('reproducibility and provenance (owner §10)', () => {
   });
   test('the run records provider, provider version, dataset version, proposal schema version and domain version', () => {
     assert.deepEqual(run.metadata, { provider: 'local-test', provider_version: LOCAL_TEST_PROVIDER_VERSION, provider_model: `deterministic-template/${LOCAL_TEST_PROVIDER_VERSION}`,
-      dataset_version: '1.0.0', proposal_schema_version: PROPOSAL_SCHEMA_VERSION, domain_version: DOMAIN_RULESET_VERSION, fixed_clock: dataset.fixed_clock, deterministic: true });
+      dataset_version: '1.1.0', proposal_schema_version: PROPOSAL_SCHEMA_VERSION, domain_version: DOMAIN_RULESET_VERSION, fixed_clock: dataset.fixed_clock, deterministic: true });
   });
   test('the only failures are documented gaps, and each is a false accept the report lists', () => {
     const unexpected = run.results.filter((r) => !r.pass && !r.known_gap);

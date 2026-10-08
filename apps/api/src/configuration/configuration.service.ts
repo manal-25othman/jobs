@@ -56,7 +56,7 @@ export class ConfigurationService {
           minAssessmentConfidence: r['min_assessment_confidence'] === null ? null : Number(r['min_assessment_confidence']), minIndependentEvidence: r['min_independent_evidence'] === null ? null : Number(r['min_independent_evidence']),
           escalateOn: r['escalate_on'], blockingRule: r['blocking_rule'], perSkillEvidenceDerivation: r['per_skill_evidence_derivation'], decisionActors: r['decision_actors'], descriptionEn: r['description_en'] })), active: active(vp, (r) => String(r['key'])) },
         assessmentContextPolicies: { items: cx.map((r) => ({ ...presentGoverned(r), inputs: r['inputs_json'], descriptionEn: r['description_en'] })), active: active(cx, (r) => String(r['key'])) },
-        claimPolicies: { consumed: false, note: 'Recorded, not consumed: presentationFor()/career_presentation_rule decide CV/LinkedIn eligibility until Phase 7.',
+        claimPolicies: { consumed: true, note: 'Phase 7: claim drafts are judged by the claim policy active for their kind. legacy_presentation@1 is the migration-created baseline that reproduces presentationFor(); default@1 rows are DRAFT / NOT VALIDATED and inactive (development-only where a seed says so).',
           items: cl.map((r) => ({ ...presentGoverned(r), claimKind: r['kind'], minEvidenceLevel: r['min_evidence_level'], minEvidenceCount: r['min_evidence_count'], minSourceStrength: r['min_source_strength'],
             requiresVerificationDecision: r['requires_verification_decision'], requiresUserApproval: r['requires_user_approval'], lockUntilGrounded: r['lock_until_grounded'], descriptionEn: r['description_en'] })),
           active: active(cl, (r) => `${r['key']}:${r['kind']}`) },

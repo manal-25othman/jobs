@@ -272,3 +272,9 @@ select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_confi
 update disclosure_questionnaire set activation = 'inactive' where key = 'ai_usage' and version = 1 and activation = 'legacy_baseline';
 update disclosure_questionnaire set activation = 'development_only' where key = 'ai_usage' and version = 2 and activation = 'inactive';
 select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);
+
+-- Phase 7: outside production, the demo may draft case studies with the DRAFT default@1 case_study policy
+-- (no legacy baseline exists for case studies; production refuses them until a validated policy is activated).
+select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo: allow DRAFT case-study claim drafts outside production', false);
+update claim_policy set activation = 'development_only' where key = 'default' and version = 1 and claim_kind = 'case_study' and activation = 'inactive';
+select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);

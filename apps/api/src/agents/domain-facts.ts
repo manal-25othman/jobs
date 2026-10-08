@@ -21,6 +21,18 @@ export async function loadDomainFacts(c: PoolClient, userId: string): Promise<Do
         select unnest(declared_technologies) as t from submission where user_id = $1
      ) x`, [userId]);
   const known = await c.query('select term, aliases from technology_term');
+  // Phase 7: technologies per piece of evidence (its project and that project's submissions), and the skill vocabulary.
+  const byEvidence = await c.query(
+    `select e.id, array_remove(array_agg(distinct t), null) as techs
+       from evidence e
+       left join lateral (
+         select unnest(p.declared_technologies) as t from project p where p.id = e.project_id
+         union all
+         select unnest(s.declared_technologies) from submission s where s.project_id = e.project_id and s.user_id = e.user_id
+       ) x on true
+      where e.user_id = $1 and e.withdrawn_at is null group by e.id`, [userId]);
+  // OPEN-039: an alias skill's labels count for its canonical skill (states are keyed by the canonical id).
+  const skills = await c.query('select canonical_skill_id(id) as id, array_agg(label_en) || array_agg(label_ar) as labels from skill group by canonical_skill_id(id)');
   // Recorded numbers only: per evaluation result, the total, the maximum and
   // the count of fully met criteria. Nothing else is a number a wording may use.
   const scores = await c.query(
@@ -34,7 +46,9 @@ export async function loadDomainFacts(c: PoolClient, userId: string): Promise<Do
     skillStates: canonicalEvidenceStates([], claims.rows.map((r) => ({ skillId: String(r.skill_id), state: r.state as EvidenceState }))),
     existingEvidence: new Set<string>(ev.rows.map((r) => r.id)),
     approvedTechnologies: new Set<string>(approved.rows.map((r) => String(r.t))),
+    approvedTechnologiesByEvidence: new Map(byEvidence.rows.map((r) => [String(r.id), new Set<string>((r.techs as string[]) ?? [])])),
     knownTechnologies: new Map<string, readonly string[]>(known.rows.map((r) => [String(r.term), (r.aliases as string[]) ?? []])),
+    knownSkills: new Map<string, readonly string[]>(skills.rows.map((r) => [String(r.id), (r.labels as string[]) ?? []])),
     numericFacts,
   };
 }

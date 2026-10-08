@@ -61,6 +61,15 @@ export const RULES: readonly Rule[] = [
     route: { ruleId: 'R5-criterion-failed-to-technical', agentType: 'technical',
       requestedAction: 'explain the failed criterion', expectedProposalTypes: ['rubric_explanation', 'improvement_action'] },
   },
+  {
+    // Phase 7: the user asks for a claim draft of one kind. The agent proposes;
+    // the claim policy and the user decide.
+    ruleId: 'R6-claim-draft-requested-to-recruitment',
+    when: (e) => e.type === 'user.requested' && typeof e.facts['requestedClaimKind'] === 'string',
+    route: { ruleId: 'R6-claim-draft-requested-to-recruitment', agentType: 'recruitment',
+      requestedAction: 'draft the requested career claim from existing evidence only',
+      expectedProposalTypes: ['cv_bullet', 'project_description', 'professional_summary', 'linkedin_headline', 'linkedin_about', 'linkedin_skill', 'linkedin_project', 'case_study', 'recruiter_next_action'] },
+  },
 ];
 
 /** First matching rule wins. Returns null when no agent should run. */

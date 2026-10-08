@@ -3,11 +3,12 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import {
-  effectOfWithdrawal, assertRelinkAllowed, assertAssetTransition, MissingPrerequisite,
+  effectOfWithdrawal, assertRelinkAllowed, assertAssetTransition, MissingPrerequisite, claimKindForProposalType,
   type EvidenceState, type AssetLifecycleState,
 } from '@naqla/domain';
 import { validateAgainstDomain, ProposalRejected } from '@naqla/agents';
 import { loadDomainFacts } from '../agents/domain-facts';
+import { recordClaimEvent } from '../agents/claim-drafts';
 
 /**
  * Withdrawn evidence (D-077).
@@ -55,15 +56,30 @@ export class WithdrawalService {
         affected.push({ id: a.id, lifecycleState: effect.to, evidenceBacked: effect.evidenceBacked });
       }
 
+      // Phase 7: claim drafts still waiting for the user that cite this evidence are flagged, not deleted.
+      // They can no longer be approved (approval re-checks the evidence); the user sees why.
+      const drafts = await c.query(
+        `select id, proposal_type, claim_kind from agent_proposal
+          where user_id = $1 and lifecycle = 'awaiting_user' and $2 = any(evidence_refs)`, [userId, evidenceId]);
+      const flaggedDrafts: string[] = [];
+      for (const d of drafts.rows) {
+        const kind = claimKindForProposalType(d.proposal_type);
+        if (!kind) continue;
+        if (d.claim_kind) await c.query(`update agent_proposal set grounding_status = 'evidence_withdrawn' where id = $1`, [d.id]);
+        await recordClaimEvent(c, { proposalId: d.id, userId, event: 'flagged_evidence_withdrawn', claimKind: kind, policy: null, actorKind: 'system',
+          detail: `evidence ${evidenceId} was withdrawn: ${reason.trim()}` });
+        flaggedDrafts.push(d.id);
+      }
+
       await emitAuditEvent(c, { eventType: 'evidence.withdrawn', userId, actorKind: 'user', actorId: userId, subjectTable: 'evidence', subjectId: evidenceId,
-        reason: reason.trim(), payload: { affectedAssets: affected.map((a) => a.id) } });
+        reason: reason.trim(), payload: { affectedAssets: affected.map((a) => a.id), flaggedClaimDrafts: flaggedDrafts } });
 
       // Phase 2: the journey learns how much evidence still stands. The claim state is not touched here (D-077).
       const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [userId, ev.rows[0].skill_id]);
       await this.progress.apply(c, { userId, skillId: ev.rows[0].skill_id, trigger: 'evidence.withdrawn', facts: { standing_evidence_count: standing.rows[0].n },
         eventRef: { table: 'evidence', id: evidenceId }, reason: `evidence withdrawn: ${reason.trim()}`, actorKind: 'user' });
 
-      return { evidenceId, withdrawn: true as const, affectedAssets: affected };
+      return { evidenceId, withdrawn: true as const, affectedAssets: affected, flaggedClaimDrafts: flaggedDrafts };
     });
   }
 

@@ -16,6 +16,12 @@ export interface ScenarioDomainFacts {
   readonly existingEvidence: readonly string[];
   readonly approvedTechnologies: readonly string[];
   readonly numericFacts: readonly string[];
+  /**
+   * Phase 7: approved technologies per evidence id. Omitted in a scenario that
+   * describes a single project: every existing evidence then carries the
+   * scenario's approved technologies (stated in the run, not guessed).
+   */
+  readonly approvedTechnologiesByEvidence?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface Scenario {
@@ -62,6 +68,8 @@ export interface Dataset {
   readonly dataset_version: string;
   readonly fixed_clock: string;
   readonly known_technologies: Readonly<Record<string, readonly string[]>>;
+  /** Phase 7: the skill vocabulary (skillId → labels) used to detect skills written into a wording. */
+  readonly known_skills?: Readonly<Record<string, readonly string[]>>;
   readonly scenarios: readonly Scenario[];
 }
 

@@ -46,7 +46,11 @@ export function scenarioFacts(s: Scenario, d: Dataset): DomainFacts {
     skillStates: { ...s.domain_facts.skillStates },
     existingEvidence: new Set(s.domain_facts.existingEvidence),
     approvedTechnologies: new Set(s.domain_facts.approvedTechnologies),
+    approvedTechnologiesByEvidence: new Map(s.domain_facts.approvedTechnologiesByEvidence
+      ? Object.entries(s.domain_facts.approvedTechnologiesByEvidence).map(([e, t]) => [e, new Set(t)])
+      : s.domain_facts.existingEvidence.map((e) => [e, new Set(s.domain_facts.approvedTechnologies)])),
     knownTechnologies: new Map(Object.entries(d.known_technologies)),
+    knownSkills: new Map(Object.entries(d.known_skills ?? {})),
     numericFacts: new Set(s.domain_facts.numericFacts),
   };
 }

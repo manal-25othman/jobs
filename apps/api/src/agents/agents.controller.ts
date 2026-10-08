@@ -19,5 +19,12 @@ export class AgentsController {
   async reject(@CurrentUser() u: AuthenticatedUser, @Param('id') id: string, @Body() body: { reason: string }) {
     return { ok: true, data: await this.agents.reject(u.id, id, body?.reason) };
   }
+  /* Phase 7: claim drafts — request one, see the options, read a draft's history. */
+  @Get('claim-drafts/options') async claimOptions(@CurrentUser() u: AuthenticatedUser) { return { ok: true, data: await this.agents.claimDraftOptions(u.id) }; }
+  @Post('claim-drafts')
+  async requestClaimDraft(@CurrentUser() u: AuthenticatedUser, @Body() body: { claimKind: string; evidenceId?: string | null }) {
+    return { ok: true, data: await this.agents.requestClaimDraft(u.id, String(body?.claimKind ?? ''), body?.evidenceId ? String(body.evidenceId) : null) };
+  }
+  @Get('claim-drafts/:id/history') async claimHistory(@CurrentUser() u: AuthenticatedUser, @Param('id') id: string) { return { ok: true, data: { items: await this.agents.claimHistory(u.id, id) } }; }
   @Get('companion') async companion(@CurrentUser() u: AuthenticatedUser) { return { ok: true, data: await this.agents.companion(u.id) }; }
 }
