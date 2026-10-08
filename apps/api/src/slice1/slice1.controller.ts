@@ -103,7 +103,7 @@ export class Slice1Controller {
       repositoryUrl?: string;
       uploadIds?: string[];
       externalUrls?: string[];
-      aiDisclosure: { declaredUse: string[]; explanation?: string | null };
+      aiDisclosure: { declaredUse?: string[]; explanation?: string | null; questionnaireId?: string; answers?: Record<string, unknown> };
     },
   ) {
     return { ok: true, data: await this.submissions.createSubmission(user.id, projectId, body) };

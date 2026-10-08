@@ -31,6 +31,8 @@ export * from './skill-progress.js';
 export * from './verification-policy.js';
 export * from './configuration.js';
 export * from './readiness.js';
+export * from './disclosure-questionnaire.js';
+export * from './integrity.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.12.0';
+export const DOMAIN_RULESET_VERSION = '0.13.0';

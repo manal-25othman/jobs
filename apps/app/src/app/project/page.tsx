@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, uploadEvidenceFile, type Project, type EvidenceItem } from '../../lib/api';
+import { api, uploadEvidenceFile, type Project, type EvidenceItem, type DisclosureQuestionnaireView, type DisclosureQuestionView } from '../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
 import { Steps } from '../../components/Steps';
-import { deliverableProgress } from '@naqla/domain';
+import { deliverableProgress, questionVisible } from '@naqla/domain';
 
 /** The seeded demo activity. One activity, one rubric — nothing more. */
 const DEMO_ACTIVITY = 'c0000000-0000-4000-8000-000000000001';
@@ -28,7 +28,9 @@ export default function ProjectPage() {
   const [testFile, setTestFile] = useState<File | null>(null);
   const [repoUrl, setRepoUrl] = useState('');
   const [note, setNote] = useState('');
-  const [aiUse, setAiUse] = useState('');
+  // Phase 6: the disclosure questionnaire is configuration, fetched — never hard-coded here.
+  const [questionnaire, setQuestionnaire] = useState<DisclosureQuestionnaireView['questionnaire']>(null);
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const router = useRouter();
@@ -37,6 +39,9 @@ export default function ProjectPage() {
     if (!token) return;
     void api<{ items: Project[] }>('/projects', { token })
       .then((p) => setProjects(p.items))
+      .catch((e) => setError((e as Error).message));
+    void api<DisclosureQuestionnaireView>('/disclosure-questionnaire', { token })
+      .then((q) => setQuestionnaire(q.questionnaire))
       .catch((e) => setError((e as Error).message));
     // Phase 1: what the ledger holds for this user. Material, not proof.
     void api<{ items: EvidenceItem[] }>('/me/evidence', { token })
@@ -87,7 +92,10 @@ export default function ProjectPage() {
           artifacts,
           uploadIds: [componentUpload, testUpload],
           externalUrls: repoUrl.trim() ? [repoUrl.trim()] : [],
-          aiDisclosure: { declaredUse: aiUse.trim() ? [aiUse.trim()] : [], explanation: null },
+          // Answers to the exact questionnaire version shown; questions hidden by show-if are not sent.
+          aiDisclosure: questionnaire
+            ? { questionnaireId: questionnaire.id, answers: Object.fromEntries(Object.entries(answers).filter(([k]) => { const q = questionnaire.questions.find((x) => x.key === k); return q ? questionVisible(q, answers) : false; })) }
+            : { declaredUse: [], explanation: null },
         },
       });
       router.push(`/evaluation?submission=${submission.id}`);
@@ -167,12 +175,16 @@ export default function ProjectPage() {
       </section>
 
       <section className="card">
-        <h2>إقرار استخدام الذكاء الاصطناعي</h2>
-        <label className="field">
-          <span className="field__label">بماذا ساعدك الذكاء الاصطناعي؟ (اتركيه فارغًا إن لم تستعيني به)</span>
-          <input className="input" value={aiUse} onChange={(e) => setAiUse(e.target.value)} />
-        </label>
-        <p className="disclaimer">الإفصاح لا يخفض درجتك. المهم ما فعلتِه، وبماذا ساعدك، وهل تستطيعين شرح عملك والدفاع عنه.</p>
+        <h2>{questionnaire?.labelAr ?? 'طريقة عملك'}</h2>
+        <p className="body-sm">{questionnaire?.introAr ?? 'استخدام أدوات الذكاء الاصطناعي مسموح.'}</p>
+        {questionnaire ? questionnaire.questions.filter((q) => questionVisible(q, answers)).map((q) => (
+          <DisclosureField key={q.key} q={q} value={answers[q.key]} onChange={(v) => setAnswers({ ...answers, [q.key]: v })} />
+        )) : null}
+        <p className="disclaimer">
+          الإجابة بأنك استخدمتِ الذكاء الاصطناعي لا تخفض درجتك ولا تُحيل عملك إلى مراجعة بشرية بذاتها.
+          نقيّم فهمك ومساهمتك في العمل؛ ولا نستخدم أي «كاشف ذكاء اصطناعي» ولا نخمّن مصدر الكود من أسلوبه.
+          {questionnaire && !questionnaire.validated ? <> صيغة الأسئلة قيد اعتماد الخبراء.</> : null}
+        </p>
       </section>
 
       <div className="next-action">
@@ -223,4 +235,52 @@ export default function ProjectPage() {
       ) : null}
     </main>
   );
+}
+
+/** One configured question. Rendering follows the answer type from configuration; nothing is hard-coded per question. */
+function DisclosureField({ q, value, onChange }: { q: DisclosureQuestionView; value: unknown; onChange: (v: unknown) => void }) {
+  const label = <span className="field__label">{q.promptAr}{q.required ? <span className="chip" style={{ marginInlineStart: 8 }}>مطلوب</span> : null}</span>;
+  const help = q.helpAr ? <span className="micro muted">{q.helpAr}</span> : null;
+  switch (q.answerType) {
+    case 'yes_no':
+      return (
+        <div className="field">{label}
+          <div className="row" style={{ gap: 12 }}>
+            {[{ v: true, t: 'نعم' }, { v: false, t: 'لا' }].map((o) => (
+              <label key={String(o.v)} className="check-row"><input type="radio" name={q.key} checked={value === o.v} onChange={() => onChange(o.v)} /> <span>{o.t}</span></label>
+            ))}
+          </div>{help}
+        </div>
+      );
+    case 'single_choice':
+      return (
+        <div className="field">{label}
+          {q.options.map((o) => <label key={o.value} className="check-row"><input type="radio" name={q.key} checked={value === o.value} onChange={() => onChange(o.value)} /> <span>{o.labelAr}</span></label>)}{help}
+        </div>
+      );
+    case 'multi_choice': {
+      const selected = Array.isArray(value) ? (value as string[]) : [];
+      return (
+        <div className="field">{label}
+          {q.options.map((o) => (
+            <label key={o.value} className="check-row">
+              <input type="checkbox" checked={selected.includes(o.value)} onChange={(e) => onChange(e.target.checked ? [...selected, o.value] : selected.filter((x) => x !== o.value))} /> <span>{o.labelAr}</span>
+            </label>
+          ))}{help}
+        </div>
+      );
+    }
+    case 'text_list':
+      return (
+        <label className="field">{label}
+          <input className="input" value={Array.isArray(value) ? (value as string[]).join('، ') : ''} onChange={(e) => onChange(e.target.value.split(/[،,]/).map((x) => x.trim()).filter(Boolean))} />{help}
+        </label>
+      );
+    default:
+      return (
+        <label className="field">{label}
+          <input className="input" value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} />{help}
+        </label>
+      );
+  }
 }

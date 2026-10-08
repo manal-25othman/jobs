@@ -265,3 +265,10 @@ commit;
 
 -- Phase 4: the demo track's first configuration version (DRAFT, development only; never production).
 select ensure_track_config_version('b0000000-0000-4000-8000-000000000001', '0.2.0', 'seed 0001_demo_role', 'development_only');
+
+-- Phase 6: outside production, the demo uses the DRAFT ai_usage@2 questionnaire (development only).
+-- The legacy baseline ai_usage@1 is deactivated explicitly first; both acts are audited in config_change.
+select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo: use the draft questionnaire ai_usage@2 outside production', false);
+update disclosure_questionnaire set activation = 'inactive' where key = 'ai_usage' and version = 1 and activation = 'legacy_baseline';
+update disclosure_questionnaire set activation = 'development_only' where key = 'ai_usage' and version = 2 and activation = 'inactive';
+select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);

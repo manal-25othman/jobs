@@ -92,7 +92,8 @@ export function assertActivationAllowed(p: { from: ConfigActivation; to: ConfigA
 
 /* ───────────────────────────── assessment context ───────────────────────────── */
 
-export const CONTEXT_INPUT_KINDS = ['submission_artifacts', 'evidence_items', 'ai_disclosure', 'previous_attempts', 'human_review_decisions', 'user_identity', 'user_profile'] as const;
+/** `integrity_signals` (Phase 6) is a known kind; a context policy that does not list it excludes it (the baseline does). */
+export const CONTEXT_INPUT_KINDS = ['submission_artifacts', 'evidence_items', 'ai_disclosure', 'previous_attempts', 'human_review_decisions', 'integrity_signals', 'user_identity', 'user_profile'] as const;
 export type ContextInputKind = (typeof CONTEXT_INPUT_KINDS)[number];
 export const CONTEXT_INPUT_MODES = ['required', 'optional', 'excluded'] as const;
 export type ContextInputMode = (typeof CONTEXT_INPUT_MODES)[number];

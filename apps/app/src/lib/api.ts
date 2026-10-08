@@ -219,3 +219,21 @@ export interface TrackSkillDetail {
   journeyEvents: { trigger: string; from: string; to: string | null; applied: boolean; outcome: string; reason: string; at: string }[];
   activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];
 }
+
+/* ───────────────────────── AI usage & integrity (Phase 6) ───────────────────────── */
+
+export interface DisclosureQuestionView {
+  key: string; position: number; promptAr: string; promptEn: string; helpAr: string | null;
+  answerType: 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text' | 'text_list';
+  options: { value: string; labelAr: string; labelEn: string }[]; required: boolean; showIf: Record<string, string | boolean>;
+}
+export interface DisclosureQuestionnaireView {
+  questionnaire: { id: string; key: string; version: number; labelAr: string; introAr: string; reviewStatus: string; validated: boolean; activation: string; resolution: string; questions: DisclosureQuestionView[] } | null;
+  aiUseAllowedAr?: string; scoreEffect?: 'none'; requiresHumanReview?: false;
+}
+/** A short verification step. Never an accusation. */
+export interface ChallengeView {
+  id: string; submissionId: string; typeCode: string; typeLabelAr: string; promptAr: string; promptEn: string | null;
+  status: 'issued' | 'answered' | 'reviewed' | 'expired' | 'withdrawn'; issuedAt: string; dueAt: string | null;
+  response: { text?: string; code?: string } | null; respondedAt: string | null; result: { outcome: string; observations: string; reviewedAt: string } | null;
+}

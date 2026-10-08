@@ -5,6 +5,8 @@ import { assertModeRespected, assertExternalUrlValid, type AiUsageMode } from '@
 import { UploadService } from './upload.service';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
+import { DisclosureService, type AiDisclosureInput } from '../integrity/disclosure.service';
+import { IntegritySignalService } from '../integrity/integrity-signal.service';
 
 export interface SubmissionArtifactInput {
   key: string;
@@ -24,7 +26,8 @@ export interface SubmissionArtifactInput {
  */
 @Injectable()
 export class SubmissionService {
-  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine) {}
+  constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine,
+    private readonly disclosures: DisclosureService, private readonly signals: IntegritySignalService) {}
 
   async createSubmission(userId: string, projectId: string, input: {
     skillIds: string[];
@@ -34,7 +37,8 @@ export class SubmissionService {
     uploadIds?: string[];
     /** External http(s) evidence. Become `link` artifacts. */
     externalUrls?: string[];
-    aiDisclosure: { declaredUse: string[]; explanation?: string | null };
+    /** Legacy { declaredUse, explanation } or Phase 6 { questionnaireId, answers }. Answering "no AI" is a valid answer. */
+    aiDisclosure: AiDisclosureInput;
   }) {
     if (!input.skillIds?.length) {
       throw new BadRequestException('a submission must name at least one skill it claims');
@@ -63,9 +67,12 @@ export class SubmissionService {
       if (project.rows[0].user_id !== userId) throw new NotFoundException('project not found');
 
       const mode: AiUsageMode = project.rows[0].ai_usage_mode ?? 'ai_assisted';
+      // Phase 6: the disclosure is validated against the exact questionnaire version (or the legacy
+      // fields, recorded against the baseline). AI use is allowed; this is context, never a penalty.
+      const disclosure = await this.disclosures.prepare(c, input.aiDisclosure);
       // Declared AI authoring on an ai_prohibited activity contradicts the
       // spec the work was assigned under.
-      assertModeRespected({ mode, userDeclaredUse: input.aiDisclosure.declaredUse });
+      assertModeRespected({ mode, userDeclaredUse: disclosure.validated.declaredUse });
 
       const sub = await c.query(
         `insert into submission (project_id, user_id, state, repository_url, locked_at)
@@ -132,13 +139,8 @@ export class SubmissionService {
         );
       }
 
-      // Provenance for the submission itself: the user said this is their work.
-      await c.query(
-        `insert into ai_disclosure (submission_id, user_id, mode, declared_use, explanation)
-         values ($1,$2,$3,$4,$5)`,
-        [submissionId, userId, mode, input.aiDisclosure.declaredUse,
-         input.aiDisclosure.explanation ?? null],
-      );
+      // Provenance for the submission itself: the user said this is their work, and how they worked.
+      const disclosureId = await this.disclosures.record(c, { submissionId, userId, mode, prepared: disclosure });
 
       // A submission moves a claim to `practiced` at most: the user showed the
       // skill in their own work. It never reaches `demonstrated` here.
@@ -148,13 +150,17 @@ export class SubmissionService {
 
       // Phase 1: the submission is also recorded in the evidence ledger (typed
       // items, skill links, attempt number). The ledger moves no claim.
-      await this.ledger.recordSubmission(c, {
+      const ledgerResult = await this.ledger.recordSubmission(c, {
         userId, submissionId, projectId, projectTitle: project.rows[0].title, activitySpecId: project.rows[0].activity_spec_id,
         skillIds: input.skillIds, files: ledgerFiles, links: ledgerLinks,
         texts: (input.artifacts ?? []).filter((a) => a.kind === 'text' && (a.valueText ?? '').trim().length > 0)
           .map((a) => ({ key: a.key, text: a.valueText as string, locator: a.locator ?? null })),
-        disclosure: { mode, declaredUse: input.aiDisclosure.declaredUse },
+        disclosure: { mode, declaredUse: disclosure.validated.declaredUse },
       });
+
+      // Phase 6: observable facts only — the disclosure (neutral context) and, from attempt 2, the resubmission.
+      await this.signals.emitForSubmission(c, { userId, submissionId, disclosureId, questionnaireRef: `${disclosure.questionnaire.key}@${disclosure.questionnaire.version}`,
+        aiUseDeclared: disclosure.validated.aiUseDeclared, answeredCount: disclosure.validated.answers.length, submissionItemId: ledgerResult.submissionItemId, attemptNumber: ledgerResult.attemptNumber });
 
       // Phase 2: the journey of each claimed skill records the submission. The claim ceiling above is untouched.
       await this.progress.applyAll(c, input.skillIds, { userId, trigger: 'submission.created', facts: { project_id: projectId },

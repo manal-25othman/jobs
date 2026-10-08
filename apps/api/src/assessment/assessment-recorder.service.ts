@@ -69,6 +69,8 @@ export class AssessmentRecorderService {
       ai_disclosure: disclosure.rows[0] ? { mode: disclosure.rows[0].mode, declared_use: disclosure.rows[0].declared_use } : null,
       previous_attempts: previous.length ? previous : null,
       human_review_decisions: p.humanDecisions?.length ? p.humanDecisions.map((d) => d.criterionKey) : null,
+      // Phase 6: offered, never forced — a context policy decides; the legacy baseline excludes it.
+      integrity_signals: await (async () => { const ids = (await c.query('select id from integrity_signal where submission_id = $1 order by created_at', [p.submissionId])).rows.map((r) => r.id as string); return ids.length ? ids : null; })(),
     });
     const inputs = { ...context.included, excluded: context.excluded, omitted_optional: context.omittedOptional, identity_excluded: true, context_policy: context.policyRef, context_policy_resolution: ctx.resolution };
     const role = await c.query('select target_role_id from activity_spec where id = $1', [p.rubric.activitySpecId]);

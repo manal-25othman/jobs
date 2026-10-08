@@ -5,6 +5,7 @@ import { emitAuditEvent } from '../infra/audit';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import { AssessmentRecorderService } from '../assessment/assessment-recorder.service';
+import { IntegritySignalService } from '../integrity/integrity-signal.service';
 import {
   runDeterministicEvaluation, assertRubricProposalSane, assertTransitionAllowed,
   assertEvaluationResultValid, assertStateAvailableInProduction, skillsEvidencedByRun, evidenceOrdinal, DOMAIN_RULESET_VERSION,
@@ -35,7 +36,8 @@ import {
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
 
-  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine, private readonly assessments: AssessmentRecorderService) {}
+  constructor(private readonly db: DbService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine, private readonly assessments: AssessmentRecorderService,
+    private readonly signals: IntegritySignalService) {}
 
   async evaluateSubmission(userId: string, submissionId: string) {
     return this.db.asService(async (c) => {
@@ -136,6 +138,10 @@ export class EvaluationService {
           [resultId, ic.key, ic.classification, ic.passed, ic.passed ? null : 'unmet'],
         );
       }
+
+      // Phase 6: each deterministic check that did not pass is recorded as an observable signal (no outcome attached).
+      await this.signals.emitForEvaluation(c, { userId, submissionId, evaluationResultId: resultId,
+        checks: run.integrityChecks.map((i) => ({ key: i.key, passed: i.passed, classification: i.classification })) });
 
       // Phase 3: the structured assessment — what the evaluator observed — beside the result.
       const assessment = await this.assessments.recordAssessment(c, {

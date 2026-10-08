@@ -135,6 +135,10 @@ describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability,
     assert.ok(opened.body.data.submission.userExplanation.some((e: { key: string }) => e.key === 'note.data_flow'));
     assert.equal(opened.body.data.deterministic.criteria.length, 1);
     assert.equal(opened.body.data.submissionId, submissionId);
+    // Phase 6: the reviewer receives the disclosure as context (questionnaire version + answers), still blind.
+    assert.equal(opened.body.data.submission.aiDisclosure.questionnaire, 'ai_usage@1', 'the legacy API shape is recorded against the baseline questionnaire');
+    assert.deepEqual(opened.body.data.submission.aiDisclosure.declaredUse, ['code_completion']);
+    assert.equal(opened.body.data.submission.aiDisclosure.answers.length, 1);
   });
   test('6, 7 — a reviewer cannot modify the submission or the evidence state: no route exists, and RLS refuses at the database', async () => {
     const user = await newUser(); await submitted(user); const r = await reviewer();

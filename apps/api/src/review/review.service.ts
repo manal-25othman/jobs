@@ -188,7 +188,8 @@ export class ReviewService {
     const arts = await c.query('select key, kind, value_bool, value_number, value_text, locator from submission_artifact where submission_id = $1 order by key', [item['submission_id']]);
     const files = await c.query(`select u.id, u.bucket, u.object_path, u.content_type, u.size_bytes, u.checksum_sha256, a.key
                                    from submission_artifact a join upload u on u.id = a.upload_id where a.submission_id = $1 and a.kind = 'file' and u.state = 'confirmed' order by a.key`, [item['submission_id']]);
-    const disclosure = await c.query('select declared_use from ai_disclosure where submission_id = $1', [item['submission_id']]);
+    const disclosure = await c.query('select id, declared_use, questionnaire_key, questionnaire_version, ai_use_declared from ai_disclosure where submission_id = $1', [item['submission_id']]);
+    const disclosureAnswers = disclosure.rows[0] ? await c.query(`select question_key, question_snapshot, answer from ai_disclosure_answer where disclosure_id = $1 order by (question_snapshot->>'position')::int`, [disclosure.rows[0].id]) : { rows: [] };
     const context = await this.deterministicContext(c, String(item['evaluation_id']));
     // OPEN-045: human-observable integrity checks are INPUTS to this criterion's decision — what to look at,
     // and what counts as pass/fail. They carry no identity and no score of their own.
@@ -216,7 +217,10 @@ export class ReviewService {
         files: fileEntries,
         // The user's own words, where the activity asked for them (notes and answers are artifacts).
         userExplanation: arts.rows.filter((r) => /^(note|answer)\./.test(r.key)).map((r) => ({ key: r.key, text: r.value_text })),
-        aiDisclosure: { declaredUse: disclosure.rows[0]?.declared_use ?? [] },
+        // Context for the reviewer: how the user says they worked. AI use is allowed; it is not a reason to fail.
+        aiDisclosure: { declaredUse: disclosure.rows[0]?.declared_use ?? [], aiUseDeclared: disclosure.rows[0]?.ai_use_declared ?? null,
+          questionnaire: disclosure.rows[0]?.questionnaire_key ? `${disclosure.rows[0].questionnaire_key}@${disclosure.rows[0].questionnaire_version}` : null,
+          answers: disclosureAnswers.rows.map((a) => ({ questionKey: a.question_key, promptAr: a.question_snapshot.prompt_ar, answer: a.answer })) },
       },
       deterministic: context,
       previousDecisions: decisions.rows.map((d) => ({ reviewId: d.id, decision: d.decision, score: Number(d.score), rationale: d.rationale, createdAt: d.created_at, supersedesReviewId: d.supersedes_review_id })),

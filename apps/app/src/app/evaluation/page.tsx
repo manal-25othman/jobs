@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, type EvaluationResult, type SkillJourney, type SkillJourneyEngine, type Assessment } from '../../lib/api';
+import { api, type EvaluationResult, type SkillJourney, type SkillJourneyEngine, type Assessment, type ChallengeView } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { CompanionNudge } from '../../components/CompanionNudge';
@@ -14,6 +14,8 @@ function EvaluationInner() {
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [journey, setJourney] = useState<{ items: SkillJourney[]; engine: SkillJourneyEngine } | null>(null);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [challenges, setChallenges] = useState<{ introAr: string; items: ChallengeView[] } | null>(null);
+  const [challengeDraft, setChallengeDraft] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -30,6 +32,8 @@ function EvaluationInner() {
         // Phase 3: the structured assessment and the policy decision, read after the evaluation committed.
         const a = await api<{ items: Assessment[] }>(`/submissions/${submissionId}/assessment`, { token });
         setAssessment(a.items[a.items.length - 1] ?? null);
+        // Phase 6: verification steps for this submission, if any were issued (none are in this phase).
+        setChallenges(await api<{ introAr: string; items: ChallengeView[] }>(`/me/challenges?submissionId=${submissionId}`, { token }));
       } catch (e) {
         setError((e as Error).message);
       }
@@ -190,6 +194,30 @@ function EvaluationInner() {
           <a className="link" href="/project">ابدئي تسليمًا جديدًا</a>
         </section>
       )}
+
+      {challenges && challenges.items.length > 0 ? (
+        <section className="card">
+          <h2>{challenges.introAr}</h2>
+          <div className="rows">
+            {challenges.items.map((ch) => (
+              <div key={ch.id} className="stack" style={{ gap: 6 }}>
+                <span className="body-sm" style={{ fontWeight: 500 }}>{ch.promptAr}</span>
+                {ch.status === 'issued' ? (
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <input className="input grow" value={challengeDraft[ch.id] ?? ''} onChange={(e) => setChallengeDraft({ ...challengeDraft, [ch.id]: e.target.value })} />
+                    <button className="btn" onClick={async () => {
+                      if (!token) return;
+                      await api(`/me/challenges/${ch.id}/response`, { method: 'POST', token, body: { text: challengeDraft[ch.id] ?? '' } });
+                      setChallenges(await api<{ introAr: string; items: ChallengeView[] }>(`/me/challenges?submissionId=${submissionId}`, { token }));
+                    }}>إرسال</button>
+                  </div>
+                ) : <span className="chip">{ch.status === 'answered' ? 'أُرسلت الإجابة' : ch.status === 'reviewed' ? 'رُوجعت' : ch.status}</span>}
+              </div>
+            ))}
+          </div>
+          <p className="disclaimer">هذه خطوة لتأكيد فهمك لعملك، وليست اتهامًا. استخدام أدوات الذكاء الاصطناعي مسموح.</p>
+        </section>
+      ) : null}
 
       {assessment ? (
         <section className="card">
