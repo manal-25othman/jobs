@@ -118,6 +118,12 @@ describe('critical evidence rules', () => {
     const src = (await pool.query('select evaluation_result_id, project_id from evidence where id = $1', [evidenceId])).rows[0];
     const practicedEv = (await pool.query(`insert into evidence (user_id, skill_id, source_strength, evaluation_result_id, project_id, provenance_class, provenance_source, confidence)
       values ($1,$2,'platform_controlled',$3,$4,'system_derived','e2e fixture',1.0) returning id`, [user.id, SECONDARY, src.evaluation_result_id, src.project_id])).rows[0].id;
+    // Closure guard: the DRAFT presentation-rule data that allows cv_bullet at practiced exists, and is NOT consumed —
+    // eligibility stays presentationFor()-equivalent until an expert and the Product Owner decide otherwise.
+    const conflicting = (await pool.query(`select allowed, review_status::text as rs from career_presentation_rule where asset_type = 'cv_bullet' and evidence_level = 'practiced'`)).rows;
+    assert.ok(conflicting.length > 0 && conflicting.every((r) => r.allowed === true && r.rs === 'draft'), 'the conflicting draft rule is present and still draft');
+    assert.equal((await pool.query(`select count(*)::int as n from claim_policy where claim_kind = 'cv_bullet' and activation <> 'inactive' and min_evidence_level::text <> 'demonstrated'`)).rows[0].n, 0,
+      'no active cv_bullet policy below demonstrated');
     for (const kind of ['cv_bullet', 'linkedin_skill', 'case_study']) {
       const r = await ask(user, kind, practicedEv);
       assert.equal(r.status, 'not_eligible', kind); assert.equal(r.proposalIds.length, 0);
