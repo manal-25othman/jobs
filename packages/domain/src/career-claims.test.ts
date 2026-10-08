@@ -108,3 +108,29 @@ describe('claim kinds', () => {
     assert.equal(claimKindForProposalType('profile_gap'), null);
   });
 });
+
+import { assetPresentableNow } from './index.js';
+
+describe('approval vs current standing — fail-closed presentation gate', () => {
+  const base = { lifecycleState: 'active', evidenceBacked: true, userApprovedAt: '2026-10-08T00:00:00Z', standingPolicyId: null, claimPolicyId: 'baseline' };
+  const baseline = { policyId: 'baseline', resolution: 'legacy_baseline' as const };
+  const v2 = { policyId: 'v2', resolution: 'production_active' as const };
+  test('an asset approved under the policy in effect is presentable', () => {
+    assert.equal(assetPresentableNow(base, baseline).presentable, true);
+  });
+  test('a newer policy in effect hides it until it is re-checked under that policy', () => {
+    assert.deepEqual(assetPresentableNow(base, v2), { presentable: false, reason: 'not_verified_under_policy_in_effect' });
+    assert.equal(assetPresentableNow({ ...base, standingPolicyId: 'v2' }, v2).presentable, true);
+  });
+  test('an asset approved before the policy layer is presentable only while the legacy baseline is in effect', () => {
+    const pre = { ...base, claimPolicyId: null };
+    assert.equal(assetPresentableNow(pre, baseline).presentable, true);
+    assert.equal(assetPresentableNow(pre, v2).presentable, false);
+  });
+  test('needs_review, not evidence-backed, unapproved, or no policy in effect ⇒ never presentable', () => {
+    assert.equal(assetPresentableNow({ ...base, lifecycleState: 'needs_review' }, baseline).presentable, false);
+    assert.equal(assetPresentableNow({ ...base, evidenceBacked: false }, baseline).presentable, false);
+    assert.equal(assetPresentableNow({ ...base, userApprovedAt: null }, baseline).presentable, false);
+    assert.equal(assetPresentableNow(base, null).reason, 'no_policy_in_effect');
+  });
+});

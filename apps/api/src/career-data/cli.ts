@@ -8,6 +8,7 @@
  *   config-approve <table> <id> --by <uuid> --label <name> --reason "<why>"            Phase 4: validate a configuration row (never a legacy baseline in place)
  *   config-activate <table> <id> --activation <inactive|development_only|production_active> --by <name> --reason "<why>"   audited; production_active needs an approved row; an active row is never replaced by accident
  *   config-new-version <role-uuid> --label <l> --verification key@v --context key@v --claim key@v [--challenge key@v] [--pack v] --by <name>   next DRAFT track configuration version (inactive)
+ *   claims-revalidate [claim_kind] --by <name>   Phase 7b: re-check approved assets' standing against the claim policy in effect (recovery after an out-of-band change)
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
 import { Pool } from 'pg';
@@ -19,7 +20,7 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
-import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet } from '../configuration/config-admin.service';
+import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims } from '../configuration/config-admin.service';
 import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
@@ -99,6 +100,11 @@ export async function main(argv: string[], root: string): Promise<number> {
       const r = await cliActivate(pool, { table: a1!, id: a2!, activation, actor: by, reason });
       console.log(`${a1} ${r.key}@${r.version}: activation ${r.activation} (recorded in config_change)`); return 0;
     }
+    if (cmd === 'claims-revalidate') {
+      const by = arg(argv, '--by'); if (!by) { console.error('claims-revalidate needs --by <name>'); return 2; }
+      const r = await cliRevalidateClaims(pool, { claimKind: a1 && !a1.startsWith('--') ? a1 : null, actor: by });
+      console.log(`claims-revalidate: ${r.checked} active asset(s) checked · ${r.keptEligible} still eligible · ${r.movedToReview} moved to needs_review (recorded in asset_standing_event)`); return 0;
+    }
     if (cmd === 'readiness-new-set') {
       const file = arg(argv, '--rules'); if (!file) { console.error('readiness-new-set needs --rules <file.json>'); return 2; }
       const rules = JSON.parse(readFileSync(file, 'utf8')) as Parameters<typeof cliCreateReadinessSet>[1]['rules'];
@@ -110,7 +116,7 @@ export async function main(argv: string[], root: string): Promise<number> {
         claimPolicyRef: arg(argv, '--claim') ?? 'default@1', challengePolicy: arg(argv, '--challenge') ?? null, packVersion: arg(argv, '--pack') ?? null, notes: arg(argv, '--notes') ?? null, createdBy: arg(argv, '--by') ?? 'unknown' });
       console.log(`track_config_version ${r.id}: v${r.version} created as an inactive DRAFT`); return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version|readiness-new-set> …'); return 2;
+    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version|readiness-new-set|claims-revalidate> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

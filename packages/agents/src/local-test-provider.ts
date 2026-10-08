@@ -18,7 +18,7 @@ export type TestProviderMode = 'normal' | 'malformed' | 'error' | 'invents' | 's
 export interface ScriptedOutput { readonly candidates: readonly unknown[]; }
 
 /** Bumped whenever a template changes, so a harness run names what it ran against. */
-export const LOCAL_TEST_PROVIDER_VERSION = '0.4.0';
+export const LOCAL_TEST_PROVIDER_VERSION = '0.5.0';
 
 export class LocalTestProvider implements AgentProvider {
   readonly name = 'local-test';
@@ -118,13 +118,14 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
         rationale: 'a published role requirement with no qualifying evidence is a gap the user should see, not a claim', warnings: [], requiresUserApproval: false,
       }))
     : [];
+  const bullet = cvBulletWording(ev, ctx['claimFacts'] as ProviderFact[] | undefined);
   return [...gaps, {
     proposalType: 'cv_bullet', subjectType: 'evidence', subjectId: ev.id,
     summary: `بند سيرة جديد من دليل «${ev.skillLabelAr}»`,
     structuredPayload: {
       kind: 'wording', currentValue: null,
-      suggestedValueAr: `عملتُ على «${ev.projectTitle}»، وأثبتُّ ${ev.skillLabelAr} عبر ${met} من المعايير المُقيَّمة بنتيجة ${ev.totalScore}/${ev.maxScore}.`,
-      suggestedValueEn: `Worked on "${ev.projectTitle}", demonstrating ${ev.skillLabelEn} across ${met} evaluated criteria, scoring ${ev.totalScore}/${ev.maxScore}.`,
+      suggestedValueAr: bullet.ar,
+      suggestedValueEn: bullet.en,
       supportingSources: [
         { kind: 'evidence', ref: ev.id }, { kind: 'project', ref: ev.projectTitle }, { kind: 'skill', ref: ev.skillId },
         ...ev.criteriaMet.map((c) => ({ kind: 'criterion', ref: c })),
@@ -132,6 +133,7 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
       reason: 'the evaluation met every mandatory criterion; each clause maps to a recorded fact',
       unsupportedRisk: 'none', limitationNote: 'wording only; substance comes from the evaluation record',
       namedSkillIds: [ev.skillId], namedTechnologies: [...((ctx['approvedTechnologies'] as string[] | undefined) ?? [])],
+      ...(bullet.plan ? { claimPlan: bullet.plan } : {}),
     },
     evidenceRefs: [ev.id],
     sourceRefs: [{ kind: 'evidence', id: ev.id }, { kind: 'evaluation_result', id: ev.evaluationResultId }],
@@ -215,7 +217,7 @@ function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] 
   return out;
 }
 
-/* ───────────── Phase 7: user-requested claim drafts (facts only) ───────────── */
+/* ───────────── Phase 7/7b: user-requested claim drafts (facts only, with a declared plan) ───────────── */
 
 interface ClaimRequest {
   readonly kind: string;
@@ -226,83 +228,142 @@ interface ClaimRequest {
   readonly roleLabelAr: string | null;
   readonly roleLabelEn: string | null;
   readonly approvedTechnologies: readonly string[];
+  /** Phase 7b: the recorded facts (ids, kinds, values) the draft may cite. Built by the application, never by this provider. */
+  readonly facts?: readonly ProviderFact[];
 }
+interface ProviderFact { readonly id: string; readonly kind: string; readonly value?: string; readonly evidenceId: string | null }
 
 const PROPOSAL_TYPE_FOR_KIND: Readonly<Record<string, string>> = {
   cv_bullet: 'cv_bullet', project_description: 'project_description', professional_summary: 'professional_summary', linkedin_headline: 'linkedin_headline',
   linkedin_about: 'linkedin_about', linkedin_skill: 'linkedin_skill', linkedin_project: 'linkedin_project', case_study: 'case_study',
 };
 
+/** A piece of wording: either glue (`c`) or a typed assertion citing fact ids. */
+type Piece = { readonly c: readonly [string, string] } | { readonly a: string; readonly t: readonly [string, string]; readonly f: readonly string[] };
+const C = (ar: string, en: string): Piece => ({ c: [ar, en] });
+const A = (type: string, ar: string, en: string, factIds: readonly (string | undefined)[]): Piece => ({ a: type, t: [ar, en], f: factIds.filter((x): x is string => !!x) });
+
+/** Builds both texts and the plan from the same pieces, so every declared span is exactly where the plan says. */
+function compose(pieces: readonly Piece[]): { ar: string; en: string; plan: { assertions: unknown[] } } {
+  let ar = ''; let en = ''; const assertions: unknown[] = [];
+  for (const p of pieces) {
+    if ('c' in p) { ar += p.c[0]; en += p.c[1]; continue; }
+    assertions.push({ type: p.a, ar: { text: p.t[0], start: ar.length }, en: { text: p.t[1], start: en.length }, factIds: p.f });
+    ar += p.t[0]; en += p.t[1];
+  }
+  return { ar, en, plan: { assertions } };
+}
+
+/** Fact ids by kind/value, from the facts the application passed. Absent facts ⇒ no plan (pre-7b behaviour). */
+function factIndex(facts: readonly ProviderFact[] | undefined, evidenceId: string | null) {
+  const fs = facts ?? [];
+  const of = (kind: string, pred: (f: ProviderFact) => boolean = () => true) => fs.find((f) => f.kind === kind && pred(f))?.id;
+  return {
+    available: fs.length > 0,
+    project: of('project', (f) => f.evidenceId === evidenceId),
+    evaluation: of('evaluation', (f) => f.evidenceId === evidenceId),
+    skill: (skillId: string) => of('skill_level', (f) => f.value === skillId),
+    number: (role: 'met' | 'total' | 'max') => of('number', (f) => f.evidenceId === evidenceId && f.id.endsWith(`:${role}`)),
+    tech: (t: string) => of('technology', (f) => f.value === t && f.evidenceId === evidenceId),
+    context: of('context'),
+  };
+}
+
+/** The Phase 7 CV-bullet template, now with its plan. Shared by R1 (evidence.demonstrated) and R6 (user request). */
+function cvBulletPieces(ev: NonNullable<ClaimRequest['evidence']>, fx: ReturnType<typeof factIndex>): Piece[] {
+  return [
+    A('ACTION', `عملتُ على «${ev.projectTitle}»`, `Worked on "${ev.projectTitle}"`, [fx.project]),
+    C('، ', ', '),
+    A('SKILL', `وأثبتُّ ${ev.skillLabelAr}`, `demonstrating ${ev.skillLabelEn}`, [fx.skill(ev.skillId)]),
+    C(' عبر ', ' across '),
+    A('EVALUATION', `${ev.criteriaMet.length} من المعايير المُقيَّمة`, `${ev.criteriaMet.length} evaluated criteria`, [fx.number('met'), fx.evaluation]),
+    C(' بنتيجة ', ', scoring '),
+    A('EVALUATION', `${ev.totalScore}/${ev.maxScore}`, `${ev.totalScore}/${ev.maxScore}`, [fx.number('total'), fx.number('max'), fx.evaluation]),
+    C('.', '.'),
+  ];
+}
+
+export function cvBulletWording(ev: NonNullable<ClaimRequest['evidence']>, facts: readonly ProviderFact[] | undefined): { ar: string; en: string; plan: { assertions: unknown[] } | null } {
+  const fx = factIndex(facts, ev.id);
+  const w = compose(cvBulletPieces(ev, fx));
+  return { ...w, plan: fx.available ? w.plan : null };
+}
+
 /**
  * One template per claim kind. Each clause copies a fact from the request:
  * the project title, the skill label, the met-criterion count and recorded
  * score, the user-declared technologies, the demonstrated skills. Nothing is
- * added — no outcome, no employer, no number that was not recorded.
+ * added — no outcome, no employer, no number that was not recorded — and the
+ * plan names the fact behind each clause (checked by the application).
  */
 function claimDraftCandidates(r: ClaimRequest): unknown[] {
   const proposalType = PROPOSAL_TYPE_FOR_KIND[r.kind];
   if (!proposalType) return [];
   const ev = r.evidence;
-  const skillsAr = r.demonstratedSkills.map((x) => x.labelAr).join('، ');
-  const skillsEn = r.demonstratedSkills.map((x) => x.labelEn).join(', ');
   const techs = [...r.approvedTechnologies];
   const needsEvidence = !['professional_summary', 'linkedin_headline', 'linkedin_about'].includes(r.kind);
   if (needsEvidence && !ev) return [nothingToDraft(r.kind, 'this claim kind needs a piece of evidence and none was given')];
   if (!needsEvidence && r.demonstratedSkills.length === 0) return [nothingToDraft(r.kind, 'no demonstrated skill exists yet, so a summary would have nothing to stand on')];
+  const fx = factIndex(r.facts, ev?.id ?? null);
+  const skillList = (): Piece[] => r.demonstratedSkills.flatMap((s, i) => [...(i > 0 ? [C('، ', ', ')] : []), A('SKILL', s.labelAr, s.labelEn, [fx.skill(s.skillId)])]);
+  const evaluated = A('EVALUATION', 'وقُيِّم وفق معيار منشور', 'evaluated against a published rubric', [fx.evaluation]);
 
-  let ar: string; let en: string; let namedSkillIds: string[] = []; let namedTechnologies: string[] = [];
+  let pieces: Piece[]; let namedSkillIds: string[] = []; let namedTechnologies: string[] = [];
   const sources: { kind: string; ref: string }[] = [];
   if (ev) sources.push({ kind: 'evidence', ref: ev.id }, { kind: 'project', ref: ev.projectTitle });
   switch (r.kind) {
     case 'cv_bullet':
-      ar = `عملتُ على «${ev!.projectTitle}»، وأثبتُّ ${ev!.skillLabelAr} عبر ${ev!.criteriaMet.length} من المعايير المُقيَّمة بنتيجة ${ev!.totalScore}/${ev!.maxScore}.`;
-      en = `Worked on "${ev!.projectTitle}", demonstrating ${ev!.skillLabelEn} across ${ev!.criteriaMet.length} evaluated criteria, scoring ${ev!.totalScore}/${ev!.maxScore}.`;
-      namedSkillIds = [ev!.skillId]; namedTechnologies = techs;
+      pieces = cvBulletPieces(ev!, fx); namedSkillIds = [ev!.skillId]; namedTechnologies = techs;
       sources.push({ kind: 'skill', ref: ev!.skillId }, ...ev!.criteriaMet.map((c) => ({ kind: 'criterion', ref: c })));
       break;
     case 'project_description':
-      ar = techs.length ? `«${ev!.projectTitle}» — مشروع قدّمتُه وقُيِّم وفق معيار منشور (التقنيات المُعلَنة: ${techs.join('، ')}).` : `«${ev!.projectTitle}» — مشروع قدّمتُه وقُيِّم وفق معيار منشور.`;
-      en = techs.length ? `"${ev!.projectTitle}" — a project I submitted, evaluated against a published rubric (declared technologies: ${techs.join(', ')}).` : `"${ev!.projectTitle}" — a project I submitted, evaluated against a published rubric.`;
+      pieces = [A('ACTION', `«${ev!.projectTitle}»`, `"${ev!.projectTitle}"`, [fx.project]), C(' — ', ' — '),
+        A('ACTION', 'مشروع قدّمتُه', 'a project I submitted', [fx.project]), C('، ', ', '), evaluated,
+        ...(techs.length ? [C(' (', ' ('), A('TECHNOLOGY', `التقنيات المُعلَنة: ${techs.join('، ')}`, `declared technologies: ${techs.join(', ')}`, techs.map((t) => fx.tech(t))), C(')', ')')] : []),
+        C('.', '.')];
       namedTechnologies = techs;
       break;
     case 'linkedin_project':
-      ar = `مشروع «${ev!.projectTitle}»: عمل قدّمتُه وقُيِّم وفق معيار منشور.`;
-      en = `Project "${ev!.projectTitle}": work I submitted, evaluated against a published rubric.`;
+      pieces = [A('ACTION', `مشروع «${ev!.projectTitle}»`, `Project "${ev!.projectTitle}"`, [fx.project]), C(': ', ': '),
+        A('ACTION', 'عمل قدّمتُه', 'work I submitted', [fx.project]), C('، ', ', '), evaluated, C('.', '.')];
       break;
     case 'linkedin_skill':
-      ar = ev!.skillLabelAr; en = ev!.skillLabelEn; namedSkillIds = [ev!.skillId];
+      pieces = [A('SKILL', ev!.skillLabelAr, ev!.skillLabelEn, [fx.skill(ev!.skillId)])]; namedSkillIds = [ev!.skillId];
       sources.push({ kind: 'skill', ref: ev!.skillId });
       break;
     case 'case_study':
-      ar = `دراسة حالة: «${ev!.projectTitle}». المهارة المُثبَتة: ${ev!.skillLabelAr} — ${ev!.criteriaMet.length} من المعايير المُقيَّمة مستوفاة.`;
-      en = `Case study: "${ev!.projectTitle}". Demonstrated skill: ${ev!.skillLabelEn} — ${ev!.criteriaMet.length} evaluated criteria met.`;
+      pieces = [C('دراسة حالة: ', 'Case study: '), A('ACTION', `«${ev!.projectTitle}»`, `"${ev!.projectTitle}"`, [fx.project]), C('. ', '. '),
+        A('SKILL', `المهارة المُثبَتة: ${ev!.skillLabelAr}`, `Demonstrated skill: ${ev!.skillLabelEn}`, [fx.skill(ev!.skillId)]), C(' — ', ' — '),
+        A('EVALUATION', `${ev!.criteriaMet.length} من المعايير المُقيَّمة مستوفاة`, `${ev!.criteriaMet.length} evaluated criteria met`, [fx.number('met'), fx.evaluation]), C('.', '.')];
       namedSkillIds = [ev!.skillId];
       sources.push({ kind: 'skill', ref: ev!.skillId }, ...ev!.criteriaMet.map((c) => ({ kind: 'criterion', ref: c })));
       break;
     case 'professional_summary':
-      ar = `مهارات أثبتُّها بأعمال مُقيَّمة: ${skillsAr}.`; en = `Skills I demonstrated through evaluated work: ${skillsEn}.`;
+      pieces = [C('مهارات أثبتُّها بأعمال مُقيَّمة: ', 'Skills I demonstrated through evaluated work: '), ...skillList(), C('.', '.')];
       namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
       sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
       break;
     case 'linkedin_headline':
-      ar = r.roleLabelAr ? `مسار ${r.roleLabelAr} · ${skillsAr} مُثبَتة بعمل مُقيَّم` : `${skillsAr} مُثبَتة بعمل مُقيَّم`;
-      en = r.roleLabelEn ? `${r.roleLabelEn} track · ${skillsEn} demonstrated in evaluated work` : `${skillsEn} demonstrated in evaluated work`;
+      pieces = [...(r.roleLabelAr && r.roleLabelEn ? [A('FRAMING', `مسار ${r.roleLabelAr}`, `${r.roleLabelEn} track`, [fx.context]), C(' · ', ' · ')] : []),
+        ...skillList(), C(' مُثبَتة بعمل مُقيَّم', ' demonstrated in evaluated work')];
       namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
       sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
       break;
     default: // linkedin_about
-      ar = `${r.roleLabelAr ? `أتعلّم في مسار ${r.roleLabelAr}. ` : ''}مهارات أثبتُّها بأعمال مُقيَّمة: ${skillsAr}. كل مهارة هنا مرتبطة بدليل يمكن الرجوع إليه.`;
-      en = `${r.roleLabelEn ? `Learning in the ${r.roleLabelEn} track. ` : ''}Skills I demonstrated through evaluated work: ${skillsEn}. Each one links to evidence.`;
+      pieces = [...(r.roleLabelAr && r.roleLabelEn ? [A('FRAMING', `أتعلّم في مسار ${r.roleLabelAr}`, `Learning in the ${r.roleLabelEn} track`, [fx.context]), C('. ', '. ')] : []),
+        C('مهارات أثبتُّها بأعمال مُقيَّمة: ', 'Skills I demonstrated through evaluated work: '), ...skillList(),
+        C('. كل مهارة هنا مرتبطة بدليل يمكن الرجوع إليه.', '. Each one links to evidence.')];
       namedSkillIds = r.demonstratedSkills.map((x) => x.skillId);
       sources.push(...r.demonstratedSkills.map((x) => ({ kind: 'skill', ref: x.skillId })));
   }
+  const w = compose(pieces);
   return [{
     proposalType, subjectType: ev ? 'evidence' : 'career_goal', subjectId: ev ? ev.id : 'profile',
     summary: `صياغة مقترحة — ${CLAIM_KIND_LABEL_AR[r.kind as DraftableClaimKind]}`,
-    structuredPayload: { kind: 'wording', currentValue: r.current, suggestedValueAr: ar, suggestedValueEn: en, supportingSources: sources,
+    structuredPayload: { kind: 'wording', currentValue: r.current, suggestedValueAr: w.ar, suggestedValueEn: w.en, supportingSources: sources,
       reason: ev ? 'every clause copies a recorded fact: the project, the evaluated criteria, the declared technologies' : 'every clause names a skill that is demonstrated by evaluated work',
       unsupportedRisk: 'none', limitationNote: 'wording only; it says what was built and evaluated, not an effect on users or a business',
-      namedSkillIds, namedTechnologies },
+      namedSkillIds, namedTechnologies, ...(fx.available ? { claimPlan: w.plan } : {}) },
     evidenceRefs: ev ? [ev.id] : [],
     sourceRefs: ev ? [{ kind: 'evidence', id: ev.id }, ...(ev.evaluationResultId ? [{ kind: 'evaluation_result', id: ev.evaluationResultId }] : [])] : [],
     rationale: 'the user asked for this claim; the draft uses existing evidence only and waits for the user\'s preview and approval',

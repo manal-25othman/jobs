@@ -35,5 +35,5 @@ export * from './disclosure-questionnaire.js';
 export * from './integrity.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.14.0';
+export const DOMAIN_RULESET_VERSION = '0.15.0';
 export * from './career-claims.js';

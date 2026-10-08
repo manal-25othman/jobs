@@ -12,8 +12,15 @@ interface Proposal {
   structuredPayload: Record<string, unknown> & { kind: string };
 }
 interface Reason { code: string; ar: string; en: string }
+interface GroundingView {
+  decision: 'grounded' | 'needs_revision' | 'refused';
+  assertions: { type: string; status: string; factIds: string[] }[];
+  issues: { code: string; severity: string; ar: string; span: string | null }[];
+  unmapped: { ar: string[]; en: string[] };
+  suggestedTrim: { ar: string; en: string | null } | null;
+}
 interface ClaimInfo {
-  kind: string; labelAr: string; draftedUnder: { ref: string; resolution: string } | null; groundingStatus: string | null;
+  kind: string; labelAr: string; grounding?: { atDrafting: GroundingView | null; now: GroundingView }; draftedUnder: { ref: string; resolution: string } | null; groundingStatus: string | null;
   groundingReport: { check: string; passed: boolean; detail: string }[] | null;
   policyNow: { ref: string; resolution: string; minEvidenceLevel: string; reviewStatus: string; validationNote: string } | null;
   eligibleNow: boolean; missing: Reason[];
@@ -47,9 +54,19 @@ const RESOLUTION_AR: Record<string, string> = {
 const GROUNDING_AR: Record<string, string> = {
   grounded: 'كل جملة مرتبطة بدليل', evidence_withdrawn: 'سُحب الدليل الذي يستند إليه', not_eligible: 'لم يعد يستوفي القاعدة الحالية',
 };
+const DECISION_AR: Record<string, { label: string; tone: string }> = {
+  grounded: { label: 'كل جزء من الصياغة مرتبط بواقعة مسجّلة', tone: 'chip--success' },
+  needs_revision: { label: 'جزء من الصياغة غير مرتبط بدليل — يحتاج تعديلًا', tone: 'chip--attention' },
+  refused: { label: 'تتضمن الصياغة ادعاءً لا يدعمه الدليل', tone: 'chip--attention' },
+};
+const ASSERTION_AR: Record<string, string> = {
+  ACTION: 'ما أنجزتِه', ARTIFACT: 'ما بنيتِه', EVALUATION: 'نتيجة التقييم', SKILL: 'مهارة', TECHNOLOGY: 'تقنية', NUMBER: 'رقم',
+  OUTCOME: 'أثر', PROFESSIONAL_CONTEXT: 'سياق عمل', QUALITY: 'وصف جودة', FRAMING: 'سياق المسار',
+};
 const EVENT_AR: Record<string, string> = {
   drafted: 'اقتُرحت الصياغة', previewed: 'فتحتِ المعاينة', approved: 'اعتُمدت', rejected: 'رُفضت',
   flagged_evidence_withdrawn: 'وُسمت: سُحب دليلها', refused_not_eligible: 'رُفض اعتمادها: لا تستوفي القاعدة',
+  grounding_refused: 'رُفض اعتمادها: جزء منها لا يستند إلى دليل', edit_refused: 'رُفض تعديل: لا يستند إلى دليل (بقيت الصياغة الأصلية)',
 };
 
 function Inner() {
@@ -103,7 +120,10 @@ function Inner() {
         await api(`/me/proposals/${open.proposalId}/reject`, { method: 'POST', token, body: { reason } });
       }
       setOpen(null); await reload();
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    } catch (e) {
+      const m = (e as Error).message;
+      setError(/claim grounding/.test(m) ? 'لم تُعتمد الصياغة: جزء منها لا يستند إلى دليل مسجّل. صياغتك الأصلية محفوظة — عدّليها أو استخدمي الصياغة المختصرة.' : m);
+    } finally { setBusy(false); }
   }
 
   if (loading) return <Loading />;
@@ -111,6 +131,8 @@ function Inner() {
   const claim = open?.claim ?? null;
   const selectedKind = options?.kinds.find((k) => k.kind === kind);
   const checksPassed = claim?.groundingReport?.filter((c) => c.passed).length ?? 0;
+  const gnow = claim?.grounding?.now ?? null;
+  const groundingIssues = gnow ? gnow.issues.filter((x, i, all) => all.findIndex((y) => y.ar === x.ar) === i) : [];
 
   return (
     <>
@@ -182,6 +204,24 @@ function Inner() {
             )}
           </div>
 
+          {gnow ? (
+            <div className="stack" style={{ gap: 6 }}>
+              <span className="kicker">ارتباط الصياغة بالأدلة</span>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <span className={`chip ${DECISION_AR[gnow.decision]?.tone ?? ''}`}>{DECISION_AR[gnow.decision]?.label ?? gnow.decision}</span>
+                {gnow.assertions.map((a, i) => <span key={i} className={`chip ${a.status === 'supported' ? '' : 'chip--attention'}`}>{ASSERTION_AR[a.type] ?? a.type}{a.status === 'supported' ? ' ✓' : ''}</span>)}
+              </div>
+              {gnow.unmapped.ar.length > 0 ? <p className="body-sm">غير مرتبط بدليل: {gnow.unmapped.ar.map((u, i) => <mark key={i} style={{ marginInlineEnd: 6 }}>{u}</mark>)}</p> : null}
+              {groundingIssues.length > 0 ? <ul className="body-sm muted" style={{ margin: 0, paddingInlineStart: 18 }}>{groundingIssues.map((x, i) => <li key={i}>{x.ar}</li>)}</ul> : null}
+              {gnow.suggestedTrim ? (
+                <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                  <span className="body-sm">صياغة مختصرة تحذف ما لا يستند إلى دليل فقط: «{gnow.suggestedTrim.ar}»</span>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setEdited(gnow.suggestedTrim!.ar)}>استخدمي الصياغة المختصرة</button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {claim && claim.missing.length > 0 ? (
             <div className="banner banner--attention" style={{ margin: 0 }}><span>ما ينقص: {claim.missing.map((m) => m.ar).join(' · ')}</span></div>
           ) : null}
@@ -208,12 +248,12 @@ function Inner() {
 
           {open.lifecycle === 'awaiting_user' ? (
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn btn--primary" disabled={busy || (claim !== null && !claim.eligibleNow)} onClick={() => decide('approve')}>{busy ? 'جارٍ…' : 'اعتماد'}</button>
+              <button className="btn btn--primary" disabled={busy || (claim !== null && !claim.eligibleNow && !wasEdited)} onClick={() => decide('approve')}>{busy ? 'جارٍ…' : 'اعتماد'}</button>
               <button className="btn btn--ghost" disabled={busy} onClick={() => decide('reject')}>رفض</button>
               <button className="btn btn--ghost btn--sm" onClick={() => setOpen(null)}>إغلاق</button>
             </div>
           ) : <button className="btn btn--ghost btn--sm" onClick={() => setOpen(null)}>إغلاق</button>}
-          {claim && !claim.eligibleNow && open.lifecycle === 'awaiting_user' ? <p className="micro muted">لا يمكن اعتمادها الآن؛ يمكنك رفضها، وتبقى محفوظة في السجل.</p> : null}
+          {claim && !claim.eligibleNow && open.lifecycle === 'awaiting_user' ? <p className="micro muted">لا يمكن اعتمادها كما هي؛ عدّليها (يُعاد فحص التعديل بالأدلة) أو ارفضيها، وتبقى الصياغة الأصلية محفوظة في السجل.</p> : null}
         </section>
       ) : null}
 

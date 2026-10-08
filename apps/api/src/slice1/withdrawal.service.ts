@@ -3,12 +3,13 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import {
-  effectOfWithdrawal, assertRelinkAllowed, assertAssetTransition, MissingPrerequisite, claimKindForProposalType,
+  effectOfWithdrawal, assertRelinkAllowed, assertAssetTransition, MissingPrerequisite, claimKindForProposalType, claimPolicyRef,
   type EvidenceState, type AssetLifecycleState,
 } from '@naqla/domain';
 import { validateAgainstDomain, ProposalRejected } from '@naqla/agents';
 import { loadDomainFacts } from '../agents/domain-facts';
-import { recordClaimEvent } from '../agents/claim-drafts';
+import { recordClaimEvent, resolveClaimPolicy, loadClaimSubject, eligibilityFor } from '../agents/claim-drafts';
+import { groundWording } from '../agents/claim-facts';
 
 /**
  * Withdrawn evidence (D-077).
@@ -51,6 +52,9 @@ export class WithdrawalService {
           `insert into notification (user_id, type, body_ar, action_label, action_href)
            values ($1, 'attention', $2, 'راجعي البند', $3)`,
           [userId, effect.explanationAr, `/proposals?asset=${a.id}`]);
+        // Phase 7b (DR-019): every standing change is its own event; the approval itself is untouched.
+        await c.query(`insert into asset_standing_event (asset_id, user_id, cause, previous_state, new_state, eligible, reason, actor)
+          values ($1,$2,'evidence_withdrawn','active','needs_review',false,$3,'user')`, [a.id, userId, `evidence ${evidenceId} withdrawn: ${reason.trim()}`]);
         await emitAuditEvent(c, { eventType: 'asset.needs_review', userId, actorKind: 'system', subjectTable: 'professional_asset', subjectId: a.id,
           reason: 'the evidence behind this asset was withdrawn; the asset is kept and no longer presented as evidence-backed', payload: { evidenceId } });
         affected.push({ id: a.id, lifecycleState: effect.to, evidenceBacked: effect.evidenceBacked });
@@ -88,7 +92,7 @@ export class WithdrawalService {
     if (!evidenceId) throw new BadRequestException('an evidence id is required');
     return this.db.asService(async (c) => {
       const asset = await c.query(
-        'select id, user_id, skill_id, body, body_en, lifecycle_state, user_approved_at from professional_asset where id = $1', [assetId]);
+        'select id, user_id, skill_id, kind, body, body_en, lifecycle_state, user_approved_at from professional_asset where id = $1', [assetId]);
       if (asset.rowCount === 0 || asset.rows[0].user_id !== userId) throw new NotFoundException('asset not found');
       const a = asset.rows[0];
 
@@ -114,10 +118,22 @@ export class WithdrawalService {
         throw err;
       }
 
+      // Phase 7b (BR-026): the wording must be eligible under the claim policy in effect now, and grounded in the new evidence's records.
+      const kind = claimKindForProposalType(a.kind);
+      if (!kind) throw new BadRequestException(`an asset of kind '${a.kind}' has no claim kind to re-check`);
+      const facts = await loadDomainFacts(c, userId);
+      const resolved = await resolveClaimPolicy(c, kind);
+      const verdict = eligibilityFor(kind, resolved, await loadClaimSubject(c, userId, kind, { namedSkillIds: [a.skill_id], suggestedValueAr: a.body, suggestedValueEn: a.body_en ?? null }, [e.id], facts));
+      if (verdict.status !== 'eligible' || !resolved) throw new BadRequestException(`re-link refused by the claim policy in effect: ${verdict.status === 'eligible' ? 'no policy' : verdict.reasons.map((r) => r.en).join('; ')}`);
+      const grounding = await groundWording(c, userId, kind, { ar: a.body, en: a.body_en ?? null, plan: null }, [e.id], facts);
+      if (grounding.decision !== 'grounded') throw new BadRequestException(`re-link refused by claim grounding (${grounding.decision}): ${grounding.issues.map((x) => x.en).join('; ')}`);
+
       await c.query('insert into asset_evidence (asset_id, evidence_id) values ($1,$2) on conflict do nothing', [assetId, e.id]);
       await c.query(
         `update professional_asset set lifecycle_state = 'active', evidence_backed = true, review_reason = null, review_at = null,
-                project_id = $2, evaluation_result_id = $3 where id = $1`, [assetId, e.project_id, e.evaluation_result_id]);
+                project_id = $2, evaluation_result_id = $3, standing_policy_id = $4, standing_checked_at = now() where id = $1`, [assetId, e.project_id, e.evaluation_result_id, resolved.policy.id]);
+      await c.query(`insert into asset_standing_event (asset_id, user_id, cause, claim_policy_id, claim_policy_ref, previous_state, new_state, eligible, reason, actor)
+        values ($1,$2,'relinked',$3,$4,$5,'active',true,$6,'user')`, [assetId, userId, resolved.policy.id, `${claimPolicyRef(resolved.policy)} (${resolved.resolution})`, a.lifecycle_state, `re-linked to evidence ${e.id}; eligible and grounded`]);
       await emitAuditEvent(c, { eventType: 'asset.relinked', userId, actorKind: 'user', actorId: userId, subjectTable: 'professional_asset', subjectId: assetId,
         reason: 'the user re-linked the asset to evidence that qualifies on its own', payload: { evidenceId: e.id } });
       return { assetId, lifecycleState: 'active' as const, evidenceBacked: true as const, linkedEvidenceId: e.id };

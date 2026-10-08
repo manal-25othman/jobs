@@ -1,5 +1,5 @@
 # نَقْلة / NAQLA — Claim-to-Fact Grounding · **Design Proposal (not implemented)**
-**Date:** 2026-10-08 · **Status:** **PROPOSED — awaiting Product Owner approval. No implementation has started.** · **Closes, when built:** `RISK-GROUNDING-01` (the broad semantic grounding risk behind REC-006) · **Blocks:** any real LLM integration (OPEN-023)
+**Date:** 2026-10-08 · **Status:** accepted in principle (Product Owner, 2026-10-08). **G1 + G2 implemented in Phase 7b** (D-115 · `PHASE-7B-GROUNDING-AND-STANDING-REPORT.md`). G3 and G4 are not started and need approval. · **Closes, when built:** `RISK-GROUNDING-01` (the broad semantic grounding risk behind REC-006) · **Blocks:** any real LLM integration (OPEN-023)
 
 > **Why this exists.** Phase 7 rejects unsupported numbers, technologies, credentials, employment, professional-work claims and *listed* outcome phrasings. All of those checks are pattern lists over free text. A paraphrase outside the lists passes. Passing 30/30 harness scenarios shows the documented regressions are fixed; **it does not show comprehensive protection.** A real model writes paraphrases by default, so pattern lists cannot be the primary defence.
 

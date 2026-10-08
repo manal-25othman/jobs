@@ -91,7 +91,9 @@ describe('D-077 — withdrawn evidence: the asset survives, stops being evidence
     assert.equal(still.rows[0].lifecycle_state, 'needs_review');
 
     // ── the user does the work again: evidence is RE-ESTABLISHED, no transition (the ladder is forward-only) ──
-    const second = await demonstrated(user, 'متتبّع عادات — إعادة');
+    // Phase 7b: the re-done work is the same project, so the approved wording («متتبّع عادات») is grounded in the new evidence.
+    // (Re-linking to a different project's evidence is refused by claim grounding — claims-standing.e2e.)
+    const second = await demonstrated(user, 'متتبّع عادات');
     assert.equal(second.outcome, 'passed'); assert.equal(second.transition, null);
     assert.ok(second.reestablishedEvidenceId, 'new evidence exists for the same state');
     const transitions = await pool.query(`select count(*)::int as n from evidence_transition where user_id = $1 and to_state = 'demonstrated'`, [user.id]);

@@ -230,3 +230,35 @@ export const CLAIM_KIND_LABEL_AR: Readonly<Record<DraftableClaimKind, string>> =
   linkedin_headline: 'عنوان لينكدإن', linkedin_about: 'نبذة لينكدإن', linkedin_skill: 'مهارة في لينكدإن',
   linkedin_project: 'مشروع في لينكدإن', case_study: 'دراسة حالة / بورتفوليو',
 };
+
+/* ───────────────────── approval vs current standing (Phase 7b, BR-026 · DR-019) ───────────────────── */
+
+/**
+ * May an approved asset be presented as evidence-backed NOW? The approval is
+ * history and never changes; this is the separate, current answer. Fail closed:
+ *   - it must be active, evidence-backed and user-approved (D-077 as before);
+ *   - it must have been verified under the claim policy in effect now
+ *     (`standingPolicyId`, else the policy it was approved under);
+ *   - an asset approved before the policy layer counts as verified under the
+ *     legacy baseline, and only while that baseline is what is in effect;
+ *   - no policy in effect for its kind ⇒ not presentable.
+ * A policy activated without re-checking assets therefore hides them until
+ * they are re-checked — it never leaves them shown under an obsolete decision.
+ */
+export interface AssetStanding {
+  readonly lifecycleState: string;
+  readonly evidenceBacked: boolean;
+  readonly userApprovedAt: string | null;
+  readonly standingPolicyId: string | null;
+  readonly claimPolicyId: string | null;
+}
+export function assetPresentableNow(a: AssetStanding, inEffect: { readonly policyId: string; readonly resolution: ConfigResolution } | null):
+  { readonly presentable: boolean; readonly reason: 'presentable' | 'not_active' | 'not_evidence_backed' | 'not_approved' | 'no_policy_in_effect' | 'not_verified_under_policy_in_effect' } {
+  if (a.lifecycleState !== 'active') return { presentable: false, reason: 'not_active' };
+  if (!a.evidenceBacked) return { presentable: false, reason: 'not_evidence_backed' };
+  if (!a.userApprovedAt) return { presentable: false, reason: 'not_approved' };
+  if (!inEffect) return { presentable: false, reason: 'no_policy_in_effect' };
+  const verifiedUnder = a.standingPolicyId ?? a.claimPolicyId;
+  if (verifiedUnder === null) return inEffect.resolution === 'legacy_baseline' ? { presentable: true, reason: 'presentable' } : { presentable: false, reason: 'not_verified_under_policy_in_effect' };
+  return verifiedUnder === inEffect.policyId ? { presentable: true, reason: 'presentable' } : { presentable: false, reason: 'not_verified_under_policy_in_effect' };
+}

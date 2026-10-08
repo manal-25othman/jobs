@@ -1,11 +1,11 @@
 {
   "metadata": {
     "provider": "local-test",
-    "provider_version": "0.4.0",
-    "provider_model": "deterministic-template/0.4.0",
+    "provider_version": "0.5.0",
+    "provider_model": "deterministic-template/0.5.0",
     "dataset_version": "1.1.0",
-    "proposal_schema_version": "1.3.0",
-    "domain_version": "0.14.0",
+    "proposal_schema_version": "1.4.0",
+    "domain_version": "0.15.0",
     "fixed_clock": "2026-09-26T12:00:00.000Z",
     "deterministic": true
   },
@@ -40,7 +40,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -156,7 +156,7 @@
           "reason": "the wording contains the number 2, which no recorded fact supports; a metric needs a measured source"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -270,7 +270,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -377,7 +377,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -483,7 +483,7 @@
           "reason": "technology 'React' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred"
         }
       ],
-      "usage_status": "rejected_invalid_output (deterministic-template/0.4.0)",
+      "usage_status": "rejected_invalid_output (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -599,7 +599,7 @@
           "reason": "the wording claims an unsupported outcome (\"ما جعل\"): no recorded fact measures an effect on users, a team or a business; describe what was built and evaluated instead"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -706,7 +706,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -816,7 +816,7 @@
           "reason": "technology 'React' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred"
         }
       ],
-      "usage_status": "rejected_invalid_output (deterministic-template/0.4.0)",
+      "usage_status": "rejected_invalid_output (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -928,7 +928,7 @@
           "reason": "skill 'skl-ui-testing' is 'self_reported'; it cannot be presented as a supported claim"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1040,7 +1040,7 @@
           "reason": "skill 'skl-ui-testing' is 'practiced'; it cannot be presented as a supported claim"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1156,7 +1156,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1262,7 +1262,7 @@
           "reason": "payload carries 'evidenceState': agents propose, they never act"
         }
       ],
-      "usage_status": "rejected_invalid_output (deterministic-template/0.4.0)",
+      "usage_status": "rejected_invalid_output (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1376,7 +1376,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1498,7 +1498,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1612,7 +1612,7 @@
           "reason": "the wording asserts seniority, which no evidence records"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1728,7 +1728,7 @@
           "reason": "the wording asserts years of experience, which no evidence records"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1842,7 +1842,7 @@
           "reason": "a wording proposal with no evidence reference is an unsupported claim"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -1956,7 +1956,7 @@
           "reason": "the wording asserts a certification, which no evidence records"
         }
       ],
-      "usage_status": "rejected_invalid_output (deterministic-template/0.4.0)",
+      "usage_status": "rejected_invalid_output (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "professionalAssets",
@@ -2189,7 +2189,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -2351,7 +2351,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -2513,7 +2513,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -2656,7 +2656,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -2820,7 +2820,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -2977,7 +2977,7 @@
           "reason": "technology 'Jest' has no approved source (user-declared, project metadata, artifact, or evidence metadata); it may not be inferred"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -3134,7 +3134,7 @@
           "reason": "payload carries 'score': agents propose, they never act"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -3296,7 +3296,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -3439,7 +3439,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -3589,7 +3589,7 @@
         }
       ],
       "rejected": [],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",
@@ -3753,7 +3753,7 @@
           "reason": "an agent may not recommend Verified (D-059)"
         }
       ],
-      "usage_status": "ok (deterministic-template/0.4.0)",
+      "usage_status": "ok (deterministic-template/0.5.0)",
       "passed_context": [
         "targetRole",
         "deterministicResults",

@@ -65,6 +65,16 @@ export function validateSchema(agentType: AgentType, raw: unknown): Omit<AgentPr
       throw new ProposalRejected('schema', 'wording payload is incomplete');
     }
     if (!['none', 'low', 'high'].includes(p.unsupportedRisk)) throw new ProposalRejected('schema', 'unsupportedRisk must be set');
+    // Phase 7b: a declared claim plan is structure, not evidence; malformed ⇒ refused here, its content is checked by grounding.
+    const plan = (p as { claimPlan?: unknown }).claimPlan;
+    if (plan !== undefined) {
+      const as = (plan as { assertions?: unknown } | null)?.assertions;
+      const span = (x: unknown) => x === null || (!!x && typeof x === 'object' && isStr((x as Record<string, unknown>)['text']));
+      if (!isArr(as) || !as.every((a) => !!a && typeof a === 'object' && isStr((a as Record<string, unknown>)['type']) && isArr((a as Record<string, unknown>)['factIds'])
+          && span((a as Record<string, unknown>)['ar']) && span((a as Record<string, unknown>)['en']))) {
+        throw new ProposalRejected('schema', 'claimPlan must be { assertions: [{ type, ar: {text}|null, en: {text}|null, factIds: [] }] }');
+      }
+    }
   }
   const requiresUserApproval = WORDING_PROPOSAL_TYPES.has(proposalType) ? true : c['requiresUserApproval'] === true;
 
@@ -161,7 +171,7 @@ export function skillsMentioned(text: string, skills: ReadonlyMap<string, readon
 const AR_B = '(^|[\\s،,.؛;:\'"«»(])';
 const AR_E = '($|[\\s،,.؛;:\'"«»)])';
 
-const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
+export const INVENTED_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\b(at|for)\s+[A-Z][A-Za-z]+\s+(Inc|Ltd|LLC|Corp|Company|Bank|Group)\b/, 'an employer'],
   [/\bcertif(ied|ication|icate)\b/i, 'a certification'],
   [/(^|[\s،,.؛;:'"«»(])(شهادة|معتمد|معتمدة)($|[\s،,.؛;:'"«»)])/, 'a certification'],

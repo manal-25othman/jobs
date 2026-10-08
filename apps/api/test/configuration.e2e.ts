@@ -57,9 +57,10 @@ describe('activation model — the baseline is not a draft, and a draft is never
     // Phase 7: claim policies are consumed. The baseline reproduces presentationFor(); no claim policy is validated; the
     // DRAFT default@1 rows stay inactive except the case-study row the demo seed allows outside production.
     assert.equal(r.claimPolicies.consumed, true);
-    // version 1 only: claims.e2e adds an e2e default@2 (left inactive) when it runs first.
-    assert.equal(r.claimPolicies.items.filter((p: { version: number }) => p.version === 1).length, 17);
-    assert.ok(r.claimPolicies.items.filter((p: { version: number }) => p.version === 1).every((p: { validated: boolean }) => !p.validated));
+    // The seeded rows only: claims*.e2e add e2e policy versions/keys (left inactive) when they run first.
+    const seeded = r.claimPolicies.items.filter((p: { key: string; version: number }) => ['default', 'legacy_presentation'].includes(p.key) && p.version === 1);
+    assert.equal(seeded.length, 17);
+    assert.ok(seeded.every((p: { validated: boolean }) => !p.validated));
     assert.ok(r.claimPolicies.items.filter((p: { key: string }) => p.key === 'legacy_presentation').every((p: { activation: string; baselineOf: string | null }) => p.activation === 'legacy_baseline' && !!p.baselineOf));
     assert.deepEqual(r.claimPolicies.items.filter((p: { key: string; version: number; activation: string }) => p.key === 'default' && p.version === 1 && p.activation !== 'inactive').map((p: { claimKind: string; activation: string }) => `${p.claimKind}:${p.activation}`), ['case_study:development_only']);
     assert.equal(r.challengePolicies.runnerExists, false); assert.ok(r.challengePolicies.items.every((p: { activation: string }) => p.activation === 'inactive'));

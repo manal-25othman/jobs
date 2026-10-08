@@ -1,3 +1,4 @@
+import { presentableFilter } from '../agents/asset-standing';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
@@ -132,13 +133,17 @@ export class ReportService {
       // Phase 7: CV bullets only — what the report has always listed. Other
       // claim kinds (headline, About, case study…) are the user's own channels;
       // the recruiter report's own claim policy (evidence_report) is not active.
-      const assets = await c.query(
-        `select body, user_approved_at from professional_asset
+      // Phase 7b (BR-026): and only while verified under the claim policy in effect now — fail closed.
+      const presentable = await presentableFilter(c, 'cv_bullet');
+      const assetsAll = await c.query(
+        `select body, user_approved_at, lifecycle_state, evidence_backed, standing_policy_id, claim_policy_id from professional_asset
           where user_id = $1 and lifecycle_state = 'active' and evidence_backed = true
             and user_approved_at is not null and kind = 'cv_bullet'
           order by created_at`,
         [userId],
       );
+      const assets = { rows: assetsAll.rows.filter((a) => presentable(a).presentable), rowCount: 0 };
+      assets.rowCount = assets.rows.length;
 
       const report = buildCareerEvidenceReport({
         targetRole: {

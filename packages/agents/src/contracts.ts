@@ -11,7 +11,7 @@
  * Version of the proposal envelope and payload contract. Bumped when a field,
  * payload kind or validation-relevant semantic changes. Recorded by the harness.
  */
-export const PROPOSAL_SCHEMA_VERSION = '1.3.0';
+export const PROPOSAL_SCHEMA_VERSION = '1.4.0';
 
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
@@ -62,6 +62,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'roleRequirements',
       // Phase 7: a user-requested claim draft — the kind, the current wording and the facts it may use.
       'claimRequest',
+      // Phase 7b: the recorded facts (ids, kinds, values) behind new evidence, so a draft can declare its plan.
+      'claimFacts',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },
@@ -169,6 +171,12 @@ export interface WordingPayload {
   readonly namedSkillIds: readonly string[];
   /** Technologies the wording names. Must be user-declared or it is refused. */
   readonly namedTechnologies: readonly string[];
+  /**
+   * Phase 7b (schema 1.4.0): the generator's declared claim plan — typed
+   * assertions, the recorded fact ids behind each, and their exact spans.
+   * CHECKED by Claim-to-Fact Grounding, never trusted as evidence.
+   */
+  readonly claimPlan?: import('./claim-grounding.js').ClaimPlan;
 }
 
 export interface GapPayload {

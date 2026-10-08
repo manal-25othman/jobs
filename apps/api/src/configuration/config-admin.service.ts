@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import type { Pool, PoolClient } from 'pg';
 import { assertActivationAllowed, configIsValidated, MissingPrerequisite, type ConfigActivation } from '@naqla/domain';
 import { GOVERNED_TABLES, governedFromRow, isProduction, type GovernedTable } from './configuration.service';
+import { revalidateClaimAssets } from '../agents/asset-standing';
 
 /**
  * The explicit, audited acts on configuration (Phase 4): approve a row, change
@@ -50,6 +51,9 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
   }
   return withConfigActor(c, p.actor, p.reason, async () => {
     const r = await c.query(`update ${p.table} set activation = $2 where id = $1 returning *`, [p.id, p.activation]);
+    // Phase 7b (BR-026): a change in the claim policy in effect re-checks every active asset of that kind IN THIS
+    // TRANSACTION. If the re-check cannot complete, the activation rolls back with it — never a half-applied state.
+    if (p.table === 'claim_policy') await revalidateClaimAssets(c, { claimKind: r.rows[0].claim_kind, cause: 'policy_activation', actor: p.actor });
     return governedFromRow(r.rows[0]);
   });
 }
@@ -99,6 +103,10 @@ export async function cliApprove(pool: Pool, p: Parameters<typeof approveConfigR
 }
 export async function cliActivate(pool: Pool, p: Parameters<typeof setConfigActivation>[1]) {
   const c = await pool.connect(); try { await c.query('begin'); const r = await setConfigActivation(c, p); await c.query('commit'); return r; } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}
+/** Recovery: re-check standing after a change made outside the audited path (e.g. raw SQL). Until then the presentation gate hides affected assets. */
+export async function cliRevalidateClaims(pool: Pool, p: { claimKind: string | null; actor: string }) {
+  const c = await pool.connect(); try { await c.query('begin'); const r = await revalidateClaimAssets(c, { claimKind: p.claimKind as Parameters<typeof revalidateClaimAssets>[1]['claimKind'], cause: 'revalidation_run', actor: p.actor }); await c.query('commit'); return r; } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
 }
 export async function cliCreateTrackVersion(pool: Pool, p: Parameters<typeof createTrackConfigVersion>[1]) {
   const c = await pool.connect(); try { await c.query('begin'); const r = await createTrackConfigVersion(c, p); await c.query('commit'); return r; } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }

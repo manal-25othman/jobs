@@ -8,3 +8,5 @@ export * from './companion.js';
 export * from './agents.js';
 export * from './gateway.js';
 export * from './harness/index.js';
+export * from './claim-grounding.js';
+export * from './grounding-lexicon.js';

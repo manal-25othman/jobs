@@ -58,9 +58,11 @@ export function eligibilityFor(kind: ClaimKind, resolved: ResolvedClaimPolicy | 
   return claimEligibility(kind, resolved, subject);
 }
 
-export async function recordClaimEvent(c: PoolClient, e: { proposalId: string; userId: string; event: 'drafted' | 'previewed' | 'approved' | 'rejected' | 'flagged_evidence_withdrawn' | 'refused_not_eligible';
-  claimKind: ClaimKind; policy: ResolvedClaimPolicy | null; actorKind: 'user' | 'system'; detail: string; assetId?: string | null }): Promise<void> {
+export async function recordClaimEvent(c: PoolClient, e: { proposalId: string; userId: string;
+  event: 'drafted' | 'previewed' | 'approved' | 'rejected' | 'flagged_evidence_withdrawn' | 'refused_not_eligible' | 'grounding_refused' | 'edit_refused';
+  claimKind: ClaimKind; policy: ResolvedClaimPolicy | null; actorKind: 'user' | 'system'; detail: string; assetId?: string | null; grounding?: unknown }): Promise<void> {
   await c.query(
-    `insert into claim_draft_event (proposal_id, user_id, event, claim_kind, claim_policy_id, claim_policy_ref, actor_kind, detail, asset_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [e.proposalId, e.userId, e.event, e.claimKind, e.policy?.policy.id ?? null, e.policy ? `${claimPolicyRef(e.policy.policy)} (${e.policy.resolution})` : null, e.actorKind, e.detail, e.assetId ?? null]);
+    `insert into claim_draft_event (proposal_id, user_id, event, claim_kind, claim_policy_id, claim_policy_ref, actor_kind, detail, asset_id, grounding_result) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [e.proposalId, e.userId, e.event, e.claimKind, e.policy?.policy.id ?? null, e.policy ? `${claimPolicyRef(e.policy.policy)} (${e.policy.resolution})` : null, e.actorKind, e.detail, e.assetId ?? null,
+     e.grounding === undefined ? null : JSON.stringify(e.grounding)]);
 }

@@ -15,9 +15,18 @@ import {
 import { groundingChecks } from '@naqla/agents';
 import { loadDomainFacts, approvedTechnologiesForEvidence } from './domain-facts';
 import { resolveClaimPolicy, loadClaimSubject, eligibilityFor, recordClaimEvent } from './claim-drafts';
+import { loadClaimFacts, factsForProvider, groundWording, groundingVersion } from './claim-facts';
+import type { GroundingResult } from '@naqla/agents';
 import { loadRoleRequirements, loadActivityContext } from '../career-data/career-data.service';
 
 export const AGENT_GATEWAY = Symbol('AGENT_GATEWAY');
+
+/** Phase 7b: the wording to approve is not grounded in the cited records. Recorded, then surfaced as a 400; the original draft is untouched. */
+class ClaimGroundingRefusal extends Error {
+  constructor(readonly kind: DraftableClaimKind, readonly grounding: GroundingResult, readonly edited: boolean, readonly resolved: Awaited<ReturnType<typeof resolveClaimPolicy>>) {
+    super(grounding.issues.map((x) => x.en).join('; '));
+  }
+}
 
 /** The claim policy active at approval refused the draft. Recorded, then surfaced as a 400. */
 class ClaimPolicyRefusal extends Error {
@@ -108,6 +117,8 @@ export class AgentService {
         ctx['professionalAssets'] = assets.rows;
         // D-076: only technologies with an approved source reach the agent as facts.
         ctx['approvedTechnologies'] = await approvedTechnologiesForEvidence(c, userId, String(facts['evidenceId']));
+        // Phase 7b: the recorded facts behind this evidence (ids, kinds, values), so a draft can declare its plan.
+        ctx['claimFacts'] = factsForProvider(await loadClaimFacts(c, userId, 'cv_bullet', [String(facts['evidenceId'])]));
       }
       if (facts['evaluationResultId']) {
         const crit = await c.query(`select criterion_key, score, max_score, rationale, skill_id from evaluation_criterion_score where evaluation_result_id = $1 order by criterion_key`, [facts['evaluationResultId']]);
@@ -140,7 +151,7 @@ export class AgentService {
    * active policy) is not stored as awaiting the user; the refusal is audited
    * like any other rejected candidate. Returns the stored proposal ids.
    */
-  private async persist(userId: string, r: GatewayResult, ruleId: string): Promise<{ stored: string[]; refused: string[] }> {
+  private async persist(userId: string, r: GatewayResult, ruleId: string): Promise<{ stored: string[]; refused: { en: string; ar: string }[] }> {
     return this.db.asService(async (c) => {
       const inv = r.invocation;
       await c.query(`insert into agent_invocation (id, agent_id, agent_type, trigger, user_id, target_role_id, allowed_context, redacted_context,
@@ -154,36 +165,49 @@ export class AgentService {
         [inv.invocationId, userId, u.agentType, u.provider, u.model, u.inputBytes, u.outputBytes, u.latencyMs, u.estimatedCost, u.status, u.cacheStatus, u.errorType]);
       const facts = await loadDomainFacts(c, userId);
       const stored: string[] = [];
-      const refused: string[] = [];
+      const refused: { en: string; ar: string }[] = [];
       for (const p of r.proposals) {
         const kind = WORDING_PROPOSAL_TYPES.has(p.proposalType) ? claimKindForProposalType(p.proposalType) : null;
-        let claim: { kind: DraftableClaimKind; policyId: string; ref: string; resolution: string; report: unknown; resolved: Awaited<ReturnType<typeof resolveClaimPolicy>> } | null = null;
+        let claim: { kind: DraftableClaimKind; policyId: string; ref: string; resolution: string; report: unknown; resolved: Awaited<ReturnType<typeof resolveClaimPolicy>>; grounding: GroundingResult } | null = null;
         if (kind) {
           const payload = p.structuredPayload as WordingPayload;
           const resolved = await resolveClaimPolicy(c, kind);
           const verdict = eligibilityFor(kind, resolved, await loadClaimSubject(c, userId, kind, payload, p.evidenceRefs, facts));
           if (verdict.status !== 'eligible' || !resolved) {
             const why = verdict.status === 'eligible' ? 'no policy' : verdict.reasons.map((x) => x.en).join('; ');
-            refused.push(`${p.proposalType}: ${why}`);
+            refused.push({ en: `${p.proposalType}: ${why}`, ar: verdict.status === 'eligible' ? 'لا قاعدة فعّالة لهذا النوع.' : verdict.reasons.map((x) => x.ar).join(' ') });
             await emitAuditEvent(c, { eventType: 'agent.proposal_rejected', userId, actorKind: 'system', subjectTable: 'agent_invocation', subjectId: inv.invocationId,
               reason: `claim_policy: ${why}`, payload: { proposalType: p.proposalType, claimKind: kind, policyRef: verdict.policyRef } });
             continue;
           }
+          // Phase 7b: Claim-to-Fact grounding against the cited records. A refused draft is not offered;
+          // its original wording and the reasons are kept in the audit record.
+          const grounding = await groundWording(c, userId, kind, { ar: payload.suggestedValueAr, en: payload.suggestedValueEn, plan: payload.claimPlan ?? null }, p.evidenceRefs, facts);
+          if (grounding.decision === 'refused') {
+            refused.push({ en: `${p.proposalType}: ${grounding.issues.filter((x) => x.severity === 'refuse').map((x) => x.en).join('; ')}`,
+              ar: grounding.issues.filter((x) => x.severity === 'refuse').map((x) => x.ar).join(' ') });
+            await emitAuditEvent(c, { eventType: 'agent.proposal_rejected', userId, actorKind: 'system', subjectTable: 'agent_invocation', subjectId: inv.invocationId,
+              reason: 'claim_grounding: refused — an assertion is not supported by the cited records', payload: { proposalType: p.proposalType, claimKind: kind, grounding } });
+            continue;
+          }
           claim = { kind, policyId: resolved.policy.id, ref: claimPolicyRef(resolved.policy), resolution: resolved.resolution,
-            report: [...groundingChecks(p, facts), ...verdict.checked.map((ch) => ({ check: `policy:${ch}`, passed: true, detail: `${claimPolicyRef(resolved.policy)} (${resolved.resolution})` }))], resolved };
+            report: [...groundingChecks(p, facts), ...verdict.checked.map((ch) => ({ check: `policy:${ch}`, passed: true, detail: `${claimPolicyRef(resolved.policy)} (${resolved.resolution})` }))], resolved, grounding };
         }
         // Gateway already validated schema + domain, so the row is born `validated`,
         // and a wording proposal moves straight to awaiting_user.
         const lifecycle: ProposalLifecycle = p.requiresUserApproval ? 'awaiting_user' : 'validated';
         await c.query(`insert into agent_proposal (id, invocation_id, user_id, agent_type, proposal_type, subject_type, subject_id, summary, structured_payload,
             evidence_refs, source_refs, rationale, warnings, requires_user_approval, lifecycle, validated_at,
-            claim_kind, claim_policy_id, claim_policy_ref, claim_policy_resolution, grounding_status, grounding_report)
-          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), $16,$17,$18,$19,$20,$21)`,
+            claim_kind, claim_policy_id, claim_policy_ref, claim_policy_resolution, grounding_status, grounding_report, grounding_result, grounding_version)
+          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), $16,$17,$18,$19,$20,$21,$22,$23)`,
           [p.proposalId, inv.invocationId, userId, p.agentType, p.proposalType, p.subjectType, p.subjectId, p.summary, JSON.stringify(p.structuredPayload),
            p.evidenceRefs, JSON.stringify(p.sourceRefs), p.rationale, p.warnings, p.requiresUserApproval, lifecycle,
-           claim?.kind ?? null, claim?.policyId ?? null, claim?.ref ?? null, claim?.resolution ?? null, claim ? 'grounded' : null, claim ? JSON.stringify(claim.report) : null]);
-        if (claim) await recordClaimEvent(c, { proposalId: p.proposalId, userId, event: 'drafted', claimKind: claim.kind, policy: claim.resolved, actorKind: 'system',
-          detail: 'drafted from existing evidence; every grounding check and the claim policy passed; waiting for the user' });
+           claim?.kind ?? null, claim?.policyId ?? null, claim?.ref ?? null, claim?.resolution ?? null, claim ? claim.grounding.decision : null, claim ? JSON.stringify(claim.report) : null,
+           claim ? JSON.stringify(claim.grounding) : null, claim ? groundingVersion(claim.grounding) : null]);
+        if (claim) await recordClaimEvent(c, { proposalId: p.proposalId, userId, event: 'drafted', claimKind: claim.kind, policy: claim.resolved, actorKind: 'system', grounding: claim.grounding,
+          detail: claim.grounding.decision === 'grounded'
+            ? 'drafted from existing evidence; every assertion is supported by a cited record and the claim policy passed; waiting for the user'
+            : 'drafted, but part of the wording is not accounted for by a cited record (needs revision); it cannot be approved as evidence-backed until revised' });
         stored.push(p.proposalId);
       }
       for (const rej of r.rejected) {
@@ -192,7 +216,7 @@ export class AgentService {
       }
       await emitAuditEvent(c, { eventType: 'agent.invoked', userId, actorKind: 'system', subjectTable: 'agent_invocation', subjectId: inv.invocationId,
         reason: `rule ${ruleId}: ${inv.requestedAction}`, payload: { proposals: stored.length, rejected: r.rejected.length + refused.length, status: u.status, passedContext: inv.allowedContext } });
-      return { stored, refused: [...r.rejected.map((x) => `${x.code}: ${x.reason}`), ...refused] };
+      return { stored, refused: [...r.rejected.map((x) => ({ en: `${x.code}: ${x.reason}`, ar: 'لم يجتز الاقتراح فحوص الأدلة، فلم يُعرض عليك.' })), ...refused] };
     });
   }
 
@@ -231,7 +255,7 @@ export class AgentService {
     const { stored, refused } = await this.persist(userId, result, decision.ruleId);
     const drafts = await this.db.asService(async (c) => (await c.query(`select id from agent_proposal where id = any($1::uuid[]) and claim_kind is not null`, [stored])).rows.map((x) => String(x.id)));
     return { status: drafts.length > 0 ? 'drafted' as const : 'nothing_drafted' as const, proposalIds: drafts,
-      reasons: drafts.length > 0 ? [] : refused.map((en) => ({ code: 'refused', en, ar: 'لم يجتز الاقتراح فحوص الأدلة، فلم يُعرض عليك.' })) };
+      reasons: drafts.length > 0 ? [] : refused.map((x) => ({ code: 'refused', en: x.en, ar: x.ar })) };
   }
 
   /** What the agent may use for a claim draft: facts only, including the CURRENT wording of the same kind, for the comparison. */
@@ -250,6 +274,7 @@ export class AgentService {
         where sc.user_id = $1 and sc.state in ('demonstrated','verified') order by sk.label_en`, [userId]);
     const role = await c.query(`select tr.label_ar, tr.label_en from career_goal cg join target_role tr on tr.id = cg.target_role_id where cg.user_id = $1 and cg.is_current`, [userId]);
     return { kind, current: await this.currentWording(c, userId, kind, (evidence?.['skillId'] as string | undefined) ?? null), evidence,
+      facts: factsForProvider(await loadClaimFacts(c, userId, kind, evidenceId ? [evidenceId] : [])),
       demonstratedSkills: demonstrated.rows.map((x) => ({ skillId: x.id, labelAr: x.label_ar, labelEn: x.label_en })),
       roleLabelAr: role.rows[0]?.label_ar ?? null, roleLabelEn: role.rows[0]?.label_en ?? null,
       approvedTechnologies: evidenceId ? await approvedTechnologiesForEvidence(c, userId, evidenceId) : [] };
@@ -318,7 +343,7 @@ export class AgentService {
       const first = await c.query('update agent_proposal set previewed_at = now() where id = $1 and user_id = $2 and previewed_at is null returning claim_kind', [id, userId]);
       const kind = isWording ? claimKindForProposalType(p.proposalType) : null;
       if (!kind) return null;
-      const row = (await c.query('select claim_kind, claim_policy_ref, claim_policy_resolution, grounding_status, grounding_report from agent_proposal where id = $1', [id])).rows[0];
+      const row = (await c.query('select claim_kind, claim_policy_ref, claim_policy_resolution, grounding_status, grounding_report, grounding_result from agent_proposal where id = $1', [id])).rows[0];
       const facts = await loadDomainFacts(c, userId);
       const resolved = await resolveClaimPolicy(c, kind);
       const now = eligibilityFor(kind, resolved, await loadClaimSubject(c, userId, kind, payload, p.evidenceRefs, facts));
@@ -326,13 +351,17 @@ export class AgentService {
       const ev = p.evidenceRefs.length === 0 ? [] : (await c.query(`select e.id, e.withdrawn_at is not null as withdrawn, p.title, sk.label_ar, sk.label_en
           from evidence e join skill sk on sk.id = canonical_skill_id(e.skill_id) left join project p on p.id = e.project_id
          where e.user_id = $1 and e.id = any($2::uuid[])`, [userId, p.evidenceRefs])).rows;
+      // Phase 7b: grounding as recorded at drafting, and as it stands now against the cited records (read-only).
+      const groundingNow = await groundWording(c, userId, kind, { ar: payload.suggestedValueAr, en: payload.suggestedValueEn, plan: payload.claimPlan ?? null }, p.evidenceRefs, facts);
       return {
         kind, labelAr: CLAIM_KIND_LABEL_AR[kind],
+        grounding: { atDrafting: (row.grounding_result as GroundingResult | null) ?? null, now: groundingNow },
         draftedUnder: row.claim_policy_ref ? { ref: row.claim_policy_ref, resolution: row.claim_policy_resolution } : null,
         groundingStatus: row.grounding_status ?? null, groundingReport: row.grounding_report ?? null,
         policyNow: resolved ? { ref: claimPolicyRef(resolved.policy), resolution: resolved.resolution, minEvidenceLevel: resolved.policy.minEvidenceLevel,
           reviewStatus: resolved.policy.reviewStatus, validationNote: resolved.validationNote } : null,
-        eligibleNow: now.status === 'eligible',
+        eligibleNow: now.status === 'eligible' && groundingNow.decision === 'grounded',
+        policyEligibleNow: now.status === 'eligible',
         missing: now.status === 'eligible' ? [] : now.reasons.map((x) => ({ code: x.code, ar: x.ar, en: x.en })),
         evidence: ev.map((e) => ({ id: e.id, projectTitle: e.title, skillLabelAr: e.label_ar, skillLabelEn: e.label_en, withdrawn: e.withdrawn })),
         current: payload.currentValue ?? await this.currentWording(c, userId, kind, null),
@@ -354,6 +383,16 @@ export class AgentService {
     try {
       return await this.approveIn(userId, id, editedBody);
     } catch (e) {
+      if (e instanceof ClaimGroundingRefusal) {
+        await this.db.asService(async (c) => {
+          if (!e.edited) await c.query(`update agent_proposal set grounding_status = $2, grounding_result = $3, grounding_version = $4 where id = $1 and claim_kind is not null and lifecycle = 'awaiting_user'`,
+            [id, e.grounding.decision, JSON.stringify(e.grounding), groundingVersion(e.grounding)]);
+          await recordClaimEvent(c, { proposalId: id, userId, event: e.edited ? 'edit_refused' : 'grounding_refused', claimKind: e.kind, policy: e.resolved, actorKind: 'system', grounding: e.grounding,
+            detail: e.edited ? 'the edited wording is not accounted for by the cited records; the original draft is kept unchanged' : 'the wording is not accounted for by the cited records as they stand now' });
+        });
+        const label = e.grounding.decision === 'refused' ? 'refused' : 'needs revision';
+        throw new BadRequestException(`approval refused by claim grounding (${label}): ${e.grounding.issues.map((x) => x.en).join('; ')}`);
+      }
       if (!(e instanceof ClaimPolicyRefusal)) throw e;
       // Recorded in its own transaction: the refusal is history even though the approval did not happen.
       await this.db.asService(async (c) => {
@@ -391,6 +430,10 @@ export class AgentService {
       const resolved = await resolveClaimPolicy(c, kind);
       const verdict = eligibilityFor(kind, resolved, await loadClaimSubject(c, userId, kind, checked, p.evidence_refs, facts));
       if (verdict.status !== 'eligible' || !resolved) throw new ClaimPolicyRefusal(kind, resolved, verdict.status === 'eligible' ? 'no active policy' : verdict.reasons.map((x) => x.en).join('; '));
+      // Phase 7b: every assertion must be accounted for by the cited records as they stand now. An edit has no plan: it is grounded as written.
+      const editedNow = !!editedBody && editedBody.trim() !== payload.suggestedValueAr.trim();
+      const grounding = await groundWording(c, userId, kind, { ar: body, en: editedNow ? null : payload.suggestedValueEn, plan: editedNow ? null : (payload.claimPlan ?? null) }, p.evidence_refs, facts);
+      if (grounding.decision !== 'grounded') throw new ClaimGroundingRefusal(kind, grounding, editedNow, resolved);
 
       let anchor: { skill_id: string | null; project_id: string | null; evaluation_result_id: string | null } = { skill_id: null, project_id: null, evaluation_result_id: null };
       if (p.evidence_refs.length > 0) {
@@ -417,7 +460,9 @@ export class AgentService {
       // A draft refused earlier under a stricter policy is grounded again once the policy active now accepts it.
       await c.query(`update agent_proposal set lifecycle = 'approved', approved_at = $2, approved_body = $3, resulting_asset_id = $4,
           grounding_status = case when claim_kind is null then null else 'grounded' end where id = $1`, [id, approvedAt, userEdited ? body : null, assetId]);
-      await recordClaimEvent(c, { proposalId: id, userId, event: 'approved', claimKind: kind, policy: resolved, actorKind: 'user', assetId,
+      // The asset was verified under the policy in effect now: that is its current standing.
+      await c.query('update professional_asset set standing_policy_id = $2, standing_checked_at = now() where id = $1', [assetId, resolved.policy.id]);
+      await recordClaimEvent(c, { proposalId: id, userId, event: 'approved', claimKind: kind, policy: resolved, actorKind: 'user', assetId, grounding,
         detail: userEdited ? 'the user approved an edited wording; it was re-checked against the evidence and the policy' : 'the user approved the wording as proposed' });
       await emitAuditEvent(c, { eventType: 'agent.proposal_approved', userId, actorKind: 'user', actorId: userId, subjectTable: 'agent_proposal', subjectId: id,
         reason: userEdited ? 'the user approved the proposal after editing the wording' : 'the user approved the proposal as proposed', payload: { assetId, userEdited, claimKind: kind, policyRef } });

@@ -278,3 +278,9 @@ select set_config('naqla.config_actor', '', false), set_config('naqla.config_rea
 select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo: allow DRAFT case-study claim drafts outside production', false);
 update claim_policy set activation = 'development_only' where key = 'default' and version = 1 and claim_kind = 'case_study' and activation = 'inactive';
 select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);
+
+-- Phase 7b: outside production, the demo uses the DRAFT grounding vocabulary default@1 (development only).
+-- Production has no active vocabulary until an SME approves one, so grounding fails closed there.
+select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo: use the draft grounding vocabulary outside production', false);
+update grounding_lexicon set activation = 'development_only' where key = 'default' and version = 1 and activation = 'inactive';
+select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);
