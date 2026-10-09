@@ -102,7 +102,7 @@ export default function SkillDetailPage() {
       {d.activities.length ? (
         <section className="card">
           <h2>الأنشطة المرتبطة</h2>
-          <div className="rows">{d.activities.map((a) => <div key={a.id} className="row" style={{ gap: 10 }}><span className="grow body-sm">{a.titleAr}</span><span className="chip">{a.depth === 'primary' ? 'رئيسية' : 'مساندة'}</span></div>)}</div>
+          <div className="rows">{d.activities.map((a) => <div key={a.id} className="row" style={{ gap: 10 }}><a className="link grow" href={`/activities/${encodeURIComponent(a.id)}`}>{a.titleAr}</a><span className="chip">{a.depth === 'primary' ? 'رئيسية' : 'مساندة'}</span></div>)}</div>
         </section>
       ) : null}
     </main>

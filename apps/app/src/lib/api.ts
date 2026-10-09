@@ -27,21 +27,31 @@ export async function api<T>(
   });
 
   const payload = (await res.json().catch(() => null)) as ApiResult<T> | null;
-  if (!payload) throw new Error(`the API returned no body (${res.status})`);
-  if (!payload.ok) throw new Error(payload.error?.message ?? `request failed (${res.status})`);
+  if (!payload) throw new ApiError(`the API returned no body (${res.status})`, res.status, 'internal');
+  if (!payload.ok) throw new ApiError(payload.error?.message ?? `request failed (${res.status})`, res.status, payload.error?.code ?? 'internal');
   return payload.data;
 }
+
+/** A refused request: the HTTP status and the contract's error code ride along with the message. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code: string) { super(message); this.name = 'ApiError'; }
+}
+export const isNotFound = (e: unknown): boolean => e instanceof ApiError && e.status === 404;
 
 /* ─────────────────────────── shapes this slice uses ─────────────────────── */
 
 export interface TargetRole {
   id: string; slug: string; label_ar: string; label_en: string;
   review_status: string; is_demo_fixture: boolean;
+  /** D-119: demo roles are listed only where demo content is visible, always labelled. */
+  isDemo?: boolean; label?: string | null;
 }
 
 export interface CareerGoal {
   id: string; targetRoleId: string; roleLabel: string; roleLabelAr?: string;
   roleReviewStatus: 'reviewed' | 'draft'; requirementsIncomplete: boolean; confirmedAt: string;
+  /** D-119: false when the goal's role is no longer offered (history kept). */
+  roleAvailable?: boolean; isDemo?: boolean;
 }
 
 export interface Project {
@@ -84,6 +94,65 @@ export interface EvaluationResult {
   evaluatedAt: string;
   /** Present while a person reviews the judgement criteria. No time estimate: there is no SLA yet. */
   humanReview: { pendingCriteria: string[]; completedCriteria: string[] } | null;
+}
+
+/* ───────────── graduate activity journey (backend Phase 1, D-119 · UI Phase 2) ───────────── */
+
+export type WorkStatus =
+  | 'in_progress' | 'submitted' | 'evaluation_running' | 'evaluation_failed' | 'under_human_review'
+  | 'blocked_by_checks' | 'pending_validation' | 'level_recorded' | 'feedback_ready';
+
+/** Derived by the API from the rubric an evaluation would use (D-118 rule). Informational: it decides nothing. */
+export interface ActivityAssessment { mode: 'human_reviewed' | 'formative_only' | 'automated_verified'; evaluable: boolean; canSupportLevel: boolean; reasons: string[] }
+export interface ActivitySkill { id: string; slug: string; labelAr: string; labelEn: string; depth: 'primary' | 'secondary' }
+interface ActivityBase {
+  id: string; slug: string; version: string; titleAr: string; titleEn: string; objectiveAr: string | null;
+  level: string | null; estimatedMinutes: number | null; aiUsageMode: string; isDemo: boolean; label: string | null;
+  skills: ActivitySkill[]; assessment: ActivityAssessment;
+}
+export interface ActivitySummary extends ActivityBase {
+  deliverableCount: number; fileDeliverableCount: number;
+  myLatest: { projectId: string; workStatus: WorkStatus; attempts: number } | null;
+}
+export interface ActivityCatalogue {
+  role: { id: string; slug: string; labelAr: string; labelEn: string; isDemo: boolean } | null;
+  unavailableReason: 'no_career_goal' | 'role_unavailable' | null;
+  items: ActivitySummary[];
+}
+export interface ActivityDeliverable { key: string; format: string; kind: 'file' | 'text'; mandatory: boolean; descriptionAr: string | null; descriptionEn: string | null; position: number }
+export interface ActivityDetail extends ActivityBase {
+  businessContextAr: string | null; businessContextEn: string | null; objectiveEn: string | null;
+  /** In the graduate's current catalogue. False for their own history on an activity no longer offered: readable, not restartable. */
+  available: boolean;
+  deliverables: ActivityDeliverable[];
+  /** A planted-issue input carries no description (`descriptionWithheld`): its wording would reveal the assessment. */
+  inputs: { key: string; descriptionAr: string | null; descriptionEn: string | null; descriptionWithheld: boolean }[];
+  /** Starter materials do not exist yet (Phase 3). Said plainly. */
+  materialsAvailable: boolean;
+  myProjects: ProjectStatus[];
+}
+export interface ProjectStatus {
+  id: string; title: string; kind: 'platform_activity' | 'personal_project'; status: string;
+  activitySpecId: string | null; activitySpecVersion: string | null;
+  activity: { id: string; slug: string; titleAr: string; titleEn: string } | null;
+  attempts: number; createdAt: string; updatedAt: string;
+  latestSubmission: null | { id: string; submittedAt: string; evaluationId: string | null; evaluationState: string | null; resultId: string | null; outcome: string | null; decision: string | null; levelChanged: boolean };
+  workStatus: WorkStatus;
+}
+/** GET /submissions/:id/evaluation — a pure read, valid in every state; never starts a run. */
+export interface EvaluationView {
+  submissionId: string; evaluationId: string | null;
+  state: 'not_evaluated' | 'queued' | 'running' | 'completed' | 'failed' | 'queued_for_human' | string;
+  workStatus: WorkStatus;
+  resultId: string | null; outcome: string | null; totalScore: number | null; maxScore: number | null; reason: string | null;
+  criteria: EvaluationCriterion[];
+  integrityChecks: { key: string; passed: boolean; message: string | null }[];
+  transition: { from: string; to: string; evidenceId: string } | null;
+  verificationDecision: { decision: string; reason: string } | null;
+  humanReview: { pending: number; completed: number; awaiting: { criterionKey: string; nameAr: string }[]; pendingCriteria: string[]; completedCriteria: string[] } | null;
+  evaluatedAt: string | null;
+  actions: { evaluate: boolean };
+  alreadyEvaluated?: boolean;
 }
 
 export interface ReviewQueueItem {

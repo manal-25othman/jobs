@@ -13,3 +13,6 @@ coverage/
 
 # Local env
 .env.local
+
+# UI acceptance screenshots and results (apps/app/test/browser)
+.ui-acceptance/

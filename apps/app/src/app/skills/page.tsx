@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, type TrackSkillsPage } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
+import { JourneyNav } from '../../components/JourneyNav';
 
 /**
  * Skills of the current track (Phase 5). Four dimensions, side by side, never
@@ -36,6 +37,7 @@ export default function SkillsPage() {
   const r = page.readiness;
   return (
     <main className="wrap">
+      <JourneyNav current="/skills" />
       <h1>مهارات مسار {page.role.labelAr}</h1>
 
       <section className="card">
@@ -83,7 +85,7 @@ export default function SkillsPage() {
           لكل مهارة أربعة أبعاد منفصلة: حالة الرحلة · مستوى التحقق · الأدلة · مساهمتها في الجاهزية. التصنيف (أساسية/مساندة) لا يُعرض قبل اعتماد الخبراء.
         </p>
       </section>
-      <p className="body-sm"><a className="link" href="/project">← التسليم</a> · <a className="link" href="/evaluation">التقييم</a></p>
+      <p className="body-sm"><a className="link" href="/activities">← أنشطة دورك</a> · <a className="link" href="/work">أعمالي</a></p>
     </main>
   );
 }

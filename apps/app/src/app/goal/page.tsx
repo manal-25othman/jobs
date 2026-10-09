@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, type TargetRole, type CareerGoal } from '../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
 import { Steps } from '../../components/Steps';
+import { JourneyNav } from '../../components/JourneyNav';
 
 /**
  * Minimal career goal context.
@@ -49,7 +50,7 @@ export default function GoalPage() {
         method: 'PUT', body: { targetRoleId: selected, confirmed: true }, token,
       });
       setGoal(g);
-      router.push('/project');
+      router.push('/activities');
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -62,6 +63,7 @@ export default function GoalPage() {
   return (
     <main className="wrap">
       <Steps current={0} />
+      <JourneyNav current="/goal" />
       <h1>هدفك المهني</h1>
       {error ? <ErrorBanner message={error} /> : null}
 
@@ -81,8 +83,8 @@ export default function GoalPage() {
                 {r.review_status !== 'published' ? (
                   <span className="chip chip--attention">البيانات غير مكتملة بعد</span>
                 ) : null}
-                {r.is_demo_fixture ? (
-                  <span className="micro muted">بيانات تجريبية · ليست تعريف دور مُراجَعًا</span>
+                {r.isDemo ?? r.is_demo_fixture ? (
+                  <span className="micro muted">{r.label ?? 'تجريبي — غير مراجَع'} · بيانات تجريبية · ليست تعريف دور مُراجَعًا</span>
                 ) : null}
               </span>
             </label>
@@ -98,12 +100,16 @@ export default function GoalPage() {
         </button>
       </section>
 
+      {roles.length === 0 && !error ? (
+        <p className="body-sm muted">لا أدوار متاحة للاختيار بعد. تُضاف الأدوار بعد مراجعة محتواها ونشره.</p>
+      ) : null}
+
       {goal ? (
         <div className="banner banner--success" role="status">
           <span className="grow">
-            هدفك الحالي: <strong style={{ fontWeight: 500 }} className="term" lang="en">{goal.roleLabel}</strong>
+            هدفك الحالي: <strong style={{ fontWeight: 500 }}>{goal.roleLabelAr ?? goal.roleLabel}</strong>
           </span>
-          <a className="link" href="/project">التالي ←</a>
+          <a className="link" href="/activities">أنشطة دورك ←</a>
         </div>
       ) : null}
     </main>
