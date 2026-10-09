@@ -1,9 +1,10 @@
 import type { PoolClient } from 'pg';
-import { claimPolicyRef, assetPresentableNow, CLAIM_KINDS, type ClaimKind } from '@naqla/domain';
+import { claimPolicyRef, assetPresentableNow, claimKindForProposalType, CLAIM_KINDS, type ClaimKind } from '@naqla/domain';
 import type { DomainFacts } from '@naqla/agents';
 import { emitAuditEvent } from '../infra/audit';
 import { loadDomainFacts } from './domain-facts';
 import { resolveClaimPolicy, loadClaimSubject, eligibilityFor } from './claim-drafts';
+import { currentGroundingVersion, groundWording } from './claim-facts';
 
 /**
  * Current standing of approved professional assets (Phase 7b · BR-026 · DR-019).
@@ -62,11 +63,55 @@ export async function revalidateClaimAssets(c: PoolClient, p: { claimKind: Claim
   return out;
 }
 
-/** The fail-closed presentation gate for one kind, as a predicate over asset rows. */
+/** The fail-closed presentation gate for one kind, as a predicate over asset rows: the policy AND the grounding version in effect. */
 export async function presentableFilter(c: PoolClient, kind: ClaimKind) {
   const resolved = await resolveClaimPolicy(c, kind);
   const inEffect = resolved ? { policyId: resolved.policy.id, resolution: resolved.resolution } : null;
-  return (row: { lifecycle_state: string; evidence_backed: boolean; user_approved_at: unknown; standing_policy_id: string | null; claim_policy_id: string | null }) =>
+  const currentVersion = await currentGroundingVersion(c);
+  return (row: { lifecycle_state: string; evidence_backed: boolean; user_approved_at: unknown; standing_policy_id: string | null; claim_policy_id: string | null; grounding_version: string | null }) =>
     assetPresentableNow({ lifecycleState: row.lifecycle_state, evidenceBacked: row.evidence_backed, userApprovedAt: row.user_approved_at ? String(row.user_approved_at) : null,
-      standingPolicyId: row.standing_policy_id, claimPolicyId: row.claim_policy_id }, inEffect);
+      standingPolicyId: row.standing_policy_id, claimPolicyId: row.claim_policy_id }, inEffect, { assetVersion: row.grounding_version, currentVersion });
+}
+
+/**
+ * Phase 8 — re-grounding (owner requirement 3). When the grounding vocabulary in
+ * effect changes (activation) or the engine version changes (deployment), every
+ * active approved asset is grounded again, as written, against the records it
+ * cites. Grounded → its grounding_version is the one in effect; otherwise →
+ * needs_review with the reason. Runs inside the caller's transaction: if it
+ * cannot complete, the vocabulary change does not happen. The approval itself is
+ * never rewritten (trigger), and nothing is restored automatically.
+ */
+export async function regroundApprovedAssets(c: PoolClient, p: { cause: 'grounding_revalidation'; actor: string }) {
+  const version = await currentGroundingVersion(c);
+  const out = { checked: 0, grounded: 0, movedToReview: 0, version };
+  const assets = await c.query(
+    `select a.id, a.user_id, a.kind, a.body, a.body_en from professional_asset a
+      where a.lifecycle_state = 'active' and a.user_approved_at is not null order by a.id for update`);
+  const factsByUser = new Map<string, DomainFacts>();
+  for (const a of assets.rows) {
+    const kind = claimKindForProposalType(String(a.kind));
+    if (!kind) continue;
+    out.checked++;
+    const userId = String(a.user_id);
+    if (!factsByUser.has(userId)) factsByUser.set(userId, await loadDomainFacts(c, userId));
+    const refs = (await c.query('select evidence_id from asset_evidence where asset_id = $1', [a.id])).rows.map((r) => String(r.evidence_id));
+    const g = await groundWording(c, userId, kind, { ar: String(a.body), en: a.body_en ?? null, plan: null }, refs, factsByUser.get(userId)!);
+    if (g.decision === 'grounded') {
+      await c.query('update professional_asset set grounding_version = $2 where id = $1', [a.id, version]);
+      await c.query(`insert into asset_standing_event (asset_id, user_id, cause, previous_state, new_state, eligible, reason, actor) values ($1,$2,$3,'active','active',true,$4,$5)`,
+        [a.id, userId, p.cause, `still grounded under ${version}`, p.actor]);
+      out.grounded++;
+      continue;
+    }
+    const reasonAr = 'تغيّرت قواعد التحقق من الصياغة، ولم يعد هذا البند كما كُتب مستندًا إلى أدلتك المسجّلة. البند محفوظ كما اعتمدتِه، ولم يعد يُعرض بوصفه مدعومًا بدليل.';
+    await c.query(`update professional_asset set lifecycle_state = 'needs_review', evidence_backed = false, review_reason = $2, review_at = now() where id = $1`, [a.id, reasonAr]);
+    await c.query(`insert into asset_standing_event (asset_id, user_id, cause, previous_state, new_state, eligible, reason, actor) values ($1,$2,$3,'active','needs_review',false,$4,$5)`,
+      [a.id, userId, p.cause, `not grounded under ${version}: ${g.issues.map((x) => x.en).join('; ')}`, p.actor]);
+    await c.query(`insert into notification (user_id, type, body_ar, action_label, action_href) values ($1, 'attention', $2, 'راجعي البند', $3)`, [userId, reasonAr, `/proposals?asset=${a.id}`]);
+    await emitAuditEvent(c, { eventType: 'asset.needs_review', userId, actorKind: 'system', subjectTable: 'professional_asset', subjectId: String(a.id),
+      reason: `grounding ${version}: the approved wording is no longer accounted for by its cited records. The approval is kept unchanged.`, payload: { cause: p.cause, version } });
+    out.movedToReview++;
+  }
+  return out;
 }

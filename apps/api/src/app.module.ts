@@ -11,6 +11,7 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { SkillProgressModule } from './skill-progress/skill-progress.module';
 import { AssessmentModule } from './assessment/assessment.module';
 import { ConfigurationModule } from './configuration/configuration.module';
+import { AdminModule } from './admin/admin.module';
 import { ReadinessModule } from './readiness/readiness.module';
 import { IntegrityModule } from './integrity/integrity.module';
 
@@ -21,7 +22,7 @@ import { IntegrityModule } from './integrity/integrity.module';
  * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
-  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule],
+  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule, AdminModule],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

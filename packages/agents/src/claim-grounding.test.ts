@@ -225,3 +225,26 @@ describe('the local test provider declares a plan that grounds for every draftab
     assert.equal(cvBulletWording(ev, undefined).plan, null);
   });
 });
+
+/**
+ * RISK-GROUNDING-02 — OPEN GAP, recorded on purpose (Phase 8 brief, item 2).
+ * A cited project proves the project exists, not that the user performed a
+ * specific action on it. Today an action verb the vocabulary lists ("fixed",
+ * "refactored", «أصلحتُ», «عالجتُ») is accepted whenever a project fact is cited.
+ * These tests pin the CURRENT behaviour so that a mitigation must change them
+ * consciously. They are not an endorsement: no real LLM integration until this
+ * gap has a tested mitigation.
+ */
+describe('RISK-GROUNDING-02 (open): unsupported action verbs on a cited project', () => {
+  test('gap: «أصلحتُ» / "Fixed" is grounded on the project fact alone — no record says what was fixed', () => {
+    assert.equal(g('أصلحتُ «متتبّع عادات»', 'Fixed the Habit tracker').decision, 'grounded');
+    assert.equal(g('عالجتُ «متتبّع عادات»').decision, 'grounded');
+  });
+  test('gap: "Refactored" (English) is grounded on the project fact alone', () => {
+    assert.equal(g('بنيتُ «متتبّع عادات»', 'Refactored the Habit tracker').decision, 'grounded');
+  });
+  test('held only incidentally: «أعدتُ هيكلة» is not in the vocabulary (needs revision); "optimized"/«حسّنتُ» trips the quality detector (refused)', () => {
+    assert.equal(g('أعدتُ هيكلة «متتبّع عادات»').decision, 'needs_revision');
+    assert.equal(g('حسّنتُ «متتبّع عادات»', 'Optimized the Habit tracker').decision, 'refused');
+  });
+});

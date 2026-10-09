@@ -252,12 +252,15 @@ export interface AssetStanding {
   readonly standingPolicyId: string | null;
   readonly claimPolicyId: string | null;
 }
-export function assetPresentableNow(a: AssetStanding, inEffect: { readonly policyId: string; readonly resolution: ConfigResolution } | null):
-  { readonly presentable: boolean; readonly reason: 'presentable' | 'not_active' | 'not_evidence_backed' | 'not_approved' | 'no_policy_in_effect' | 'not_verified_under_policy_in_effect' } {
+export function assetPresentableNow(a: AssetStanding, inEffect: { readonly policyId: string; readonly resolution: ConfigResolution } | null,
+  grounding?: { readonly assetVersion: string | null; readonly currentVersion: string }):
+  { readonly presentable: boolean; readonly reason: 'presentable' | 'not_active' | 'not_evidence_backed' | 'not_approved' | 'no_policy_in_effect' | 'not_verified_under_policy_in_effect' | 'not_grounded_under_current_version' } {
   if (a.lifecycleState !== 'active') return { presentable: false, reason: 'not_active' };
   if (!a.evidenceBacked) return { presentable: false, reason: 'not_evidence_backed' };
   if (!a.userApprovedAt) return { presentable: false, reason: 'not_approved' };
   if (!inEffect) return { presentable: false, reason: 'no_policy_in_effect' };
+  // Phase 8: a grounding vocabulary or engine change hides the asset until it is re-grounded under the version in effect.
+  if (grounding && grounding.assetVersion !== grounding.currentVersion) return { presentable: false, reason: 'not_grounded_under_current_version' };
   const verifiedUnder = a.standingPolicyId ?? a.claimPolicyId;
   if (verifiedUnder === null) return inEffect.resolution === 'legacy_baseline' ? { presentable: true, reason: 'presentable' } : { presentable: false, reason: 'not_verified_under_policy_in_effect' };
   return verifiedUnder === inEffect.policyId ? { presentable: true, reason: 'presentable' } : { presentable: false, reason: 'not_verified_under_policy_in_effect' };

@@ -29,9 +29,19 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
 done
 
 echo "==> invariant proofs (each must be REJECTED by the database)"
-psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/tests/invariants.sql" 2>&1 | grep -E 'PASS|FAIL' || true
+# A psql error stops the run and is printed in full — never hidden by the PASS/FAIL filter.
+run_proofs() {
+  local out
+  if ! out="$(psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$1" 2>&1)"; then
+    echo "$out" | tail -20
+    echo "==> FAILED: $(basename "$1") stopped on an error" >&2
+    exit 1
+  fi
+  echo "$out" | grep -E "$2" || true
+}
+run_proofs "$ROOT/supabase/tests/invariants.sql" 'PASS|FAIL'
 
 echo "==> access model proofs"
-psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/tests/rls.sql" 2>&1 | grep -E 'ROLE|PASS|FAIL' || true
+run_proofs "$ROOT/supabase/tests/rls.sql" 'ROLE|PASS|FAIL'
 
 echo "==> all database proofs passed"

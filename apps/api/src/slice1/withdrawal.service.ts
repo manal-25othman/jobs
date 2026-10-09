@@ -9,7 +9,7 @@ import {
 import { validateAgainstDomain, ProposalRejected } from '@naqla/agents';
 import { loadDomainFacts } from '../agents/domain-facts';
 import { recordClaimEvent, resolveClaimPolicy, loadClaimSubject, eligibilityFor } from '../agents/claim-drafts';
-import { groundWording } from '../agents/claim-facts';
+import { groundWording, groundingVersion } from '../agents/claim-facts';
 
 /**
  * Withdrawn evidence (D-077).
@@ -131,7 +131,7 @@ export class WithdrawalService {
       await c.query('insert into asset_evidence (asset_id, evidence_id) values ($1,$2) on conflict do nothing', [assetId, e.id]);
       await c.query(
         `update professional_asset set lifecycle_state = 'active', evidence_backed = true, review_reason = null, review_at = null,
-                project_id = $2, evaluation_result_id = $3, standing_policy_id = $4, standing_checked_at = now() where id = $1`, [assetId, e.project_id, e.evaluation_result_id, resolved.policy.id]);
+                project_id = $2, evaluation_result_id = $3, standing_policy_id = $4, standing_checked_at = now(), grounding_version = $5 where id = $1`, [assetId, e.project_id, e.evaluation_result_id, resolved.policy.id, groundingVersion(grounding)]);
       await c.query(`insert into asset_standing_event (asset_id, user_id, cause, claim_policy_id, claim_policy_ref, previous_state, new_state, eligible, reason, actor)
         values ($1,$2,'relinked',$3,$4,$5,'active',true,$6,'user')`, [assetId, userId, resolved.policy.id, `${claimPolicyRef(resolved.policy)} (${resolved.resolution})`, a.lifecycle_state, `re-linked to evidence ${e.id}; eligible and grounded`]);
       await emitAuditEvent(c, { eventType: 'asset.relinked', userId, actorKind: 'user', actorId: userId, subjectTable: 'professional_asset', subjectId: assetId,

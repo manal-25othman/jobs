@@ -461,7 +461,7 @@ export class AgentService {
       await c.query(`update agent_proposal set lifecycle = 'approved', approved_at = $2, approved_body = $3, resulting_asset_id = $4,
           grounding_status = case when claim_kind is null then null else 'grounded' end where id = $1`, [id, approvedAt, userEdited ? body : null, assetId]);
       // The asset was verified under the policy in effect now: that is its current standing.
-      await c.query('update professional_asset set standing_policy_id = $2, standing_checked_at = now() where id = $1', [assetId, resolved.policy.id]);
+      await c.query('update professional_asset set standing_policy_id = $2, standing_checked_at = now(), grounding_version = $3 where id = $1', [assetId, resolved.policy.id, groundingVersion(grounding)]);
       await recordClaimEvent(c, { proposalId: id, userId, event: 'approved', claimKind: kind, policy: resolved, actorKind: 'user', assetId, grounding,
         detail: userEdited ? 'the user approved an edited wording; it was re-checked against the evidence and the policy' : 'the user approved the wording as proposed' });
       await emitAuditEvent(c, { eventType: 'agent.proposal_approved', userId, actorKind: 'user', actorId: userId, subjectTable: 'agent_proposal', subjectId: id,

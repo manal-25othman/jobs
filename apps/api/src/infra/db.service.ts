@@ -32,6 +32,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.pool?.end();
   }
 
+  /**
+   * Phase 8: the career-data review commands (reviewTransition, approveRubricValues, supersedePrevious)
+   * own their transaction and take a pool; the admin API calls them through this, unchanged.
+   */
+  async withPool<T>(fn: (pool: Pool) => Promise<T>): Promise<T> { return fn(this.pool); }
+
   /** Raw pool access for health checks only. */
   async ping(): Promise<boolean> {
     try {

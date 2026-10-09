@@ -201,5 +201,30 @@ set role anon;
 select expect_rows($$select 1 from case_study$$, 0, 'an expired link is closed too');
 reset role;
 
+-- ─────────────── Phase 8: Track Builder governance is not user-reachable ───────────────
+-- Roles come from operator grants; nobody grants themself a Track Builder role,
+-- and track-skill change drafts are reachable only through the API (service).
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+select assert_effective_role('authenticated');
+select expect_denied($$
+  insert into reviewer_grant (user_id, role_performed, granted_by)
+  values ('11111111-1111-4111-8111-111111111111', 'track_admin', 'myself')
+$$, 'a user cannot grant themself the track administrator role');
+select expect_denied($$
+  insert into reviewer_grant (user_id, role_performed, granted_by)
+  values ('11111111-1111-4111-8111-111111111111', 'product_owner', 'myself')
+$$, 'a user cannot grant themself the product owner role');
+select expect_denied($$select 1 from reviewer_grant$$, 'a user cannot read reviewer grants');
+select expect_denied($$select 1 from track_skill_change$$, 'a user cannot read track-skill change drafts');
+select expect_denied($$
+  insert into track_skill_change (target_role_id, role_requirement_id, proposed, base, professional, reason, drafted_by)
+  values (gen_random_uuid(), gen_random_uuid(), '{"is_core": true}', '{}', true, 'self', '11111111-1111-4111-8111-111111111111')
+$$, 'a user cannot write a track-skill change');
+select expect_denied($$
+  update claim_policy set min_evidence_count = 1
+$$, 'a user cannot edit a claim policy');
+reset role;
+
 \echo ''
 \echo 'All access-model checks passed.'

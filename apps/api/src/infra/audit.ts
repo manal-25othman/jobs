@@ -14,7 +14,7 @@ export async function emitAuditEvent(
     userId: string | null;
     actorKind: 'user' | 'human_reviewer' | 'system';
     actorId?: string | null;
-    rolePerformed?: 'sme' | 'human_reviewer' | null;
+    rolePerformed?: 'sme' | 'human_reviewer' | 'track_admin' | 'product_owner' | null;
     subjectTable: string;
     subjectId: string | null;
     reason: string;

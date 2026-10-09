@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { resolveActiveConfig, CLAIM_KINDS_WITHOUT_EVIDENCE_REF, type ClaimKind, type EvidenceState } from '@naqla/domain';
 import {
-  groundClaim, LEXICON_CLASSES, type ClaimFact, type ClaimPlan, type DomainFacts, type GroundingLexicon, type GroundingResult, type LexiconClass,
+  groundClaim, LEXICON_CLASSES, GROUNDING_ENGINE_VERSION, type ClaimFact, type ClaimPlan, type DomainFacts, type GroundingLexicon, type GroundingResult, type LexiconClass,
 } from '@naqla/agents';
 import { governedFromRow, isProduction } from '../configuration/configuration.service';
 
@@ -99,3 +99,9 @@ export async function groundWording(c: PoolClient, userId: string, kind: ClaimKi
 }
 
 export function groundingVersion(r: GroundingResult): string { return `${r.engineVersion}+${r.lexiconRef ?? 'no-lexicon'}`; }
+
+/** The grounding version in effect now: engine + vocabulary. An asset grounded under any other version is not presented (fail closed). */
+export async function currentGroundingVersion(c: PoolClient): Promise<string> {
+  const lexicon = await resolveGroundingLexicon(c);
+  return `${GROUNDING_ENGINE_VERSION}+${lexicon?.ref ?? 'no-lexicon'}`;
+}

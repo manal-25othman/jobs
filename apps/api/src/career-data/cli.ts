@@ -8,7 +8,7 @@
  *   config-approve <table> <id> --by <uuid> --label <name> --reason "<why>"            Phase 4: validate a configuration row (never a legacy baseline in place)
  *   config-activate <table> <id> --activation <inactive|development_only|production_active> --by <name> --reason "<why>"   audited; production_active needs an approved row; an active row is never replaced by accident
  *   config-new-version <role-uuid> --label <l> --verification key@v --context key@v --claim key@v [--challenge key@v] [--pack v] --by <name>   next DRAFT track configuration version (inactive)
- *   claims-revalidate [claim_kind] --by <name>   Phase 7b: re-check approved assets' standing against the claim policy in effect (recovery after an out-of-band change)
+ *   claims-revalidate [claim_kind] --by <name> [--reground]   Phase 7b/8 (--reground after a grounding engine change): re-check approved assets' standing against the claim policy in effect (recovery after an out-of-band change)
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
 import { Pool } from 'pg';
@@ -102,8 +102,10 @@ export async function main(argv: string[], root: string): Promise<number> {
     }
     if (cmd === 'claims-revalidate') {
       const by = arg(argv, '--by'); if (!by) { console.error('claims-revalidate needs --by <name>'); return 2; }
-      const r = await cliRevalidateClaims(pool, { claimKind: a1 && !a1.startsWith('--') ? a1 : null, actor: by });
-      console.log(`claims-revalidate: ${r.checked} active asset(s) checked · ${r.keptEligible} still eligible · ${r.movedToReview} moved to needs_review (recorded in asset_standing_event)`); return 0;
+      const r = await cliRevalidateClaims(pool, { claimKind: a1 && !a1.startsWith('--') ? a1 : null, actor: by, reground: argv.includes('--reground') });
+      console.log(`claims-revalidate: ${r.checked} active asset(s) checked · ${r.keptEligible} still eligible · ${r.movedToReview} moved to needs_review (recorded in asset_standing_event)`);
+      if (r.regrounded) console.log(`re-grounding under ${r.regrounded.version}: ${r.regrounded.checked} checked · ${r.regrounded.grounded} grounded · ${r.regrounded.movedToReview} moved to needs_review`);
+      return 0;
     }
     if (cmd === 'readiness-new-set') {
       const file = arg(argv, '--rules'); if (!file) { console.error('readiness-new-set needs --rules <file.json>'); return 2; }
