@@ -8,12 +8,12 @@ import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
-import { bootApp, newUser, FIXTURE, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser, filesFor } from './helpers';
 import { EvaluationService } from '../src/slice1/evaluation.service';
 import { assertBlindPayload } from '@naqla/domain';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
-let activityId: string; let rubricId: string; let skillId: string;
+let activityId: string; let rubricId: string; let skillId: string; let activityRoleId: string;
 const auth = (u: TestUser) => ({ Authorization: `Bearer ${u.token}` });
 
 before(async () => {
@@ -28,6 +28,8 @@ before(async () => {
     await pool.query(`update activity_spec set status = 'published' where id = $1`, [activityId]);
   }
   skillId = (await pool.query(`select id from skill where slug = 'skl_ui_state_interaction' and is_demo_fixture`)).rows[0].id;
+  // Graduate journey Phase 1: work starts only on an activity of the goal role's catalogue.
+  activityRoleId = (await pool.query('select target_role_id from activity_spec where id = $1', [activityId])).rows[0].target_role_id;
 });
 after(async () => { await pool?.end(); await app?.close(); });
 
@@ -43,11 +45,11 @@ async function reviewer(): Promise<TestUser> {
 }
 async function submitted(user: TestUser, artifacts = ARTIFACTS, fileCount = 3) {
   await http.post('/v1/me/bootstrap').set(auth(user)).send({ displayName: 'Sara Identity' }).expect(201);
-  await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
+  await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: activityRoleId, confirmed: true }).expect(200);
   const project = await http.post('/v1/projects').set(auth(user)).send({ title: 'طلب إجازة', kind: 'platform_activity', activitySpecId: activityId }).expect(201);
   const u1 = await uploadFile(app, http, user, 'index.html', COMPONENT_BYTES, 'text/plain'); const u2 = await uploadFile(app, http, user, 'styles.css', TEST_BYTES, 'text/plain');
   const u3 = await uploadFile(app, http, user, 'app.js', TEST_BYTES);
-  const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [skillId], artifacts, uploadIds: [u1, u2, u3].slice(0, fileCount), aiDisclosure: { declaredUse: ['code_completion'] } }).expect(201);
+  const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [skillId], artifacts, files: filesFor([u1, u2, u3].slice(0, fileCount), ['file.index_html', 'file.styles_css', 'file.app_js']), aiDisclosure: { declaredUse: ['code_completion'] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   return { submissionId: sub.body.data.id as string, ev: ev.body.data as { outcome: string; humanReview: { pendingCriteria: string[] } | null; evaluationId: string } };
 }
@@ -78,14 +80,17 @@ describe('4, 5, 12 — deterministic stage, queue contents, what the user sees',
     assert.equal(view.body.data.humanReview.pending, 7); assert.equal(view.body.data.criteria.length, 1, 'what was checked automatically');
     assert.ok(!JSON.stringify(view.body.data).match(/minutes|دقائق|فشل/), '12 — no invented time, no "failed"');
     assert.equal((await pool.query('select count(*)::int n from evidence where user_id = $1', [user.id])).rows[0].n, 0, 'nothing proposed before review');
-    // The user cannot re-evaluate while it is in review.
-    await http.post(`/v1/submissions/${submissionId}/evaluate`).set(auth(user)).expect(400);
+    // Reopening while it is in review creates nothing: the same evaluation, still awaiting review (graduate journey Phase 1).
+    const again = await http.post(`/v1/submissions/${submissionId}/evaluate`).set(auth(user)).expect(200);
+    assert.equal(again.body.data.alreadyEvaluated, true); assert.equal(again.body.data.state, 'queued_for_human'); assert.equal(again.body.data.workStatus, 'under_human_review');
+    assert.equal((await pool.query('select count(*)::int n from evaluation where submission_id = $1', [submissionId])).rows[0].n, 1, 'no second run');
   });
-  test('10 — a missing mandatory deliverable blocks deterministically; nothing reaches a reviewer', async () => {
-    const user = await newUser(); const { ev } = await submitted(user, ARTIFACTS, 2); // one mandatory file not uploaded
-    assert.equal(ev.outcome, 'blocked_by_checks'); assert.equal(ev.humanReview, null);
-    assert.equal((await pool.query('select count(*)::int n from review_queue_item where evaluation_id = $1', [ev.evaluationId])).rows[0].n, 0);
-    assert.equal((await pool.query('select state from evaluation where id = $1', [ev.evaluationId])).rows[0].state, 'completed');
+  test('10 — a missing mandatory deliverable is refused at submission (A3); nothing reaches a reviewer', async () => {
+    // Before Phase 1 the gate blocked it at evaluation (blocked_by_checks). The explicit mapping refuses it first.
+    const user = await newUser();
+    await assert.rejects(() => submitted(user, ARTIFACTS, 2), /got 400/); // one mandatory file not uploaded
+    assert.equal((await pool.query('select count(*)::int n from submission where user_id = $1', [user.id])).rows[0].n, 0);
+    assert.equal((await pool.query('select count(*)::int n from review_queue_item q join submission s on s.id = q.submission_id where s.user_id = $1', [user.id])).rows[0].n, 0);
   });
 });
 
@@ -110,9 +115,9 @@ describe('OPEN-044 / OPEN-045 / OPEN-039 — what the deterministic stage record
   });
   test('OPEN-039 — a claim on the alias skill is refused and names the canonical skill; nothing is guessed', async () => {
     const user = await newUser(); await http.post('/v1/me/bootstrap').set(auth(user)).send({ displayName: 'Alias Claimer' }).expect(201);
-    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
+    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: activityRoleId, confirmed: true }).expect(200);
     const project = await http.post('/v1/projects').set(auth(user)).send({ title: 'x', kind: 'platform_activity', activitySpecId: activityId }).expect(201);
-    const res = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: ['a0000000-0000-4000-8000-000000000001'], artifacts: ARTIFACTS, uploadIds: [], aiDisclosure: { declaredUse: [] } }).expect(400);
+    const res = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: ['a0000000-0000-4000-8000-000000000001'], artifacts: ARTIFACTS, files: filesFor([]), aiDisclosure: { declaredUse: [] } }).expect(400);
     assert.match(JSON.stringify(res.body), /merged_into.*skl_ui_state_interaction/);
     assert.equal((await pool.query(`select count(*)::int n from skill where id = 'a0000000-0000-4000-8000-000000000001'`)).rows[0].n, 1, 'the alias row still exists');
   });

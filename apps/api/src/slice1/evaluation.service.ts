@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
@@ -19,6 +19,7 @@ import {
   type ReviewQueueState,
   MissingPrerequisite,
   assessmentBasis, type AssessmentBasis, type ArtifactProvenance,
+  workStatus, type WorkStatus,
 } from '@naqla/domain';
 import { isProduction } from '../configuration/configuration.service';
 
@@ -49,7 +50,8 @@ export class EvaluationService {
                 p.activity_spec_id, p.activity_spec_version, p.title as project_title, p.kind as project_kind
            from submission s
            join project p on p.id = s.project_id
-          where s.id = $1`,
+          where s.id = $1
+            for update of s`,
         [submissionId],
       );
       if (sub.rowCount === 0) throw new NotFoundException('submission not found');
@@ -66,7 +68,9 @@ export class EvaluationService {
         [submissionId],
       );
       if (already.rowCount && already.rowCount > 0) {
-        throw new BadRequestException(already.rows[0].state === 'queued_for_human'
+        // Graduate journey Phase 1: the controller answers a repeated request with the existing evaluation; this
+        // is reached only by a concurrent duplicate, which is refused — a submission is evaluated once.
+        throw new ConflictException(already.rows[0].state === 'queued_for_human'
           ? 'this submission is awaiting human review; a correction creates a new submission'
           : 'this submission already has a completed evaluation; a correction creates a new submission');
       }
@@ -519,6 +523,15 @@ export class EvaluationService {
     return (rows[0]?.state as EvidenceState) ?? 'gap';
   }
 
+  /**
+   * Graduate journey Phase 1: the rubric an evaluation of this activity would use, or null when none could
+   * run (none published, or not runnable). The same resolution as the evaluation itself, so the activity
+   * catalogue's assessment mode describes exactly what an evaluation would do.
+   */
+  async publishedRubricOrNull(c: PoolClient, activitySpecId: string, activitySpecVersion: string): Promise<PublishedRubric | null> {
+    try { return await this.loadPublishedRubric(c, activitySpecId, activitySpecVersion); } catch (e) { if (e instanceof BadRequestException) return null; throw e; }
+  }
+
   private async loadPublishedRubric(
     c: PoolClient, activitySpecId: string, activitySpecVersion: string, rubricVersionId: string | null = null,
   ): Promise<PublishedRubric> {
@@ -624,67 +637,105 @@ export class EvaluationService {
     }));
   }
 
+  /**
+   * Graduate journey Phase 1 — the read path for an evaluation, in every state. It never creates or reruns
+   * anything. Fields:
+   *   - the legacy GET fields (`evaluationId`, `state`, `resultId`, `outcome`, `criteria` rows, `integrityChecks`,
+   *     `humanReview.{pending,completed,awaiting}`, `verification` = the legacy verification row);
+   *   - the fields the evaluate response carries, so a reopened evaluation renders like a fresh one
+   *     (`totalScore`, `maxScore`, `reason`, `transition`, `verification.decision`, `humanReview.pendingCriteria`);
+   *   - `workStatus`, from authoritative records, and `verificationDecision` (D-118, including
+   *     `assessment_pending_validation`).
+   * A submission with no evaluation yet answers `state: 'not_evaluated'` — an explicit evaluate action is
+   * available — instead of an error.
+   */
   async getEvaluationForSubmission(userId: string, submissionId: string) {
-    return this.db.asUser(userId, async (c) => {
+    const view = await this.db.asUser(userId, async (c) => {
+      const owned = await c.query('select id from submission where id = $1', [submissionId]);
+      // RLS already filtered by owner: "not yours" and "does not exist" are the same answer.
+      if (owned.rowCount === 0) throw new NotFoundException('submission not found');
       const { rows } = await c.query(
         `select e.id, e.state, e.queued_at, e.completed_at,
-                r.id as result_id, r.outcome, r.activity_spec_version, r.evaluated_at,
-                rv.version as rubric_version
+                r.id as result_id, r.outcome, r.activity_spec_id, r.activity_spec_version, r.rubric_version_id, r.evaluated_at,
+                -- a blocked result records no activity; the project still names it (for user-facing check messages)
+                (select p.activity_spec_id from submission s join project p on p.id = s.project_id where s.id = e.submission_id) as project_activity_id
            from evaluation e
            left join evaluation_result r on r.evaluation_id = e.id
              and not exists (select 1 from evaluation_result n where n.supersedes_result_id = r.id)
-           left join rubric_version rv on rv.id = r.rubric_version_id
           where e.submission_id = $1
           order by e.queued_at desc, r.evaluated_at desc nulls last limit 1`,
         [submissionId],
       );
-      if (rows.length === 0) throw new NotFoundException('no evaluation for this submission');
+      if (rows.length === 0) return null;
       const r = rows[0];
-
-      const criteria = r.result_id ? await c.query(
-        `select criterion_key, score, max_score, rationale, supporting_excerpt
-           from evaluation_criterion_score where evaluation_result_id = $1
-          order by criterion_key`,
-        [r.result_id],
-      ) : { rows: [] };
-
-      // Only user-facing checks cross this boundary.
-      const integrity = r.result_id ? await c.query(
-        `select check_key, passed from integrity_check
-          where evaluation_result_id = $1 and classification = 'user_facing'
-          order by check_key`,
-        [r.result_id],
-      ) : { rows: [] };
-
-      const verification = r.result_id ? await c.query(
-        `select outcome, proposed_state, resulting_state, reason, decided_at
-           from verification where evaluation_result_id = $1`,
-        [r.result_id],
-      ) : { rows: [] };
-
-      // What the user may know while a person reviews: which criteria were
-      // checked automatically and which await review. No invented time.
-      let humanReview: { pending: number; completed: number; awaiting: { criterionKey: string; nameAr: string }[] } | null = null;
-      if (r.state === 'queued_for_human') {
-        const q = await this.db.asService((sc) => sc.query(
-          `select q.criterion_key, q.state, rc.name_ar from review_queue_item q join rubric_criterion rc on rc.id = q.criterion_id where q.evaluation_id = $1 order by q.criterion_key`, [r.id]));
-        humanReview = { pending: q.rows.filter((x) => x.state !== 'completed').length, completed: q.rows.filter((x) => x.state === 'completed').length,
-          awaiting: q.rows.filter((x) => x.state !== 'completed').map((x) => ({ criterionKey: x.criterion_key, nameAr: x.name_ar })) };
-      }
-
-      return {
-        evaluationId: r.id,
-        state: r.state,
-        humanReview,
-        resultId: r.result_id,
-        outcome: r.outcome,
-        rubricVersion: r.rubric_version,
-        activitySpecVersion: r.activity_spec_version,
-        evaluatedAt: r.evaluated_at,
-        criteria: criteria.rows,
-        integrityChecks: integrity.rows,
-        verification: verification.rows[0] ?? null,
-      };
+      const criteria = r.result_id ? (await c.query(
+        `select criterion_key, criterion_key as "criterionId", score, max_score, max_score as "maxScore", rationale, supporting_excerpt
+           from evaluation_criterion_score where evaluation_result_id = $1 order by criterion_key`, [r.result_id])).rows : [];
+      const legacy = r.result_id ? (await c.query(
+        `select outcome, proposed_state, resulting_state, reason, decided_at from verification where evaluation_result_id = $1`, [r.result_id])).rows[0] ?? null : null;
+      const decisions = r.result_id ? (await c.query(
+        `select decision, previous_state, resulting_state, reason, evidence_id, skill_id from verification_decision where evaluation_result_id = $1 order by decided_at`, [r.result_id])).rows : [];
+      return { r, criteria, legacy, decisions };
     });
+
+    if (!view) {
+      return { submissionId, evaluationId: null, state: 'not_evaluated' as const, workStatus: 'submitted' as WorkStatus, resultId: null, outcome: null,
+        totalScore: null, maxScore: null, reason: null, criteria: [], integrityChecks: [], transition: null, verification: null, verificationDecision: null,
+        humanReview: null, evaluatedAt: null, activitySpecVersion: null, rubricVersion: null, actions: { evaluate: true } };
+    }
+    const { r, criteria, legacy, decisions } = view;
+
+    // Facts the user may know that live in service-only tables (queue, check messages, the run's reason, rubric size),
+    // read for THIS user's own evaluation only (ownership was established above under RLS).
+    const svc = await this.db.asService(async (sc) => {
+      const queue = r.state === 'queued_for_human' ? (await sc.query(
+        `select q.criterion_key, q.state, rc.name_ar from review_queue_item q join rubric_criterion rc on rc.id = q.criterion_id where q.evaluation_id = $1 order by q.criterion_key`, [r.id])).rows : [];
+      // Only user-facing checks cross this boundary. integrity_check has no client policy (assessment-only rows
+      // live beside them), so the user's own result is read here, filtered to user-facing.
+      const integrity = r.result_id ? (await sc.query(
+        `select check_key, passed from integrity_check where evaluation_result_id = $1 and classification = 'user_facing' order by check_key`, [r.result_id])).rows : [];
+      const messages = r.project_activity_id ? (await sc.query(
+        `select key, user_facing_message from integrity_check_spec where activity_spec_id = $1 and classification = 'user_facing'`, [r.project_activity_id])).rows : [];
+      const reason = r.result_id ? (await sc.query(
+        `select reason from audit_event where subject_table = 'evaluation_result' and subject_id = $1 order by occurred_at desc limit 1`, [r.result_id])).rows[0]?.reason ?? null : null;
+      const rubric = r.rubric_version_id ? (await sc.query(
+        `select rv.version, (select sum(max_score) from rubric_criterion c where c.rubric_version_id = rv.id) as max_total from rubric_version rv where rv.id = $1`, [r.rubric_version_id])).rows[0] ?? null : null;
+      return { queue, integrity, messages, reason, rubric };
+    });
+
+    const humanReview = r.state === 'queued_for_human' ? {
+      pending: svc.queue.filter((x) => x.state !== 'completed').length, completed: svc.queue.filter((x) => x.state === 'completed').length,
+      awaiting: svc.queue.filter((x) => x.state !== 'completed').map((x) => ({ criterionKey: x.criterion_key, nameAr: x.name_ar })),
+      pendingCriteria: svc.queue.filter((x) => x.state !== 'completed').map((x) => x.criterion_key as string),
+      completedCriteria: svc.queue.filter((x) => x.state === 'completed').map((x) => x.criterion_key as string),
+    } : null;
+    const pending = decisions.find((d) => d.decision === 'assessment_pending_validation');
+    const decision = pending ?? decisions[0] ?? null;
+    const moved = decisions.find((d) => d.evidence_id && d.resulting_state && d.resulting_state !== d.previous_state && d.decision !== 'assessment_pending_validation');
+    const verificationDecision = decision ? { decision: decision.decision as string, reason: decision.reason as string } : null;
+    const totalFromRows = criteria.reduce((a, x) => a + Number(x.score), 0);
+    return {
+      submissionId,
+      evaluationId: r.id,
+      state: r.state as string,
+      workStatus: workStatus({ hasSubmission: true, evaluationState: r.state, outcome: r.outcome, decision: decision?.decision ?? null, levelChanged: !!moved }),
+      humanReview,
+      resultId: r.result_id,
+      outcome: r.outcome,
+      totalScore: r.result_id ? totalFromRows : null,
+      maxScore: r.result_id ? (svc.rubric?.max_total !== null && svc.rubric?.max_total !== undefined ? Number(svc.rubric.max_total) : criteria.reduce((a, x) => a + Number(x.max_score), 0)) : null,
+      reason: svc.reason,
+      rubricVersion: svc.rubric?.version ?? null,
+      activitySpecVersion: r.activity_spec_version,
+      evaluatedAt: r.evaluated_at,
+      criteria,
+      integrityChecks: svc.integrity.map((i) => ({ check_key: i.check_key, key: i.check_key, passed: i.passed, message: svc.messages.find((m) => m.key === i.check_key)?.user_facing_message ?? null })),
+      // A level change, read from the decision that made it (never inferred from the outcome).
+      transition: moved ? { from: moved.previous_state as EvidenceState, to: moved.resulting_state as EvidenceState, evidenceId: moved.evidence_id as string } : null,
+      // The legacy verification row (unchanged fields) plus the D-118 decision; a pending decision has no legacy row.
+      verification: legacy ? { ...legacy, decision: decision?.decision ?? null } : verificationDecision,
+      verificationDecision,
+      actions: { evaluate: false },
+    };
   }
 }

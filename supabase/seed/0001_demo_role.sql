@@ -284,3 +284,9 @@ select set_config('naqla.config_actor', '', false), set_config('naqla.config_rea
 select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo: use the draft grounding vocabulary outside production', false);
 update grounding_lexicon set activation = 'development_only' where key = 'default' and version = 1 and activation = 'inactive';
 select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);
+
+-- Graduate journey Phase 1 (0024): this seed IS the demo content, so where it is loaded, demo content may be shown
+-- to graduates — always labelled DEMO. Never loaded in production; the API refuses to start in production with it on.
+select set_config('naqla.config_actor', 'seed 0001_demo_role', false), set_config('naqla.config_reason', 'demo fixture loaded: demo content may be shown to graduates, labelled DEMO (never production)', false);
+update platform_deployment set demo_content_visible = true where singleton and not demo_content_visible;
+select set_config('naqla.config_actor', '', false), set_config('naqla.config_reason', '', false);

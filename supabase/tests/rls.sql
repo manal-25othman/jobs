@@ -146,7 +146,9 @@ select expect_rows($$select 1 from audit_event$$, 0, 'anon sees no audit events'
 select expect_rows($$select 1 from notification$$, 0, 'anon sees no notifications');
 select expect_rows($$select 1 from public_profile$$, 0, 'anon sees no unpublished profile');
 select expect_rows($$select 1 from case_study$$, 0, 'anon sees no case study without a share link');
-select expect_rows($$select 1 from skill$$, 1, 'anon may read the skill catalogue (non-personal content)');
+-- Graduate journey Phase 1 (0024): before, anon read the whole skill catalogue — drafts and test rows included.
+-- Content now reaches a graduate only through the authenticated, filtered paths.
+select expect_denied($$select 1 from skill$$, 'anon reads no skill catalogue (0024; was readable, drafts included)');
 
 reset role;
 
@@ -269,6 +271,46 @@ select expect_denied($$update pack_validation_run set passed = true$$, 'pack val
 select expect_denied($$delete from pack_validation_run$$, 'pack validation runs cannot be deleted');
 select expect_denied($$insert into pack_constraint (set_id, constraint_type, min_value) select id, 'task_count', 1 from pack_constraint_set where key = 'legacy_pack_constraints'$$,
   'the baseline constraint set is frozen (it has been active)');
+
+-- ─────────────── Graduate journey Phase 1 (0024): content visibility and assessment-private data ───────────────
+-- Migrations only (no demo seed): demo content is NOT visible here, as in production.
+insert into target_role (id, slug, label_ar, label_en, track_id, review_status, source_label, provenance_class, provenance_source, is_demo_fixture) values
+  ('d1000000-0000-4000-8000-000000000001', 'rls-draft-role', 'دور', 'Draft role', 'rls', 'draft', 'RLS', 'curated', 'rls proof', false),
+  ('d1000000-0000-4000-8000-000000000002', 'rls-demo-role', 'دور', 'Demo role', 'rls', 'draft', 'DEMO', 'curated', 'rls proof', true);
+insert into skill (id, slug, label_ar, label_en, family, provenance_class, provenance_source, is_demo_fixture) values
+  ('d2000000-0000-4000-8000-000000000001', 'rls-draft-skill', 'مهارة', 'Draft skill', 'x', 'curated', 'rls proof', false);
+insert into role_requirement (target_role_id, skill_id, is_core, importance, target_proficiency, why_required_ar, why_required_en, review_status, weight, minimum_evidence_count)
+  values ('d1000000-0000-4000-8000-000000000001', 'd2000000-0000-4000-8000-000000000001', true, 'high', 'working', 'x', 'x', 'draft', 0.5, 2);
+select expect_denied($$update platform_deployment set demo_content_visible = true$$, 'the demo-visibility flag cannot change without an audited actor and reason');
+select expect_denied($$delete from platform_deployment$$, 'the deployment row is never deleted');
+select expect_rows($$select 1 from platform_deployment where not demo_content_visible$$, 1, 'demo content is hidden by default (fail closed)');
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+select assert_effective_role('authenticated');
+select expect_rows($$select 1 from target_role where id = 'd1000000-0000-4000-8000-000000000001'$$, 0, 'a draft (test / Track Builder) role is invisible, even by id');
+select expect_rows($$select 1 from target_role where id = 'd1000000-0000-4000-8000-000000000002'$$, 0, 'a demo role is invisible where demo content is hidden');
+select expect_rows($$select 1 from skill where id = 'd2000000-0000-4000-8000-000000000001'$$, 0, 'a draft skill is invisible, even by id');
+select expect_rows($$select id from role_requirement where target_role_id = 'd1000000-0000-4000-8000-000000000001'$$, 0, 'role-skill mappings of a draft role are invisible');
+select expect_denied($$select * from activity_input$$, 'activity inputs (planted issues) are service-only');
+select expect_denied($$select contains_planted_issue from activity_input$$, 'the planted-issue flag is unreadable');
+select expect_denied($$select spec from activity_spec$$, 'the raw activity spec document is unreadable');
+select expect_denied($$select reviewed_by from activity_spec$$, 'reviewer identities on activities are unreadable');
+select expect_denied($$select weight, minimum_evidence_count, human_review_required from role_requirement$$, 'readiness and assessment internals of a requirement are unreadable');
+select expect_denied($$select * from platform_deployment$$, 'the deployment flag is not readable by a user');
+select expect_denied($$update target_role set review_status = 'published' where id = 'd1000000-0000-4000-8000-000000000001'$$, 'a user cannot publish content');
+select expect_rows($$select 1 where graduate_content_visible('draft', false) or graduate_content_visible('draft', true)$$, 0, 'the shared rule: draft content and hidden demo are not graduate-visible');
+select expect_rows($$select 1 where graduate_content_visible('published', false)$$, 1, 'the shared rule: published non-demo content is graduate-visible');
+reset role;
+
+set role anon;
+select assert_effective_role('anon');
+select expect_denied($$select 1 from target_role$$, 'anon reads no role');
+select expect_denied($$select 1 from skill$$, 'anon reads no skill');
+select expect_denied($$select 1 from role_requirement$$, 'anon reads no role-skill mapping');
+select expect_denied($$select 1 from activity_spec$$, 'anon reads no activity');
+select expect_denied($$select 1 from activity_input$$, 'anon reads no activity input');
+reset role;
 
 \echo ''
 \echo 'All access-model checks passed.'

@@ -16,7 +16,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { assertBlindPayload } from '@naqla/domain';
-import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser, filesFor, asHistoricalWithoutFile } from './helpers';
 import { ChallengeService } from '../src/integrity/challenge.service';
 import { DbService } from '../src/infra/db.service';
 
@@ -41,7 +41,7 @@ async function submit(u: TestUser, aiDisclosure: Record<string, unknown>, opts: 
   const ups: string[] = [];
   if ((opts.uploads ?? 2) >= 1) ups.push(await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES));
   if ((opts.uploads ?? 2) >= 2) ups.push(await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES));
-  const r = await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: [SKILL], artifacts: COMPLETE_ARTIFACTS, uploadIds: ups, aiDisclosure }).expect(opts.expect ?? 201);
+  const r = await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: [SKILL], artifacts: COMPLETE_ARTIFACTS, files: filesFor(ups), aiDisclosure }).expect(opts.expect ?? 201);
   return { pid, sid: r.body.data?.id as string, res: r };
 }
 
@@ -119,7 +119,9 @@ describe('AI use is not cheating: declaring it changes nothing about the outcome
 
   test('observable facts only: an unmet check and a resubmission become signals; the owner sees user-facing ones only', async () => {
     const u = await bootstrapped();
-    const first = await submit(u, { declaredUse: [] }, { uploads: 1 });
+    const first = await submit(u, { declaredUse: [] });
+    // A pre-Phase-1 submission stored without its test file (the API now refuses one at the door, A3).
+    await asHistoricalWithoutFile(pool, first.sid, 'file.test');
     const ev = (await http.post(`/v1/submissions/${first.sid}/evaluate`).set(auth(u)).expect(201)).body.data;
     assert.equal(ev.outcome, 'blocked_by_checks');
     const s1 = (await http.get(`/v1/submissions/${first.sid}/integrity-signals`).set(auth(u)).expect(200)).body.data.items as { signalType: string; integrityCheckKey: string | null }[];

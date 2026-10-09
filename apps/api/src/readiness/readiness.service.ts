@@ -48,6 +48,8 @@ export class ReadinessService {
          left join skill_claim sc on sc.user_id = $1 and sc.skill_id = rr.skill_id
          left join skill_progress sp on sp.user_id = $1 and sp.skill_id = rr.skill_id
         where rr.target_role_id = $2 and s.status = 'active'
+          -- A4 (0024): only role-skill mappings a graduate may see — visible requirement on a visible skill.
+          and graduate_content_visible(rr.review_status, rr.is_demo_fixture) and graduate_content_visible(s.review_status, s.is_demo_fixture)
         order by rr.display_order nulls last, s.label_en`, [userId, targetRoleId]);
     return rows.map((r) => ({
       skillId: r.skill_id, labelAr: r.label_ar, labelEn: r.label_en, verificationLevel: (r.claim_state as EvidenceState | null) ?? 'gap',
@@ -156,7 +158,9 @@ export class ReadinessService {
       const evidence = await c.query(`select id, source_strength, evaluation_result_id, project_id, created_at, withdrawn_at from evidence where user_id = $1 and skill_id = $2 order by created_at desc`, [userId, skillId]);
       const decisions = await c.query(`select id, decision, previous_state, proposed_state, resulting_state, policy_key, policy_version, policy_status, decided_by_ref, track_config_version_id, decided_at from verification_decision where user_id = $1 and skill_id = $2 order by decided_at desc limit 20`, [userId, skillId]);
       const events = await c.query(`select trigger_code, from_state, to_state, applied, outcome, reason, created_at from skill_progress_event where user_id = $1 and skill_id = $2 order by created_at desc limit 20`, [userId, skillId]);
-      const activities = await c.query(`select a.id, a.slug, a.title_ar, a.version, k.depth from activity_skill k join activity_spec a on a.id = k.activity_spec_id where k.skill_id = $1 and a.status = 'published' order by a.title_ar`, [skillId]);
+      // A1: the related activities are those of the current role's catalogue (one rule, in the database).
+      const activities = await c.query(`select a.id, a.slug, a.title_ar, a.version, k.depth from activity_skill k join activity_spec a on a.id = k.activity_spec_id
+         where k.skill_id = $1 and graduate_activity_in_catalogue(a.id, $2) order by a.title_ar`, [skillId, list.role?.id ?? null]);
       return {
         materials: items.rows.map((r) => ({ id: r.id, typeCode: r.item_type_code, typeLabelAr: r.type_label_ar, title: r.title, status: r.status, attemptNumber: Number(r.attempt_number), submittedAt: r.submitted_at, source: r.source })),
         evaluatedEvidence: evidence.rows.map((r) => ({ id: r.id, sourceStrength: r.source_strength, evaluationResultId: r.evaluation_result_id, projectId: r.project_id, createdAt: r.created_at, withdrawnAt: r.withdrawn_at })),

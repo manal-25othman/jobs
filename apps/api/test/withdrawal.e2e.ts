@@ -12,8 +12,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES,
-  approveCvBulletProposal, asAuthenticatedUser, expectRejected, type TestUser,
-} from './helpers';
+  approveCvBulletProposal, asAuthenticatedUser, expectRejected, type TestUser, filesFor } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -25,7 +24,7 @@ async function demonstrated(user: TestUser, title: string) {
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   return ev.body.data as { outcome: string; transition: { to: string; evidenceId: string } | null; reestablishedEvidenceId: string | null };
 }

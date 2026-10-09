@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
-import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, approveCvBulletProposal, asAuthenticatedUser, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, approveCvBulletProposal, asAuthenticatedUser, type TestUser, filesFor } from './helpers';
 import { cliActivate, cliApprove, cliRevalidateClaims } from '../src/configuration/config-admin.service';
 import { resolveGroundingLexicon } from '../src/agents/claim-facts';
 
@@ -28,7 +28,7 @@ async function demonstrated(user: TestUser, title: string) {
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   return ev.body.data as { outcome: string; transition: { to: string; evidenceId: string } | null; reestablishedEvidenceId: string | null };
 }

@@ -21,7 +21,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser,
-  useSafetyBaseline, useLegacyVerificationCompat, type TestUser } from './helpers';
+  useSafetyBaseline, useLegacyVerificationCompat, type TestUser, filesFor, asHistoricalWithoutFile } from './helpers';
 import { promoteDemo } from '../src/career-data/promotion';
 import { reviewTransition, approveRubricValues } from '../src/career-data/review';
 
@@ -57,6 +57,10 @@ async function project(u: TestUser, activitySpecId: string = FIXTURE.activitySpe
 async function submit(u: TestUser, body: Record<string, unknown>, code = 201, activitySpecId?: string) {
   const pid = await project(u, activitySpecId);
   return http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: [FIXTURE.skillUiTesting], aiDisclosure: { declaredUse: [] }, ...body }).expect(code);
+}
+/** Both demo files, explicitly mapped (A3): the cases below are about declarations, so the files are always present. */
+async function demoFiles(u: TestUser) {
+  return filesFor([await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES), await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES)]);
 }
 async function evaluate(u: TestUser, submissionId: string) {
   return (await http.post(`/v1/submissions/${submissionId}/evaluate`).set(auth(u)).expect(201)).body.data as
@@ -94,7 +98,7 @@ describe('declarations and uploads never earn a level', () => {
   test('1 · three checked boxes (+ a note, + two files): the run is recorded, the decision is assessment_pending_validation, nothing is promoted', async () => {
     const u = await graduate();
     const u1 = await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES); const u2 = await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES);
-    const sub = await submit(u, { artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2] });
+    const sub = await submit(u, { artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]) });
     assert.deepEqual(await levelFacts(u.id), NONE, 'submitting records no level (no Practiced on submission)');
     const ev = await evaluate(u, sub.body.data.id);
     assert.equal(ev.outcome, 'passed', 'the formative result is still shown');
@@ -108,14 +112,14 @@ describe('declarations and uploads never earn a level', () => {
   test('2 · two arbitrary (blank) files with the boxes ticked: no level', async () => {
     const u = await graduate();
     const u1 = await uploadFile(app, http, u, 'a.txt', BLANK, 'text/plain'); const u2 = await uploadFile(app, http, u, 'b.txt', BLANK, 'text/plain');
-    const ev = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2] })).body.data.id);
+    const ev = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]) })).body.data.id);
     assert.equal(ev.verification.decision, 'assessment_pending_validation');
     assert.deepEqual(await levelFacts(u.id), NONE);
   });
   test('2b · two arbitrary files and nothing else: no level', async () => {
     const u = await graduate();
     const u1 = await uploadFile(app, http, u, 'a.txt', BLANK, 'text/plain'); const u2 = await uploadFile(app, http, u, 'b.txt', BLANK, 'text/plain');
-    const ev = await evaluate(u, (await submit(u, { uploadIds: [u1, u2] })).body.data.id);
+    const ev = await evaluate(u, (await submit(u, { files: filesFor([u1, u2]) })).body.data.id);
     assert.notEqual(ev.verification.decision, 'accepted');
     assert.deepEqual(await levelFacts(u.id), NONE);
   });
@@ -143,11 +147,11 @@ describe('forged facts are refused at the API', () => {
 describe('missing, malformed or unrelated artifacts', () => {
   test('4 · missing (a mandatory box unticked), malformed (a "checkbox" sent as text) and unrelated artifacts satisfy nothing', async () => {
     const u = await graduate();
-    const missing = await evaluate(u, (await submit(u, { artifacts: INCOMPLETE_ARTIFACTS })).body.data.id);
+    const missing = await evaluate(u, (await submit(u, { artifacts: INCOMPLETE_ARTIFACTS, files: await demoFiles(u) })).body.data.id);
     assert.notEqual(missing.outcome, 'passed'); assert.notEqual(missing.verification.decision, 'accepted');
-    const malformed = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS.map((a) => (a.key.startsWith('test.') ? { key: a.key, kind: 'text' as const, valueText: 'yes I did' } : a)) })).body.data.id);
+    const malformed = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS.map((a) => (a.key.startsWith('test.') ? { key: a.key, kind: 'text' as const, valueText: 'yes I did' } : a)), files: await demoFiles(u) })).body.data.id);
     assert.notEqual(malformed.verification.decision, 'accepted');
-    const unrelated = await evaluate(u, (await submit(u, { artifacts: [{ key: 'test.something_else', kind: 'boolean', valueBool: true }, { key: 'note.unrelated', kind: 'text', valueText: 'a note about something else entirely, long enough' }] })).body.data.id);
+    const unrelated = await evaluate(u, (await submit(u, { artifacts: [{ key: 'test.something_else', kind: 'boolean', valueBool: true }, { key: 'note.unrelated', kind: 'text', valueText: 'a note about something else entirely, long enough' }], files: await demoFiles(u) })).body.data.id);
     assert.notEqual(unrelated.outcome, 'passed'); assert.notEqual(unrelated.verification.decision, 'accepted');
     assert.deepEqual(await levelFacts(u.id), NONE);
   });
@@ -157,11 +161,14 @@ describe('direct API calls cannot bypass it', () => {
   test('5 · extra fields claiming a state, a decision or a verification are ignored; another user\'s submission is not evaluable; direct table writes are refused', async () => {
     const u = await graduate();
     const f1 = await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES); const f2 = await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES);
-    const sub = await submit(u, { uploadIds: [f1, f2], artifacts: COMPLETE_ARTIFACTS, state: 'demonstrated', proposedState: 'demonstrated', verification: 'accepted', outcome: 'passed', evaluatorKind: 'human', reviewed: true });
+    const sub = await submit(u, { files: filesFor([f1, f2]), artifacts: COMPLETE_ARTIFACTS, state: 'demonstrated', proposedState: 'demonstrated', verification: 'accepted', outcome: 'passed', evaluatorKind: 'human', reviewed: true });
     const res = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(u))
       .send({ outcome: 'passed', decision: 'accepted', resultingState: 'demonstrated', basis: { independentlyVerified: true } }).expect(201);
     assert.equal(res.body.data.verification.decision, 'assessment_pending_validation');
-    await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(u)).expect(400); // already evaluated: a correction is a new submission
+    // Already evaluated: a repeat creates no run and changes nothing (a correction is a new submission).
+    const again = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(u)).expect(200);
+    assert.equal(again.body.data.alreadyEvaluated, true);
+    assert.equal((await pool.query('select count(*)::int n from evaluation where submission_id = $1', [sub.body.data.id])).rows[0].n, 1);
     const other = await graduate();
     await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(other)).expect(404);
     await asAuthenticatedUser(pool, u.id, async (c) => {
@@ -185,14 +192,16 @@ describe('the current level is preserved', () => {
     await useLegacyVerificationCompat();
     try {
       const u1 = await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES); const u2 = await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES);
-      const ev = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2] })).body.data.id);
+      const ev = await evaluate(u, (await submit(u, { artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]) })).body.data.id);
       assert.equal(ev.verification.decision, 'accepted');
     } finally { await useSafetyBaseline(); }
     const earned = await levelFacts(u.id);
     const claim = await one('select state, primary_evidence_id, state_reason from skill_claim where user_id = $1', [u.id]);
     assert.equal(claim.state, 'demonstrated');
     for (const artifacts of [COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, []]) {
-      const r = await submit(u, artifacts.length ? { artifacts } : { externalUrls: ['https://example.com/x'] });
+      const r = await submit(u, artifacts.length ? { artifacts, files: await demoFiles(u) } : { externalUrls: ['https://example.com/x'], files: await demoFiles(u) });
+      // The blocked run: a submission stored before Phase 1 without its files (the API now refuses one at the door).
+      if (!artifacts.length) { await asHistoricalWithoutFile(pool, r.body.data.id, 'file.component'); await asHistoricalWithoutFile(pool, r.body.data.id, 'file.test'); }
       await evaluate(u, r.body.data.id);
     }
     const after = await one('select state, primary_evidence_id, state_reason from skill_claim where user_id = $1', [u.id]);
@@ -226,10 +235,12 @@ describe('a valid, authorised path still works: human review on SME-approved, no
   });
   const LEVELS: Record<string, string> = { semantic_structure: 'solid', form_validation: 'solid', data_states: 'solid', state_transitions: 'solid', responsive_layout: 'solid', explanation_clarity: 'solid', judgment_assumption_check: 'met' };
   async function reviewedRun(u: TestUser, act: string, skill: string) {
+    // Graduate journey Phase 1: work starts only on an activity of the goal role's catalogue.
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: (await one('select target_role_id from activity_spec where id = $1', [act])).target_role_id, confirmed: true }).expect(200);
     const pid = ok(await http.post('/v1/projects').set(auth(u)).send({ title: 'طلب إجازة', kind: 'platform_activity', activitySpecId: act })).body.data.id;
     const f1 = await uploadFile(app, http, u, 'index.html', COMPONENT_BYTES, 'text/plain'); const f2 = await uploadFile(app, http, u, 'styles.css', TEST_BYTES, 'text/plain');
     const f3 = await uploadFile(app, http, u, 'app.js', TEST_BYTES);
-    const sub = await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: [skill], uploadIds: [f1, f2, f3], aiDisclosure: { declaredUse: [] }, artifacts: [
+    const sub = await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: [skill], files: filesFor([f1, f2, f3], ['file.index_html', 'file.styles_css', 'file.app_js']), aiDisclosure: { declaredUse: [] }, artifacts: [
       { key: 'note.data_flow', kind: 'text', valueText: 'The form submits to a state object; the list is fetched on load and re-rendered from state; loading, error and empty are explicit states.', locator: 'notes.md' },
       { key: 'answer.clarification', kind: 'text', valueText: 'The brief says four fields and the spec lists five; I implemented the four and flagged the fifth.', locator: 'notes.md' },
     ] }); ok(sub);
@@ -288,7 +299,7 @@ describe('the legacy basis never decides in production', () => {
   test('8b · in production mode a declared pass is pending under the safety baseline, and a lingering development-only legacy row is ignored', async () => {
     const u = await graduate();
     const f1 = await uploadFile(app, http, u, 'HabitList.jsx', COMPONENT_BYTES); const f2 = await uploadFile(app, http, u, 'HabitList.test.jsx', TEST_BYTES);
-    const sub = (await submit(u, { uploadIds: [f1, f2], artifacts: COMPLETE_ARTIFACTS })).body.data.id;
+    const sub = (await submit(u, { files: filesFor([f1, f2]), artifacts: COMPLETE_ARTIFACTS })).body.data.id;
     const prev = process.env['NODE_ENV'];
     process.env['NODE_ENV'] = 'production';
     try {

@@ -8,7 +8,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
-import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser, filesFor } from './helpers';
 import { loadPack } from '../src/career-data/pack-loader';
 import { importPack } from '../src/career-data/pipeline';
 import { runQualityChecks, coreSkillEvidencePaths } from '../src/career-data/quality-rules';
@@ -176,10 +176,13 @@ describe('production guard — DEMO content never serves production', () => {
 describe('agent integration — agents read structured career data or state a limitation', () => {
   async function evaluated(user: TestUser, roleId: string, artifacts = COMPLETE_ARTIFACTS) {
     await http.post('/v1/me/bootstrap').set(auth(user)).send({}).expect(201);
-    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: roleId, confirmed: true }).expect(200);
+    // Graduate journey Phase 1: the work is done on an activity of the demo role's catalogue; the goal then moves to
+    // the role under test, which is what the agents read when the evaluation completes.
+    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
     const project = await http.post('/v1/projects').set(auth(user)).send({ title: 'p', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201);
     const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES); const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
-    const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+    const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: roleId, confirmed: true }).expect(200);
     await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
     return (await http.get('/v1/me/proposals').set(auth(user)).expect(200)).body.data.items as Array<Record<string, unknown> & { structuredPayload: Record<string, unknown>; warnings: string[] }>;
   }

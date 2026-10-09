@@ -32,6 +32,7 @@ export class CareerDataService implements OnModuleInit {
         const { rows } = await c.query(`select ${col} as s, count(*)::int as n from ${t} where is_demo_fixture group by ${col}`);
         for (const r of rows) if (!demoContentAllowedInProduction(r.s as ReviewState)) out.push(`${t}: ${r.n} demo row(s) ${r.s}`);
       }
+      out.push(...await demoVisibilityProductionOffenders(c));
       return out;
     });
     if (offenders.length) throw new Error(`DEMO career data is published in a production database; refusing to start: ${offenders.join('; ')}`);
@@ -39,6 +40,15 @@ export class CareerDataService implements OnModuleInit {
 
   roleRequirementsIn(c: PoolClient, roleId: string | null): Promise<RoleRequirementsContext> { return loadRoleRequirements(c, roleId); }
   activityContextIn(c: PoolClient, activitySpecId: string | null): Promise<ActivityContext> { return loadActivityContext(c, activitySpecId); }
+}
+
+/**
+ * Graduate journey Phase 1 (0024): demo content may be shown to graduates only where the deployment says so.
+ * A production database with that flag on is refused at start, like published demo content.
+ */
+export async function demoVisibilityProductionOffenders(c: PoolClient): Promise<string[]> {
+  const { rows } = await c.query('select demo_content_visible from platform_deployment where singleton');
+  return rows[0]?.demo_content_visible === true ? ['platform_deployment.demo_content_visible is on (demo content would be shown to graduates)'] : [];
 }
 
 export async function loadRoleRequirements(c: PoolClient, roleId: string | null): Promise<RoleRequirementsContext> {

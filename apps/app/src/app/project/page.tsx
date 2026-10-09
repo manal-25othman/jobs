@@ -90,7 +90,8 @@ export default function ProjectPage() {
         body: {
           skillIds: [DEMO_SKILL],
           artifacts,
-          uploadIds: [componentUpload, testUpload],
+          // Each file is bound to the deliverable it is (graduate journey Phase 1, A3); order carries no meaning.
+          files: [{ uploadId: componentUpload, deliverableKey: 'file.component' }, { uploadId: testUpload, deliverableKey: 'file.test' }],
           externalUrls: repoUrl.trim() ? [repoUrl.trim()] : [],
           // Answers to the exact questionnaire version shown; questions hidden by show-if are not sent.
           aiDisclosure: questionnaire

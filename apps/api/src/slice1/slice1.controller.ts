@@ -1,6 +1,7 @@
 import {
-  Body, Controller, Get, Param, Post, Put, UseGuards, Query,
+  Body, Controller, Get, Param, Post, Put, UseGuards, Query, Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { SupabaseAuthGuard, type AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
@@ -12,8 +13,10 @@ import { ReportService } from './report.service';
 import { ShareService } from './share.service';
 import { UploadService } from './upload.service';
 import { WithdrawalService } from './withdrawal.service';
+import { ActivityCatalogueService } from './activity-catalogue.service';
 import { AgentService } from '../agents/agent.service';
 import { Delete } from '@nestjs/common';
+import { workStatus } from '@naqla/domain';
 
 /**
  * Vertical Slice 1 endpoints.
@@ -35,6 +38,7 @@ export class Slice1Controller {
     private readonly uploads: UploadService,
     private readonly agents: AgentService,
     private readonly withdrawal: WithdrawalService,
+    private readonly activities: ActivityCatalogueService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -67,6 +71,22 @@ export class Slice1Controller {
     return { ok: true, data: await this.career.getCurrentGoal(user.id) };
   }
 
+  /* ───────────────────── activities (graduate journey Phase 1) ───────────────────── */
+
+  /** A1 — the activities of the current role's catalogue (server-filtered; assessment mode derived, never chosen). */
+  @Get('me/activities')
+  async listActivities(@CurrentUser() user: AuthenticatedUser) {
+    await this.users.ensureUser(user);
+    return { ok: true, data: await this.activities.list(user.id) };
+  }
+
+  /** A2 — one activity, learner projection. 404 for anything outside the catalogue (draft, demo where hidden, another role's, unknown). */
+  @Get('me/activities/:id')
+  async getActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    await this.users.ensureUser(user);
+    return { ok: true, data: await this.activities.detail(user.id, id) };
+  }
+
   /* ─────────────────────────── projects ─────────────────────────── */
 
   @Post('projects')
@@ -81,9 +101,15 @@ export class Slice1Controller {
     return { ok: true, data: await this.career.createProject(user.id, body) };
   }
 
+  /** A5 — the graduate's projects with activity, attempts and current work status (authoritative records). */
   @Get('projects')
   async listProjects(@CurrentUser() user: AuthenticatedUser) {
-    return { ok: true, data: { items: await this.career.listProjects(user.id), nextCursor: null } };
+    const items = (await this.activities.projectStatuses(user.id, null)).map((p) => ({
+      ...p,
+      // the pre-Phase-1 snake_case fields, unchanged (id, title, kind and status are shared)
+      activity_spec_version: p.activitySpecVersion, created_at: p.createdAt, updated_at: p.updatedAt,
+    }));
+    return { ok: true, data: { items, nextCursor: null } };
   }
 
   @Get('projects/:id')
@@ -137,11 +163,24 @@ export class Slice1Controller {
 
   /* ───────────────────────── evaluation ─────────────────────────── */
 
+  /**
+   * The explicit, owner-only action that evaluates a submission. Idempotent (graduate journey Phase 1): when the
+   * submission already has an evaluation (completed, or awaiting human review) nothing is created or rerun, no
+   * agent runs again, and the current state is returned with `alreadyEvaluated: true` (HTTP 200). Reading an
+   * evaluation is GET /submissions/:id/evaluation.
+   */
   @Post('submissions/:id/evaluate')
-  async evaluate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async evaluate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+    const existing = await this.evaluations.getEvaluationForSubmission(user.id, id);
+    if (existing.state === 'completed' || existing.state === 'queued_for_human') {
+      res.status(200);
+      return { ok: true, data: { ...existing, alreadyEvaluated: true } };
+    }
     // The evaluation transaction commits first. Orchestration runs AFTER it,
     // outside it, and its failure is swallowed: agents never break the product.
-    const result = await this.evaluations.evaluateSubmission(user.id, id);
+    const run = await this.evaluations.evaluateSubmission(user.id, id);
+    const result = { ...run, alreadyEvaluated: false, workStatus: workStatus({ hasSubmission: true, evaluationState: run.outcome === 'needs_human_review' ? 'queued_for_human' : 'completed',
+      outcome: run.outcome, decision: run.verification.decision, levelChanged: run.transition !== null }) };
     // Awaiting human review: no agent runs on a partial result. Agents run when the review finalises.
     if (result.outcome === 'needs_human_review') return { ok: true, data: result };
     const anyUnmet = result.criteria.some((c) => c.score < c.maxScore);

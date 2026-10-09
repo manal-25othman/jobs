@@ -1,5 +1,5 @@
 # نَقْلة / NAQLA — Graduate Activity Journey: Audit and Implementation Proposal
-**Date:** 2026-10-09 · **Status:** audit and proposal only. Nothing implemented. Awaiting Product Owner approval.
+**Date:** 2026-10-09 · **Status:** audit and proposal. **Phase 1 (backend and access safety) implemented — D-119, see `GRADUATE-ACTIVITY-BACKEND-AND-ACCESS-SAFETY-REPORT.md`.** Phases 2–4 not started.
 **Basis:** code at `d3754e7`.
 **Constraints honoured:** the D-118 guarantees are preserved, and no new promotion rule, assessment engine, LLM, SME threshold, deployment or redesign is proposed.
 

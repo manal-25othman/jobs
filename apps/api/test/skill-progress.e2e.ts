@@ -13,8 +13,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, expectRejected, asAuthenticatedUser,
-  COMPONENT_BYTES, TEST_BYTES, type TestUser,
-} from './helpers';
+  COMPONENT_BYTES, TEST_BYTES, type TestUser, filesFor } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -37,7 +36,7 @@ async function submit(user: TestUser, projectId: string, artifacts = COMPLETE_AR
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   return (await http.post(`/v1/projects/${projectId}/submissions`).set(auth(user))
-    .send({ skillIds: [SKILL], artifacts, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
+    .send({ skillIds: [SKILL], artifacts, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
 }
 type Row = { skillId: string; progress: { state: string; stateReviewStatus: string }; verification: { state: string } | null; verificationEffectOfProgress: string };
 async function journey(user: TestUser): Promise<{ items: Row[]; engine: { active: boolean; reason: string | null } }> {

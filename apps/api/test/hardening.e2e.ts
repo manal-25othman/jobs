@@ -13,8 +13,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, memoryStorage,
-  expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser, approveCvBulletProposal,
-} from './helpers';
+  expectRejected, asAuthenticatedUser, COMPONENT_BYTES, TEST_BYTES, type TestUser, approveCvBulletProposal, filesFor } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -35,7 +34,7 @@ async function fullFlow(user: TestUser) {
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2],
+    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]),
             externalUrls: ['https://example.com/repo'], aiDisclosure: { declaredUse: [] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   const asset = await approveCvBulletProposal(http, user);
@@ -117,7 +116,8 @@ describe('uploads — a second user cannot reach another user’s files', () => 
     const project = await http.post('/v1/projects').set(auth(intruder))
       .send({ title: 'x', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201);
     await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(intruder))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [id], aiDisclosure: { declaredUse: [] } })
+      // A complete mapping whose component file is the OWNER's upload: refused as not found (no existence leak).
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([id, await uploadFile(app, http, intruder, 'HabitList.test.jsx', TEST_BYTES)]), aiDisclosure: { declaredUse: [] } })
       .expect(404);
   });
 
@@ -201,7 +201,7 @@ describe('D-057 — no approval without preview; D-059 — Verified stays blocke
     const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
     const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
     const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
     await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
     const list = await http.get('/v1/me/proposals').set(auth(user)).expect(200);
     const cv = list.body.data.items.find((p: { proposalType: string }) => p.proposalType === 'cv_bullet');
@@ -243,14 +243,14 @@ describe('evidence may reference external URLs', () => {
     const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
     const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
     const ok = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2],
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]),
               externalUrls: ['https://github.com/sara/habit-tracker'], aiDisclosure: { declaredUse: [] } }).expect(201);
     const got = await http.get(`/v1/submissions/${ok.body.data.id}`).set(auth(user)).expect(200);
     assert.ok(got.body.data.artifacts.some((a: { kind: string; value_text: string }) => a.kind === 'link' && a.value_text.includes('github.com')));
     assert.equal(got.body.data.artifacts.filter((a: { kind: string }) => a.kind === 'file').length, 2);
 
     const bad = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2],
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]),
               externalUrls: ['ftp://x'], aiDisclosure: { declaredUse: [] } });
     assert.equal(bad.status, 422);
     const freeText = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))

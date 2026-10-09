@@ -88,7 +88,8 @@ describe('one account holding all three roles cannot carry its own change into e
 describe('track versions: whoever drafted or decided a change the version carries cannot activate it', () => {
   let versionId = ''; let roleId = '';
   before(async () => {
-    roleId = (await one(`select id from target_role where slug = 'frontend-developer-junior' and not is_demo_fixture limit 1`) ?? await one(`select id from target_role order by is_demo_fixture limit 1`)).id;
+    // The pack role, preferring a non-demo copy (other suites create unrelated non-demo roles: never pick one of those).
+    roleId = (await one(`select id from target_role where slug = 'frontend-developer-junior' order by is_demo_fixture, created_at limit 1`)).id;
     const skills = (await get(omni, `/tracks/${roleId}`)).body.data.skills;
     const rr = skills[skills.length - 1].roleRequirementId;
     const ch = (await post(omni, `/tracks/${roleId}/skill-changes`, { roleRequirementId: rr, proposed: { display_order: 97 }, reason: 'separation e2e' })).body.data.id;

@@ -16,8 +16,7 @@ import { Pool } from 'pg';
 import { DOMAIN_RULESET_VERSION } from '@naqla/domain';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, expectRejected, asAuthenticatedUser,
-  COMPONENT_BYTES, TEST_BYTES, type TestUser,
-} from './helpers';
+  COMPONENT_BYTES, TEST_BYTES, type TestUser, filesFor, asHistoricalWithoutFile } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -34,11 +33,11 @@ async function bootstrapped(): Promise<TestUser> {
 }
 async function submitted(user: TestUser, artifacts = COMPLETE_ARTIFACTS, opts: { skillIds?: string[]; uploads?: number } = {}) {
   const pid = (await http.post('/v1/projects').set(auth(user)).send({ title: 'متتبّع عادات', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201)).body.data.id as string;
-  const uploads: string[] = [];
-  if ((opts.uploads ?? 2) >= 1) uploads.push(await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES));
-  if ((opts.uploads ?? 2) >= 2) uploads.push(await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES));
+  const uploads = [await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES), await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES)];
   const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(user))
-    .send({ skillIds: opts.skillIds ?? [SKILL], artifacts, uploadIds: uploads, aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
+    .send({ skillIds: opts.skillIds ?? [SKILL], artifacts, files: filesFor(uploads), aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
+  // Fewer files: the API refuses that now (A3), so a pre-Phase-1 submission stored without the test file is reproduced.
+  if ((opts.uploads ?? 2) < 2) await asHistoricalWithoutFile(pool, sid, 'file.test');
   return { pid, sid };
 }
 type Assessment = { id: string; evaluatorKind: string; evaluatorRef: string; versions: { rubric: string; activitySpec: string; domainRuleset: string; contextPolicy: string | null }; outcome: string; confidence: number | null;

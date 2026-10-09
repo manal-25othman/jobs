@@ -495,6 +495,8 @@ export class AdminService {
       const skills = (await c.query(`select id, slug, label_ar, label_en, review_status::text, is_demo_fixture from skill where status = 'active' order by is_demo_fixture, slug`)).rows;
       const activities = (await c.query(`select id, slug, version, title_ar, title_en, status::text, is_demo_fixture, target_role_id from activity_spec order by slug, version`)).rows;
       const deliverables = (await c.query(`select id, activity_spec_id, key, format, mandatory, description_ar, description_en from activity_deliverable order by activity_spec_id, position`)).rows;
+      // Assessment-private inputs (planted issues) are visible here, to authorised administrators only — never to graduates (0024).
+      const inputs = (await c.query(`select id, activity_spec_id, key, description_ar, description_en, is_platform_private, contains_planted_issue from activity_input order by activity_spec_id, key`)).rows;
       const rubrics = (await c.query(`select id, activity_spec_id, version, status::text, is_demo_fixture, pass_threshold, pass_threshold_status::text, values_approved_by_label, values_approved_at from rubric_version order by activity_spec_id, version`)).rows;
       const criteria = (await c.query(`select id, rubric_version_id, key, name_ar, name_en, weight, weight_status::text, threshold_for_skill, threshold_status::text, mandatory, max_score from rubric_criterion order by rubric_version_id, position`)).rows;
       return {
@@ -503,6 +505,8 @@ export class AdminService {
         activities: activities.map((a) => ({ id: a.id, slug: a.slug, version: a.version, titleAr: a.title_ar, titleEn: a.title_en, isDemo: a.is_demo_fixture, reviewStatus: a.status, editable: ['draft', 'needs_revision', 'rejected'].includes(a.status),
           ...stageView(contentStage(a.status)),
           deliverables: deliverables.filter((d) => d.activity_spec_id === a.id).map((d) => ({ id: d.id, key: d.key, format: d.format, mandatory: d.mandatory, descriptionAr: d.description_ar, descriptionEn: d.description_en })),
+          inputs: inputs.filter((i) => i.activity_spec_id === a.id).map((i) => ({ id: i.id, key: i.key, descriptionAr: i.description_ar, descriptionEn: i.description_en,
+            isPlatformPrivate: i.is_platform_private, containsPlantedIssue: i.contains_planted_issue, learnerSeesDescription: !i.contains_planted_issue })),
           rubrics: rubrics.filter((r) => r.activity_spec_id === a.id).map((r) => ({ id: r.id, version: r.version, isDemo: r.is_demo_fixture, reviewStatus: r.status, editable: ['draft', 'needs_revision', 'rejected'].includes(r.status),
             passThreshold: r.pass_threshold, passThresholdStatus: r.pass_threshold_status, valuesApprovedBy: r.values_approved_by_label, valuesApprovedAt: r.values_approved_at, ...stageView(contentStage(r.status)),
             criteria: criteria.filter((x) => x.rubric_version_id === r.id).map((x) => ({ id: x.id, key: x.key, nameAr: x.name_ar, nameEn: x.name_en, weight: x.weight, weightStatus: x.weight_status,

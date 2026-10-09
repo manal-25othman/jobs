@@ -15,8 +15,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, expectRejected, asAuthenticatedUser,
-  COMPONENT_BYTES, TEST_BYTES, type TestUser,
-} from './helpers';
+  COMPONENT_BYTES, TEST_BYTES, type TestUser, filesFor } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -37,7 +36,7 @@ async function submit(user: TestUser, projectId?: string) {
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   const sub = await http.post(`/v1/projects/${pid}/submissions`).set(auth(user))
-    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2],
+    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]),
             externalUrls: ['https://github.com/manal/habits'], aiDisclosure: { declaredUse: ['explanation'] } }).expect(201);
   return { projectId: pid, submissionId: sub.body.data.id as string };
 }
@@ -137,9 +136,9 @@ describe('a submission is recorded as typed evidence items', () => {
   test('an unclassifiable link falls back to the registry\'s declared fallback, never to a guess', async () => {
     const user = await bootstrapped();
     const pid = (await http.post('/v1/projects').set(auth(user)).send({ title: 'x', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201)).body.data.id;
-    const u1 = await uploadFile(app, http, user, 'a.jsx', COMPONENT_BYTES);
+    const u1 = await uploadFile(app, http, user, 'a.jsx', COMPONENT_BYTES); const u2 = await uploadFile(app, http, user, 'a.test.jsx', TEST_BYTES);
     await http.post(`/v1/projects/${pid}/submissions`).set(auth(user))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1],
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]),
               externalUrls: ['https://example.com/anything', 'https://github.com/manal/habits/commit/abc'], aiDisclosure: { declaredUse: [] } }).expect(201);
     const links = (await items(user)).filter((i) => i.channel === 'url');
     assert.deepEqual(links.map((l) => l.typeCode).sort(), ['external_url', 'github_commit_diff']);
@@ -176,7 +175,7 @@ describe('an evaluation records a check-result item and bridges the evaluated fa
     const u1 = await uploadFile(app, http, user, 'a.jsx', COMPONENT_BYTES);
     const u2 = await uploadFile(app, http, user, 'a.test.jsx', TEST_BYTES);
     const sub = await http.post(`/v1/projects/${pid}/submissions`).set(auth(user))
-      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS.filter((a) => a.key !== 'test.error_message'), uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+      .send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS.filter((a) => a.key !== 'test.error_message'), files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
     const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
     assert.notEqual(ev.body.data.outcome, 'passed');
     const check = (await items(user)).find((i) => i.typeCode === 'automated_check_result')!;

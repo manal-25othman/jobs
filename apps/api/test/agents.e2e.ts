@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
-import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, asAuthenticatedUser, expectRejected, type TestUser, filesFor } from './helpers';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -22,7 +22,7 @@ async function evaluated(user: TestUser, artifacts = COMPLETE_ARTIFACTS) {
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES);
   const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
   const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user))
-    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+    .send({ skillIds: [FIXTURE.skillUiTesting], artifacts, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   return { submissionId: sub.body.data.id, ev: ev.body.data };
 }
@@ -170,7 +170,7 @@ describe('11 — isolation, and 17 — failure leaves authoritative state untouc
       await h.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
       const project = await h.post('/v1/projects').set(auth(user)).send({ title: 'x', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201);
       const u1 = await uploadFile(broken, h, user, 'HabitList.jsx', COMPONENT_BYTES); const u2 = await uploadFile(broken, h, user, 'HabitList.test.jsx', TEST_BYTES);
-      const sub = await h.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201);
+      const sub = await h.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201);
       const ev = await h.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
       assert.equal(ev.body.data.transition?.to, 'demonstrated', 'the evaluation itself succeeded');
       assert.equal((await h.get('/v1/me/proposals').set(auth(user)).expect(200)).body.data.items.length, 0, 'no proposal was stored');

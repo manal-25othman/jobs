@@ -110,6 +110,25 @@ export const COMPLETE_ARTIFACTS = [
   // D-118: `signal.tests_reference_component` was sent here (and by the UI) — a platform fact no client may write. Removed; the API refuses it.
 ];
 
+/**
+ * Graduate journey Phase 1 (A3): files are bound to the deliverable they are, by key — never by order.
+ * Keys default to the demo activity's file deliverables (act_fe_003: component, test).
+ */
+export const DEMO_FILE_KEYS = ['file.component', 'file.test'] as const;
+export function filesFor(uploadIds: readonly string[], keys: readonly string[] = DEMO_FILE_KEYS): { uploadId: string; deliverableKey: string }[] {
+  return uploadIds.map((uploadId, i) => ({ uploadId, deliverableKey: keys[i]! }));
+}
+
+/**
+ * Reproduces a HISTORICAL submission recorded before graduate journey Phase 1, when the API still accepted a
+ * submission with a mandatory file missing (the blocking `files_present` check then stopped its evaluation).
+ * The API now refuses such a submission at the door; evaluation of the ones already stored must keep working.
+ * Test-only: run as the database owner on a fresh submission, before it is evaluated.
+ */
+export async function asHistoricalWithoutFile(pool: { query: (sql: string, args: unknown[]) => Promise<unknown> }, submissionId: string, key: string): Promise<void> {
+  await pool.query('delete from submission_artifact where submission_id = $1 and key = $2', [submissionId, key]);
+}
+
 /** The same submission with the mandatory error-message test missing. */
 export const INCOMPLETE_ARTIFACTS = COMPLETE_ARTIFACTS.filter((a) => a.key !== 'test.error_message');
 

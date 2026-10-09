@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
-import { assertModeRespected, assertExternalUrlValid, assertClientArtifactAllowed, type AiUsageMode } from '@naqla/domain';
+import { assertModeRespected, assertExternalUrlValid, assertClientArtifactAllowed, resolveDeliverableFileMapping, explicitFileMappingRequired, DeliverableMappingRefused, type AiUsageMode } from '@naqla/domain';
 import { AssessmentRecorderService } from '../assessment/assessment-recorder.service';
 import { UploadService } from './upload.service';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
@@ -34,7 +34,12 @@ export class SubmissionService {
     skillIds: string[];
     artifacts: SubmissionArtifactInput[];
     repositoryUrl?: string;
-    /** Confirmed uploads the user owns. Become `file` artifacts. */
+    /**
+     * Graduate journey Phase 1 (A3): each confirmed upload bound to a deliverable the ACTIVITY declares, by key.
+     * Required for any activity that declares a file deliverable. Upload order carries no meaning.
+     */
+    files?: { uploadId: string; deliverableKey: string }[];
+    /** Confirmed uploads, positional: only for work with no declared file deliverable (a personal project). */
     uploadIds?: string[];
     /** External http(s) evidence. Become `link` artifacts. */
     externalUrls?: string[];
@@ -44,7 +49,11 @@ export class SubmissionService {
     if (!input.skillIds?.length) {
       throw new BadRequestException('a submission must name at least one skill it claims');
     }
-    const hasAny = (input.artifacts?.length ?? 0) + (input.uploadIds?.length ?? 0) + (input.externalUrls?.length ?? 0);
+    if (input.files !== undefined && input.uploadIds !== undefined) {
+      throw new BadRequestException('[ambiguous_file_mapping] send files as `files` (explicit deliverable mapping) or `uploadIds`, never both');
+    }
+    if (input.files !== undefined && !Array.isArray(input.files)) throw new BadRequestException('[malformed_file_mapping] files must be a list of { uploadId, deliverableKey }');
+    const hasAny = (input.artifacts?.length ?? 0) + (input.uploadIds?.length ?? 0) + (input.files?.length ?? 0) + (input.externalUrls?.length ?? 0);
     if (hasAny === 0) {
       throw new BadRequestException('a submission with no evidence artifacts cannot be evaluated');
     }
@@ -89,9 +98,17 @@ export class SubmissionService {
       for (const skillId of input.skillIds) {
         // OPEN-039: an alias (merged) skill is not claimable; the canonical one is. Nothing is guessed:
         // the caller is told which skill replaced it.
-        const sk = await c.query(`select status, merged_into_id, (select slug from skill k where k.id = s.merged_into_id) as canonical_slug from skill s where s.id = $1`, [skillId]);
-        if (sk.rowCount === 0) throw new BadRequestException(`unknown skill ${skillId}`);
+        // A4: a skill the graduate may not see is unknown to them (no existence leak).
+        const sk = await c.query(`select status, merged_into_id, (select slug from skill k where k.id = s.merged_into_id) as canonical_slug,
+                                         graduate_content_visible(review_status, is_demo_fixture) as visible from skill s where s.id = $1`, [skillId]);
+        if (sk.rowCount === 0 || (!sk.rows[0].visible && sk.rows[0].status === 'active')) throw new BadRequestException(`unknown skill ${skillId}`);
         if (sk.rows[0].status !== 'active') throw new BadRequestException(`skill ${skillId} is ${sk.rows[0].status}${sk.rows[0].canonical_slug ? `; claim its canonical skill '${sk.rows[0].canonical_slug}' (${sk.rows[0].merged_into_id})` : ''}`);
+        // Approved activity mapping: on a platform activity, only a skill the activity is mapped to can be claimed —
+        // a review of this work must never move an unrelated skill.
+        if (project.rows[0].activity_spec_id) {
+          const onActivity = await c.query('select 1 from activity_skill where activity_spec_id = $1 and skill_id = $2', [project.rows[0].activity_spec_id, skillId]);
+          if (onActivity.rowCount === 0) throw new BadRequestException(`[skill_not_mapped_to_activity] skill ${skillId} is not a skill of this activity`);
+        }
         await c.query(
           `insert into submission_claimed_skill (submission_id, skill_id, user_id)
            values ($1,$2,$3) on conflict do nothing`,
@@ -104,13 +121,36 @@ export class SubmissionService {
       // convention (file 0 = component, file 1 = test) remains the named fallback
       // for an activity that declares none, so existing behaviour is unchanged.
       const deliverables = await this.ledger.loadDeliverables(c, project.rows[0].activity_spec_id);
-      const fileKeys = this.ledger.fileArtifactKeys(deliverables, input.uploadIds?.length ?? 0, (input.artifacts ?? []).map((a) => a.key));
+      // A3: an activity that declares file deliverables takes files ONLY through the explicit mapping, validated
+      // against those declarations (server data): missing, duplicate, unexpected and mismatched keys are refused.
+      // The positional legacy form stays only for work with no declared file deliverable (a personal project).
+      let mapped: { uploadId: string; key: string }[];
+      try {
+        if (explicitFileMappingRequired(deliverables)) {
+          if (input.uploadIds !== undefined) {
+            throw new DeliverableMappingRefused('deliverable_mapping_required', `this activity declares file deliverables; send files as \`files: [{ uploadId, deliverableKey }]\` (one of: ${deliverables.filter((d) => d.format === 'source file').map((d) => d.key).join(', ')})`);
+          }
+          mapped = resolveDeliverableFileMapping(deliverables, input.files ?? []);
+        } else {
+          // No declared file deliverable: an explicit mapping can name none (refused as no_file_deliverables).
+          if (input.files !== undefined && input.files.length > 0) resolveDeliverableFileMapping(deliverables, input.files);
+          const legacy = this.ledger.fileArtifactKeys(deliverables, input.uploadIds?.length ?? 0, (input.artifacts ?? []).map((a) => a.key));
+          mapped = (input.uploadIds ?? []).map((uploadId, i) => ({ uploadId, key: legacy[i]!.key }));
+        }
+      } catch (e) {
+        if (e instanceof DeliverableMappingRefused) throw new BadRequestException(e.message);
+        throw e;
+      }
+      // A text artifact may not occupy a declared FILE deliverable's key.
+      for (const a of input.artifacts ?? []) {
+        if (deliverables.some((d) => d.key === a.key && d.format === 'source file')) {
+          throw new BadRequestException(`[deliverable_format_mismatch] '${a.key}' is a file deliverable; it comes only from an uploaded file`);
+        }
+      }
       const ledgerFiles: { uploadId: string; key: string; declaredName: string; contentType: string | null }[] = [];
-      let fileIndex = 0;
-      for (const uploadId of input.uploadIds ?? []) {
+      for (const { uploadId, key } of mapped) {
+        // Ownership and confirmation (stored, measured object) are checked exactly as before.
         const up = await this.uploads.assertOwnedConfirmed(c, userId, uploadId);
-        const { key } = fileKeys[fileIndex]!;
-        fileIndex++;
         await c.query(
           `insert into submission_artifact
              (submission_id, user_id, key, kind, value_text, locator, upload_id)
@@ -177,7 +217,7 @@ export class SubmissionService {
         userId, actorKind: 'user', actorId: userId,
         subjectTable: 'submission', subjectId: submissionId,
         reason: 'the user submitted work for evaluation; the submission is locked and cannot be edited',
-        payload: { projectId, artifactCount: hasAny, uploads: input.uploadIds?.length ?? 0, links: input.externalUrls?.length ?? 0 },
+        payload: { projectId, artifactCount: hasAny, uploads: mapped.length, fileMapping: input.files !== undefined ? 'explicit' : 'legacy_positional', links: input.externalUrls?.length ?? 0 },
       });
 
       return { ...sub.rows[0], claimedSkillIds: input.skillIds };

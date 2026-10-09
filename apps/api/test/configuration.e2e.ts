@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
-import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, expectRejected, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
+import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, expectRejected, COMPONENT_BYTES, TEST_BYTES, type TestUser, filesFor } from './helpers';
 import { cliApprove, cliActivate, cliCreateTrackVersion } from '../src/configuration/config-admin.service';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
@@ -32,7 +32,7 @@ async function bootstrapped(): Promise<TestUser> {
 async function evaluated(user: TestUser) {
   const pid = (await http.post('/v1/projects').set(auth(user)).send({ title: 'x', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(201)).body.data.id as string;
   const u1 = await uploadFile(app, http, user, 'HabitList.jsx', COMPONENT_BYTES); const u2 = await uploadFile(app, http, user, 'HabitList.test.jsx', TEST_BYTES);
-  const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, uploadIds: [u1, u2], aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
+  const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(user)).send({ skillIds: [FIXTURE.skillUiTesting], artifacts: COMPLETE_ARTIFACTS, files: filesFor([u1, u2]), aiDisclosure: { declaredUse: [] } }).expect(201)).body.data.id as string;
   await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(user)).expect(201);
   const a = (await http.get(`/v1/submissions/${sid}/assessment`).set(auth(user)).expect(200)).body.data.items[0];
   return { sid, assessment: a as { versions: { contextPolicy: string; trackConfigVersionId: string | null; trackConfigVersion: number | null; configResolution: string }; inputsUsed: Record<string, unknown>; decisions: { policy: { key: string; version: number; status: string; resolution: string | null }; trackConfigVersionId: string | null }[] } };

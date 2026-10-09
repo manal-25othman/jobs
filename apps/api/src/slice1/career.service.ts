@@ -13,13 +13,18 @@ import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.ser
 export class CareerService {
   constructor(private readonly db: DbService, private readonly progress: SkillProgressEngine) {}
 
-  async listTargetRoles(userId: string) {
-    return this.db.asUser(userId, async (c) => {
+  /**
+   * A4 — the roles a graduate may choose: visible content (published; DEMO only where demo content is visible,
+   * labelled) WITH consumable content (a visible requirement or a catalogue activity). Drafts, test roles and
+   * empty shells are not listed. The rule is the database's (`graduate_role_listed`, 0024), not a client filter.
+   */
+  async listTargetRoles(_userId: string) {
+    return this.db.asService(async (c) => {
       const { rows } = await c.query(
         `select id, slug, label_ar, label_en, review_status, source_label, is_demo_fixture
-           from target_role order by label_en`,
+           from target_role where graduate_role_listed(id) order by is_demo_fixture, label_en`,
       );
-      return rows;
+      return rows.map((r) => ({ ...r, isDemo: r.is_demo_fixture === true, label: r.is_demo_fixture ? 'DEMO — not reviewed' : null }));
     });
   }
 
@@ -29,8 +34,9 @@ export class CareerService {
       throw new BadRequestException('a career goal must be explicitly confirmed');
     }
     return this.db.asService(async (c) => {
+      // A4: only a role the graduate may see can become their goal; anything else is "unknown" (no existence leak).
       const role = await c.query(
-        'select id, label_en, review_status from target_role where id = $1', [targetRoleId],
+        'select id, label_en, review_status from target_role where id = $1 and graduate_role_visible(id)', [targetRoleId],
       );
       if (role.rowCount === 0) throw new NotFoundException('unknown target role');
 
@@ -67,7 +73,7 @@ export class CareerService {
     return this.db.asUser(userId, async (c) => {
       const { rows } = await c.query(
         `select cg.id, cg.target_role_id, cg.confirmed_at,
-                tr.label_en, tr.label_ar, tr.review_status
+                tr.label_en, tr.label_ar, tr.review_status, tr.is_demo_fixture, graduate_role_visible(tr.id) as role_available
            from career_goal cg
            join target_role tr on tr.id = cg.target_role_id
           where cg.user_id = $1 and cg.is_current`,
@@ -83,6 +89,9 @@ export class CareerService {
         roleReviewStatus: r.review_status === 'published' ? 'reviewed' : 'draft',
         requirementsIncomplete: r.review_status !== 'published',
         confirmedAt: r.confirmed_at,
+        // A goal set earlier on a role that is no longer offered stays the user's history; nothing new starts from it.
+        roleAvailable: r.role_available === true,
+        isDemo: r.is_demo_fixture === true,
       };
     });
   }
@@ -132,14 +141,16 @@ export class CareerService {
         if (!input.activitySpecId) {
           throw new BadRequestException('a platform activity must reference an activity spec');
         }
+        if (!/^[0-9a-f-]{36}$/i.test(input.activitySpecId)) throw new NotFoundException('unknown activity spec');
+        // A1/A2: work starts only on an activity in the graduate's current-role catalogue — published (INV-7: a
+        // draft would make the work unreproducible), visible, mapped to the role. Anything else, including a draft
+        // or another role's activity whose id is known, is "unknown" (no existence leak).
         const spec = await c.query(
-          `select id, version, status from activity_spec where id = $1`, [input.activitySpecId],
+          `select a.id, a.version, a.status from activity_spec a
+            where a.id = $1 and graduate_activity_in_catalogue(a.id, (select target_role_id from career_goal where user_id = $2 and is_current))`,
+          [input.activitySpecId, userId],
         );
         if (spec.rowCount === 0) throw new NotFoundException('unknown activity spec');
-        if (spec.rows[0].status !== 'published') {
-          // INV-7: a draft spec would make the work unreproducible.
-          throw new BadRequestException('an activity spec must be published before work starts against it');
-        }
         specId = spec.rows[0].id;
         specVersion = spec.rows[0].version;
       }
@@ -166,16 +177,6 @@ export class CareerService {
         }
       }
       return rows[0];
-    });
-  }
-
-  async listProjects(userId: string) {
-    return this.db.asUser(userId, async (c) => {
-      const { rows } = await c.query(
-        `select id, title, kind, status, activity_spec_version, created_at, updated_at
-           from project where deleted_at is null order by created_at desc`,
-      );
-      return rows;
     });
   }
 

@@ -14,8 +14,7 @@ import { Pool } from 'pg';
 import {
   bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, INCOMPLETE_ARTIFACTS,
   expectRejected, asAuthenticatedUser, uploadFile, COMPONENT_BYTES, TEST_BYTES, type TestUser,
-  approveCvBulletProposal,
-} from './helpers';
+  approveCvBulletProposal, filesFor } from './helpers';
 
 let app: INestApplication;
 let http: ReturnType<typeof request>;
@@ -54,7 +53,7 @@ async function upToSubmission(user: TestUser, artifacts = COMPLETE_ARTIFACTS, wi
     .send({
       skillIds: [FIXTURE.skillUiTesting],
       artifacts,
-      uploadIds: [componentUpload, ...(testUpload ? [testUpload] : [])],
+      files: filesFor([componentUpload, ...(testUpload ? [testUpload] : [])]),
       aiDisclosure: { declaredUse: [], explanation: null },
     }).expect(201);
 
@@ -105,6 +104,10 @@ describe('2 — the user creates a project', () => {
   test('a platform activity records its published spec version', async () => {
     const user = await newUser();
     await http.post('/v1/me/bootstrap').set('Authorization', `Bearer ${user.token}`).send({});
+    // Graduate journey Phase 1: work starts on an activity of the goal role's catalogue; without a goal there is none (404).
+    await http.post('/v1/projects').set('Authorization', `Bearer ${user.token}`)
+      .send({ title: 'متتبّع عادات', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId }).expect(404);
+    await http.put('/v1/me/career-goal').set('Authorization', `Bearer ${user.token}`).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
     const res = await http.post('/v1/projects').set('Authorization', `Bearer ${user.token}`)
       .send({ title: 'متتبّع عادات', kind: 'platform_activity', activitySpecId: FIXTURE.activitySpecId })
       .expect(201);
@@ -224,16 +227,15 @@ describe('5, 6, 7 — evaluation against the rubric', () => {
     assert.equal(claim.state, 'practiced', 'the claim holds where it was; v1 never moves backward either');
   });
 
-  test('NEGATIVE: a blocking integrity failure stops before scoring', async () => {
+  test('NEGATIVE: a missing mandatory file is refused at submission (graduate journey A3) — nothing is locked, scored or recorded', async () => {
+    // Before Phase 1 the submission was accepted and the blocking `files_present` check stopped the evaluation
+    // (blocked_by_checks). The explicit deliverable mapping now refuses it earlier, naming the deliverable; the
+    // blocking check stays as defence in depth.
     const user = await newUser();
-    const { submissionId } = await upToSubmission(user, COMPLETE_ARTIFACTS, false);
-
-    const res = await http.post(`/v1/submissions/${submissionId}/evaluate`)
-      .set('Authorization', `Bearer ${user.token}`).expect(201);
-
-    assert.equal(res.body.data.outcome, 'blocked_by_checks');
-    assert.equal(res.body.data.criteria.length, 0);
-    assert.equal(res.body.data.transition, null);
+    await assert.rejects(() => upToSubmission(user, COMPLETE_ARTIFACTS, false), /got 400/);
+    const subs = await http.get('/v1/projects').set('Authorization', `Bearer ${user.token}`).expect(200);
+    assert.equal(subs.body.data.items[0].attempts, 0, 'no submission was created');
+    assert.equal(subs.body.data.items[0].workStatus, 'in_progress');
   });
 
   test('assessment-only integrity detail never crosses the API boundary', async () => {
@@ -279,13 +281,19 @@ describe('8 — evaluation history is immutable', () => {
     });
   });
 
-  test('NEGATIVE: re-evaluating the same submission is refused, not overwritten', async () => {
+  test('NEGATIVE: re-evaluating the same submission is never a new run and never overwrites', async () => {
+    // Before graduate journey Phase 1 a repeat was a 400. It now answers the existing evaluation (idempotent);
+    // either way nothing is rerun or overwritten.
     const user = await newUser();
     const { submissionId } = await upToSubmission(user);
-    await http.post(`/v1/submissions/${submissionId}/evaluate`)
+    const first = await http.post(`/v1/submissions/${submissionId}/evaluate`)
       .set('Authorization', `Bearer ${user.token}`).expect(201);
-    await http.post(`/v1/submissions/${submissionId}/evaluate`)
-      .set('Authorization', `Bearer ${user.token}`).expect(400);
+    const again = await http.post(`/v1/submissions/${submissionId}/evaluate`)
+      .set('Authorization', `Bearer ${user.token}`).expect(200);
+    assert.equal(again.body.data.alreadyEvaluated, true);
+    assert.equal(again.body.data.resultId, first.body.data.resultId, 'the same result, not a new one');
+    const { rows } = await pool.query('select count(*)::int as e, (select count(*)::int from evaluation_result where submission_id = $1) as r from evaluation where submission_id = $1', [submissionId]);
+    assert.deepEqual(rows[0], { e: 1, r: 1 });
   });
 });
 
