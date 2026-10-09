@@ -251,12 +251,17 @@ export interface AssetStanding {
   readonly userApprovedAt: string | null;
   readonly standingPolicyId: string | null;
   readonly claimPolicyId: string | null;
+  /** Phase 9: true when any cited evidence is withdrawn now. Absent = not checked by the caller (legacy callers). */
+  readonly citesWithdrawnEvidence?: boolean;
 }
 export function assetPresentableNow(a: AssetStanding, inEffect: { readonly policyId: string; readonly resolution: ConfigResolution } | null,
   grounding?: { readonly assetVersion: string | null; readonly currentVersion: string }):
-  { readonly presentable: boolean; readonly reason: 'presentable' | 'not_active' | 'not_evidence_backed' | 'not_approved' | 'no_policy_in_effect' | 'not_verified_under_policy_in_effect' | 'not_grounded_under_current_version' } {
+  { readonly presentable: boolean; readonly reason: 'presentable' | 'not_active' | 'not_evidence_backed' | 'cites_withdrawn_evidence' | 'not_approved' | 'no_policy_in_effect' | 'not_verified_under_policy_in_effect' | 'not_grounded_under_current_version' } {
   if (a.lifecycleState !== 'active') return { presentable: false, reason: 'not_active' };
   if (!a.evidenceBacked) return { presentable: false, reason: 'not_evidence_backed' };
+  // Phase 9: evidence can be withdrawn by its owner directly (RLS permits it), not only through the API withdrawal
+  // service that moves dependent assets to review. Presentation re-checks it at read time — fail closed.
+  if (a.citesWithdrawnEvidence === true) return { presentable: false, reason: 'cites_withdrawn_evidence' };
   if (!a.userApprovedAt) return { presentable: false, reason: 'not_approved' };
   if (!inEffect) return { presentable: false, reason: 'no_policy_in_effect' };
   // Phase 8: a grounding vocabulary or engine change hides the asset until it is re-grounded under the version in effect.

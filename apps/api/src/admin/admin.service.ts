@@ -4,7 +4,7 @@ import {
   assertAdminAction, assertFourEyes, governedStage, contentStage, trackChangeStage, assertTrackSkillProposal, diffFields, diffChildren,
   RULE_CATALOG, PENDING_EXPERT_DECISIONS, STAGE_AR, ANNOTATION_AR, TRACK_SKILL_FIELDS, CLASSIFICATION_FIELDS, CLAIM_KIND_CLASS,
   assertClaimPolicySane, assertContextPolicySane, assertQuestionnaireSane, assertReadinessRuleSetSane, readinessRuleFromRow, resolveActiveConfig,
-  evidenceOrdinal,
+  evidenceOrdinal, assertPackConstraintsSane,
   type AdminRole, type AdminAction, type ClaimKind, type EvidenceState, type ConfigActivation, type ReviewState, type ReviewerRole,
 } from '@naqla/domain';
 import { LEXICON_CLASSES as LEXICON_CLASSES_FOR_ADMIN } from '@naqla/agents';
@@ -44,6 +44,9 @@ export const GOVERNED_KINDS: Readonly<Record<string, GovernedKind>> = {
     children: { table: 'disclosure_question', fk: 'questionnaire_id', fields: ['key', 'position', 'prompt_ar', 'prompt_en', 'help_ar', 'answer_type', 'options', 'required', 'show_if', 'maps_to'], key: (r) => String(r['key']) } },
   challenge_policy: { table: 'challenge_policy', labelAr: 'تحديات التحقق (تعريف فقط)', family: ['key'], activatable: false,
     editable: ['description_en', 'challenge_types', 'max_challenges', 'timing', 'difficulty', 'skill_ids', 'trigger_rule'] },
+  // Phase 9 (H5): the numeric pack constraints. Closed vocabulary; every type stated exactly once; a new kind of rule is an extension, not a row.
+  pack_constraint_set: { table: 'pack_constraint_set', labelAr: 'قيود بنية حزمة المسار', family: ['key'], activatable: true, editable: ['label_ar', 'label_en', 'description_en', 'track_id'],
+    children: { table: 'pack_constraint', fk: 'set_id', fields: ['constraint_type', 'min_value', 'max_value'], key: (r) => String(r['constraint_type']) } },
   grounding_lexicon: { table: 'grounding_lexicon', labelAr: 'مفردات التحقق من الصياغة', family: ['key'], activatable: true, editable: ['description_en'],
     children: { table: 'grounding_lexicon_entry', fk: 'lexicon_id', fields: ['language', 'cls', 'form'], key: (r) => `${String(r['language'])}|${String(r['cls'])}|${String(r['form'])}` } },
 };
@@ -152,7 +155,7 @@ export class AdminService {
         fields: diffFields(base?.row ?? null, row, k.editable).map((d) => ({ ...d, help: RULE_CATALOG[`${k.table}.${d.field}`] ?? null })),
         children: k.children ? diffChildren(base?.children ?? [], children, k.children.key) : null,
         rows: k.children ? children : null,
-        childrenHelp: k.children ? RULE_CATALOG[`${k.table}.${k.table === 'readiness_rule_set' ? 'rules' : k.table === 'disclosure_questionnaire' ? 'questions' : 'entries'}`] ?? null : null,
+        childrenHelp: k.children ? RULE_CATALOG[`${k.table}.${k.table === 'readiness_rule_set' ? 'rules' : k.table === 'disclosure_questionnaire' ? 'questions' : k.table === 'pack_constraint_set' ? 'constraints' : 'entries'}`] ?? null : null,
         ...stageView(governedStage({ reviewStatus: row.review_status, activation: row.activation, activatedAt: row.activated_at })),
       };
     });
@@ -230,6 +233,11 @@ export class AdminService {
           promptEn: String(q['prompt_en']), helpAr: (q['help_ar'] as string | null) ?? null, answerType: q['answer_type'] as never, options: (q['options'] as never) ?? [], required: q['required'] === true,
           showIf: (q['show_if'] as never) ?? {}, mapsTo: (q['maps_to'] as never) ?? null })) });
       }
+      if (k.table === 'pack_constraint_set') {
+        if (row['track_id'] !== null && row['track_id'] !== undefined && !String(row['track_id']).trim()) throw new Error('track_id is a track identifier, or empty for every track');
+        assertPackConstraintsSane(children.map((x) => ({ type: String(x['constraint_type']), min: x['min_value'] === null || x['min_value'] === undefined ? null : Number(x['min_value']),
+          max: x['max_value'] === null || x['max_value'] === undefined ? null : Number(x['max_value']) })));
+      }
       if (k.table === 'grounding_lexicon') {
         for (const e of children) if (!['ar', 'en'].includes(String(e['language'])) || !(LEXICON_CLASSES_FOR_ADMIN as readonly string[]).includes(String(e['cls'])) || !String(e['form'] ?? '').trim()) {
           throw new Error(`invalid vocabulary entry ${JSON.stringify(e)}`);
@@ -294,15 +302,30 @@ export class AdminService {
       const actor = `${who.label} (${who.id})`;
       let replaced: string | null = null;
       if (activation !== 'inactive') {
+        // Separation of duties on the EFFECTIVE identity, whatever roles it holds: whoever drafted or approved
+        // this row (or a change it carries) cannot also put it into effect. Deactivation stays open (a safety act).
+        await this.assertIndependentActivator(c, who, table, row);
+        await c.query("select set_config('naqla.config_actor_id', $1, true)", [who.id]); // the database checks it too
         assertActivationPermittedInPhase8(table, row, isProduction() || activation === 'production_active');
-        const scope = table === 'track_config_version' ? ['target_role_id'] : table === 'claim_policy' ? ['key', 'claim_kind'] : ['key'];
-        const clash = (await c.query(`select id from ${table} where ${scope.map((col, i) => `${col} = $${i + 2}`).join(' and ')} and id <> $1 and activation <> 'inactive'`, [id, ...scope.map((col) => row[col])])).rows[0];
+        // The row in effect for the SAME scope is replaced; a different scope (another track, or the global set) is never touched.
+        const scope = table === 'track_config_version' ? ['target_role_id'] : table === 'claim_policy' ? ['key', 'claim_kind'] : table === 'pack_constraint_set' ? ['key', 'track_id']
+          : table === 'readiness_rule_set' ? ['key', 'target_role_id'] : ['key'];
+        const clash = (await c.query(`select id from ${table} where ${scope.map((col, i) => `${col} is not distinct from $${i + 2}`).join(' and ')} and id <> $1 and activation <> 'inactive'`, [id, ...scope.map((col) => row[col])])).rows[0];
         if (clash) { await setConfigActivation(c, { table, id: clash.id, activation: 'inactive', actor, reason: `replaced by ${id}: ${reason}` }); replaced = clash.id; }
       }
       const g = await setConfigActivation(c, { table, id, activation, actor, reason });
       await this.audit(c, who, role, 'activation_changed', table, id, reason, { kind, activation, replaced });
       return { id, activation: g.activation, replaced };
     });
+  }
+
+  private async assertIndependentActivator(c: PoolClient, who: AdminIdentity, table: string, row: Record<string, unknown>) {
+    if (row['drafted_by'] && String(row['drafted_by']) === who.id) throw new ForbiddenException('separation of duties: you drafted this version; another product owner must activate it');
+    if (row['approved_by'] && String(row['approved_by']) === who.id) throw new ForbiddenException('separation of duties: you approved this version; another product owner must activate it');
+    if (table === 'track_config_version') {
+      const mine = await c.query(`select 1 from track_skill_change where included_in_version_id = $1 and (drafted_by = $2 or decided_by = $2) limit 1`, [row['id'], who.id]);
+      if (mine.rowCount) throw new ForbiddenException('separation of duties: you drafted or decided a change this version carries; another product owner must activate it');
+    }
   }
 
   /* ───────────────────────────── track builder: track-skill changes and versions ───────────────────────────── */
@@ -541,6 +564,13 @@ export class AdminService {
     };
     const m = map[p.to]; if (!m) throw new BadRequestException(`'${p.to}' is not a review decision`);
     const adminRole = this.authorise(who, m.action);
+    if (p.to === 'published') {
+      // Separation of duties on identity: the publisher is neither the person who submitted, edited, nor professionally approved it.
+      const involved = await this.db.asService(async (c) => (await c.query(
+        `select decided_by::text as id from review_log where entity_id = $1 and to_status in ('curated','sme_reviewed','approved') and decided_by is not null
+         union select actor_id::text from audit_event where event_type in ('admin.content_edited','admin.content_created') and (subject_id = $1 or payload->>'parentId' = $1::text) and actor_id is not null`, [p.id])).rows.map((r) => String(r.id)));
+      if (involved.includes(who.id)) throw new ForbiddenException('separation of duties: you created, submitted, edited or approved this content; another product owner must publish it');
+    }
     if (m.role === 'sme') {
       const last = await this.db.asService(async (c) => (await c.query(`select decided_by from review_log where entity_id = $1 and to_status = 'curated' order by decided_at desc limit 1`, [p.id])).rows[0]);
       const edited = await this.db.asService(async (c) => (await c.query(`select 1 from audit_event where event_type = 'admin.content_edited' and actor_id = $1 and (subject_id = $2 or payload->>'parentId' = $2::text) limit 1`, [who.id, p.id])).rowCount);
@@ -564,6 +594,8 @@ export class AdminService {
     const role = this.authorise(who, 'validate');
     const edited = await this.db.asService(async (c) => (await c.query(`select 1 from audit_event where event_type = 'admin.content_edited' and actor_id = $1 and payload->>'parentId' = $2::text limit 1`, [who.id, rubricVersionId])).rowCount);
     if (edited) throw new ForbiddenException('four eyes: you edited these values; another, named SME must approve them');
+    const submitted = await this.db.asService(async (c) => (await c.query(`select 1 from review_log where entity_id = $1 and to_status = 'curated' and decided_by = $2 limit 1`, [rubricVersionId, who.id])).rowCount);
+    if (submitted) throw new ForbiddenException('four eyes: you submitted this rubric for review; another, named SME must approve its values');
     try {
       const r = await this.db.withPool((pool) => approveRubricValues(pool, { rubricVersionId, decidedBy: who.id, decidedByLabel: who.label, reason }));
       await this.db.asService((c) => this.audit(c, who, role, 'rubric_values_approved', 'rubric_version', rubricVersionId, reason, r));

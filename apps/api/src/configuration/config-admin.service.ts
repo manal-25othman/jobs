@@ -2,7 +2,8 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import type { Pool, PoolClient } from 'pg';
 import { assertActivationAllowed, configIsValidated, MissingPrerequisite, CLAIM_KIND_CLASS, evidenceOrdinal, type ConfigActivation, type ClaimKind, type EvidenceState } from '@naqla/domain';
 import { GOVERNED_TABLES, governedFromRow, isProduction, type GovernedTable } from './configuration.service';
-import { revalidateClaimAssets, regroundApprovedAssets } from '../agents/asset-standing';
+import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
+import { emitAuditEvent } from '../infra/audit';
 
 /**
  * The explicit, audited acts on configuration (Phase 4): approve a row, change
@@ -44,7 +45,8 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
   if (cur.rowCount === 0) throw new NotFoundException(`${p.table} ${p.id} not found`);
   const g = governedFromRow(cur.rows[0]);
   assertActivationAllowed({ from: g.activation, to: p.activation, reviewStatus: g.reviewStatus, approvedBy: g.approvedBy, baselineOf: g.baselineOf, production: isProduction() });
-  const scope = p.table === 'track_config_version' ? 'target_role_id' : p.table === 'claim_policy' ? 'key, claim_kind' : p.table === 'readiness_rule_set' ? "coalesce(target_role_id, '00000000-0000-0000-0000-000000000000'::uuid), key" : 'key';
+  const scope = p.table === 'track_config_version' ? 'target_role_id' : p.table === 'claim_policy' ? 'key, claim_kind' : p.table === 'readiness_rule_set' ? "coalesce(target_role_id, '00000000-0000-0000-0000-000000000000'::uuid), key"
+    : p.table === 'pack_constraint_set' ? "key, coalesce(track_id, '')" : 'key';
   if (p.activation !== 'inactive') assertActivationPermittedInPhase8(p.table, cur.rows[0], isProduction() || p.activation === 'production_active');
   if (p.activation !== 'inactive') {
     const clash = await c.query(`select id, version, activation from ${p.table} where (${scope}) = (select ${scope} from ${p.table} where id = $1) and id <> $1 and activation <> 'inactive'`, [p.id]);
@@ -56,7 +58,11 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
     // TRANSACTION. If the re-check cannot complete, the activation rolls back with it — never a half-applied state.
     if (p.table === 'claim_policy') await revalidateClaimAssets(c, { claimKind: r.rows[0].claim_kind, cause: 'policy_activation', actor: p.actor });
     // Phase 8 (owner requirement 3): a change in the grounding vocabulary in effect re-grounds every approved asset in this transaction.
-    if (p.table === 'grounding_lexicon') await regroundApprovedAssets(c, { cause: 'grounding_revalidation', actor: p.actor });
+    if (p.table === 'grounding_lexicon') {
+      const g = await regroundApprovedAssets(c, { cause: 'grounding_revalidation', actor: p.actor });
+      // Phase 9: public direct-read paths follow the version every asset was just re-grounded under (same transaction).
+      await declarePublicGroundingVersion(c, g.version, p.actor, `vocabulary activation: ${p.reason}`);
+    }
     // Phase 8: activating a Track Builder version writes its snapshot to the live TrackSkill rows, in this transaction.
     if (p.table === 'track_config_version' && p.activation !== 'inactive' && r.rows[0].applies_skill_config) await applyTrackSkillSnapshot(c, r.rows[0], p.actor);
     return governedFromRow(r.rows[0]);
@@ -149,14 +155,97 @@ export async function applyTrackSkillSnapshot(c: PoolClient, version: Record<str
 }
 
 /** Recovery: re-check standing after a change made outside the audited path (e.g. raw SQL). Until then the presentation gate hides affected assets. */
-export async function cliRevalidateClaims(pool: Pool, p: { claimKind: string | null; actor: string; reground?: boolean }) {
+export async function cliRevalidateClaims(pool: Pool, p: { claimKind: string | null; actor: string }) {
   const c = await pool.connect();
   try {
     await c.query('begin');
     const r = await revalidateClaimAssets(c, { claimKind: p.claimKind as Parameters<typeof revalidateClaimAssets>[1]['claimKind'], cause: 'revalidation_run', actor: p.actor });
-    // Phase 8: after an engine version change (a deployment), approved assets stay hidden until re-grounded.
-    const g = p.reground ? await regroundApprovedAssets(c, { cause: 'grounding_revalidation', actor: p.actor }) : null;
-    await c.query('commit'); return { ...r, regrounded: g };
+    await c.query('commit'); return r;
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}
+
+/* ───────────────────────────── Phase 9: re-grounding deployment procedure ───────────────────────────── */
+
+/** The version public direct-read paths (case-study share links) accept. Null = frozen (closed). Logged append-only. */
+export async function declarePublicGroundingVersion(c: PoolClient, version: string | null, setBy: string, reason: string) {
+  await c.query(`insert into grounding_public_state (singleton, version, set_at, set_by, reason) values (true, $1, now(), $2, $3)
+      on conflict (singleton) do update set version = excluded.version, set_at = now(), set_by = excluded.set_by, reason = excluded.reason`, [version, setBy, reason]);
+}
+
+/** An operator is a person with an active product_owner grant. A name alone is not an authorization. */
+export async function assertAuthorizedOperator(c: PoolClient, operatorId: string | null | undefined): Promise<string> {
+  if (!operatorId || !/^[0-9a-f-]{36}$/i.test(operatorId)) throw new MissingPrerequisite('operator', 'an authorized operator is required: --operator <user-uuid> holding an active product_owner grant');
+  const g = await c.query(`select u.display_name from reviewer_grant r join app_user u on u.id = r.user_id where r.user_id = $1 and r.role_performed = 'product_owner' and r.revoked_at is null`, [operatorId]);
+  if (g.rowCount === 0) throw new MissingPrerequisite('operator', `user ${operatorId} holds no active product_owner grant; re-grounding is an operator act`);
+  return `${String(g.rows[0].display_name ?? operatorId)} (${operatorId})`;
+}
+
+export interface RegroundRunResult {
+  dryRun: boolean; operator: string | null; version: string;
+  before: GroundingSnapshot; after: GroundingSnapshot;
+  revalidation: { checked: number; keptEligible: number; movedToReview: number; details: { assetId: string; kind: string; outcome: 'eligible' | 'needs_review'; reasons: string[] }[] };
+  regrounding: { checked: number; grounded: number; movedToReview: number; details: RegroundDetail[] };
+  reconciliation: { ok: boolean; problems: string[] };
+  publicVersionDeclared: string | null;
+}
+
+/**
+ * Re-grounds every active approved asset under the grounding version in effect.
+ *   dry run  — the SAME code path inside a transaction that is rolled back: the
+ *              plan (which assets stay, which would move to needs_review) with
+ *              nothing written, no notification sent. No operator needed.
+ *   execute  — an authorized operator (product_owner grant); reconciliation must
+ *              pass or the whole run rolls back; then the public grounding version
+ *              is declared and an audit event recorded, in the same transaction.
+ * Nothing is marked grounded without being grounded: an asset gets the version
+ * only when the engine accepts its wording against its cited records now.
+ */
+export async function cliRegroundAssets(pool: Pool, p: { operatorId?: string | null; dryRun: boolean; reason?: string }): Promise<RegroundRunResult> {
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    const operator = p.dryRun ? null : await assertAuthorizedOperator(c, p.operatorId);
+    if (!p.dryRun && !p.reason?.trim()) throw new MissingPrerequisite('reason', 'a re-grounding run needs a written reason');
+    const actor = operator ?? 'dry run';
+    const before = await groundingStandingSnapshot(c);
+    const rv = await revalidateClaimAssets(c, { claimKind: null, cause: 'revalidation_run', actor });
+    const rg = await regroundApprovedAssets(c, { cause: 'grounding_revalidation', actor });
+    const after = await groundingStandingSnapshot(c);
+    const reconciliation = reconcileGrounding(before, after, rg, rv.movedToReview);
+    const result: RegroundRunResult = { dryRun: p.dryRun, operator, version: rg.version, before, after,
+      revalidation: { checked: rv.checked, keptEligible: rv.keptEligible, movedToReview: rv.movedToReview, details: rv.details },
+      regrounding: { checked: rg.checked, grounded: rg.grounded, movedToReview: rg.movedToReview, details: rg.details }, reconciliation, publicVersionDeclared: null };
+    if (p.dryRun) { await c.query('rollback'); return result; }
+    if (!reconciliation.ok) throw new Error(`re-grounding reconciliation failed; nothing was changed:\n  - ${reconciliation.problems.join('\n  - ')}`);
+    await declarePublicGroundingVersion(c, rg.version, actor, p.reason!.trim());
+    await emitAuditEvent(c, { eventType: 'grounding.reground_run', userId: null, actorKind: 'user', actorId: p.operatorId!, rolePerformed: 'product_owner', subjectTable: 'professional_asset', subjectId: null,
+      reason: p.reason!.trim(), payload: { version: rg.version, before, after: { ...after }, grounded: rg.grounded, movedToReview: rg.movedToReview + rv.movedToReview } });
+    await c.query('commit');
+    return { ...result, publicVersionDeclared: rg.version };
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}
+
+/** Read-only standing report (pre-deployment count, post-run check). */
+export async function cliGroundingStanding(pool: Pool) {
+  const c = await pool.connect();
+  try {
+    const snap = await groundingStandingSnapshot(c);
+    const pub = (await c.query('select version, set_at, set_by from grounding_public_state where singleton')).rows[0] ?? null;
+    return { ...snap, publicVersion: pub ? (pub.version as string | null) : null, publicSetBy: pub?.set_by ?? null };
+  } finally { c.release(); }
+}
+
+/** Pre-deployment step: close direct public paths until the new version has been re-grounded. Operator only. */
+export async function cliFreezePublicGrounding(pool: Pool, p: { operatorId: string; reason: string }) {
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    const operator = await assertAuthorizedOperator(c, p.operatorId);
+    if (!p.reason?.trim()) throw new MissingPrerequisite('reason', 'a freeze needs a written reason');
+    await declarePublicGroundingVersion(c, null, operator, `freeze: ${p.reason.trim()}`);
+    await emitAuditEvent(c, { eventType: 'grounding.public_frozen', userId: null, actorKind: 'user', actorId: p.operatorId, rolePerformed: 'product_owner', subjectTable: 'grounding_public_state', subjectId: null, reason: p.reason.trim(), payload: {} });
+    await c.query('commit');
+    return { operator };
   } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
 }
 export async function cliCreateTrackVersion(pool: Pool, p: Parameters<typeof createTrackConfigVersion>[1]) {

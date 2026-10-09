@@ -11,12 +11,15 @@ import {
   normalizeMatchKey, nearDuplicateCandidates, integrityClassificationOf, type IntegrityCheckType, type NearDuplicateCandidate, type DuplicateResolution,
 } from '@naqla/domain';
 import type { Pack, PackCheckDef } from './pack-schema';
-import { validatePack } from './pack-schema';
+import { validatePack, PackValidationError } from './pack-schema';
+import { resolvePackConstraintsFor } from './pack-constraints';
 import type { RawFile } from './pack-loader';
 
 export interface ImportOptions { readonly dryRun?: boolean; readonly captureMethod?: string; }
 export interface ImportReport {
   readonly packId: string; readonly packVersion: string; readonly isDemoFixture: boolean;
+  /** Phase 9: the pack constraint set the pack was validated under, and how it was resolved. */
+  readonly constraints: { readonly ref: string; readonly scope: 'track' | 'global'; readonly resolution: string };
   readonly snapshots: { file: string; sha256: string; stored: 'new' | 'existing' }[];
   readonly normalizedRecords: number;
   readonly nearDuplicates: NearDuplicateCandidate[];
@@ -32,8 +35,22 @@ export class ImportError extends Error { constructor(readonly stage: string, mes
 const EDITABLE = ['draft', 'curated'];
 
 export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile[], opts: ImportOptions = {}): Promise<ImportReport> {
-  validatePack(pack);
   const m = pack.track.manifest;
+  // Phase 9 (H5): the numeric constraints come from the governed set in effect for this track. Missing or
+  // conflicting configuration fails here, explicitly; every non-dry-run validation is recorded with its set@version.
+  const record = async (row: { setId: string | null; ref: string | null; resolution: string | null; passed: boolean; problems: readonly string[] }) => {
+    if (opts.dryRun) return;
+    await pool.query(`insert into pack_validation_run (pack_id, pack_version, track_id, constraint_set_id, constraint_ref, resolution, passed, problems) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [m.pack_id, m.pack_version, m.pack_id, row.setId, row.ref, row.resolution, row.passed, JSON.stringify(row.problems)]);
+  };
+  let constraints;
+  try { constraints = await resolvePackConstraintsFor(pool, m.pack_id); }
+  catch (e) { await record({ setId: null, ref: null, resolution: null, passed: false, problems: [(e as Error).message] }); throw new PackValidationError([(e as Error).message]); }
+  try { validatePack(pack, constraints); }
+  catch (e) {
+    if (e instanceof PackValidationError) await record({ setId: constraints.setId, ref: constraints.ref, resolution: constraints.resolution, passed: false, problems: e.problems });
+    throw e;
+  }
   const c = await pool.connect();
   try {
     await c.query('begin');
@@ -354,8 +371,11 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
     if (unmapped.length) throw new ImportError('map', 'unmapped references; nothing was written', unmapped);
     // Phase 4: a track imported after migration 0014 gets its first DRAFT configuration version — development_only outside production, inactive in production. Never a baseline.
     await c.query('select ensure_track_config_version($1, $2, $3, $4)', [roleId, m.pack_version, `career-data import ${m.pack_id}@${m.pack_version}`, process.env['NODE_ENV'] === 'production' ? 'inactive' : 'development_only']);
+    await c.query(`insert into pack_validation_run (pack_id, pack_version, track_id, constraint_set_id, constraint_ref, resolution, passed) values ($1,$2,$3,$4,$5,$6,true)`,
+      [m.pack_id, m.pack_version, m.pack_id, constraints.setId, constraints.ref, constraints.resolution]);
     if (opts.dryRun) await c.query('rollback'); else await c.query('commit');
-    return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: demo, snapshots, normalizedRecords: normalized, nearDuplicates, resolutions: applied, written, skippedFrozen, unmapped };
+    return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: demo, constraints: { ref: constraints.ref, scope: constraints.scope, resolution: constraints.resolution },
+      snapshots, normalizedRecords: normalized, nearDuplicates, resolutions: applied, written, skippedFrozen, unmapped };
   } catch (e) {
     await c.query('rollback').catch(() => undefined);
     throw e;

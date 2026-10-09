@@ -17,7 +17,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { bootApp, newUser, FIXTURE, COMPLETE_ARTIFACTS, uploadFile, COMPONENT_BYTES, TEST_BYTES, approveCvBulletProposal, type TestUser } from './helpers';
-import { cliRevalidateClaims } from '../src/configuration/config-admin.service';
+import { cliRegroundAssets } from '../src/configuration/config-admin.service';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const auth = (u: TestUser) => ({ Authorization: `Bearer ${u.token}` });
@@ -50,7 +50,7 @@ describe('authorisation is enforced on the backend', () => {
     const o = (await get(admin, '/overview')).body.data;
     assert.deepEqual(o.me.roles, ['track_admin']);
     assert.match(o.separationAr, /صلاحية التعديل ليست صلاحية اعتماد مهني/);
-    assert.equal(o.pendingExpertDecisions.length, 9);
+    assert.equal(o.pendingExpertDecisions.length, 10);
   });
 });
 
@@ -234,7 +234,7 @@ describe('grounding vocabulary and engine changes never leave approved assets sh
     assert.equal(await reportCount(), 1);
     await pool.query(`update professional_asset set grounding_version = 'claim-grounding@0+default@1' where id = $1`, [assetId]); // as if approved under an older engine
     assert.equal(await reportCount(), 0, 'fail closed: not grounded under the version in effect');
-    await cliRevalidateClaims(pool, { claimKind: 'cv_bullet', actor: 'e2e deploy', reground: true });
+    await cliRegroundAssets(pool, { dryRun: false, operatorId: po.id, reason: 'e2e deploy' });
     assert.equal(await reportCount(), 1, 'presented again once re-grounded');
   });
   test('activating a new vocabulary re-grounds approved assets in the same transaction: unsupported wording moves to review', async () => {

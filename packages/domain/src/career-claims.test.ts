@@ -132,5 +132,8 @@ describe('approval vs current standing — fail-closed presentation gate', () =>
     assert.equal(assetPresentableNow({ ...base, evidenceBacked: false }, baseline).presentable, false);
     assert.equal(assetPresentableNow({ ...base, userApprovedAt: null }, baseline).presentable, false);
     assert.equal(assetPresentableNow(base, null).reason, 'no_policy_in_effect');
+    // Phase 9: evidence withdrawn directly by its owner (RLS) closes presentation at read time.
+    assert.deepEqual(assetPresentableNow({ ...base, citesWithdrawnEvidence: true }, baseline), { presentable: false, reason: 'cites_withdrawn_evidence' });
+    assert.equal(assetPresentableNow({ ...base, citesWithdrawnEvidence: false }, baseline).presentable, true);
   });
 });

@@ -14,12 +14,17 @@ import { importPack } from '../src/career-data/pipeline';
 import { runQualityChecks, coreSkillEvidencePaths } from '../src/career-data/quality-rules';
 import { reviewTransition } from '../src/career-data/review';
 import { CareerDataService } from '../src/career-data/career-data.service';
-import { validatePack, PackValidationError } from '../src/career-data/pack-schema';
+import { validatePack as validatePackWith, PackValidationError, type Pack } from '../src/career-data/pack-schema';
+import { resolvePackConstraintsFor } from '../src/career-data/pack-constraints';
+import type { ResolvedPackConstraints } from '@naqla/domain';
 
+let C: ResolvedPackConstraints;
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const ROOT = join(__dirname, '..', '..', '..', '..');
-before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
+before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); C = await resolvePackConstraintsFor(pool, 'trk_frontend_junior'); });
 after(async () => { await pool?.end(); await app?.close(); });
+// Phase 9: the validator takes the constraint set resolved from governed configuration (here: the legacy baseline).
+const validatePack = (p: Pack) => validatePackWith(p, C);
 const auth = (u: TestUser) => ({ Authorization: `Bearer ${u.token}` });
 const counts = async () => (await pool.query(`select (select count(*) from skill) s, (select count(*) from task) t, (select count(*) from activity_spec) a, (select count(*) from rubric_criterion) c, (select count(*) from source_ref) r, (select count(*) from raw_snapshot) raw`)).rows[0];
 

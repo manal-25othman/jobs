@@ -3,7 +3,9 @@
  * offending rows; a FAIL rule with offenders fails the run. Loudly.
  */
 import type { Pool, PoolClient } from 'pg';
-import { isExactDuplicate, evidencePathStatus, artifactKeysOf, artifactHasProducer } from '@naqla/domain';
+import { isExactDuplicate, evidencePathStatus, artifactKeysOf, artifactHasProducer, resolvePackConstraints } from '@naqla/domain';
+import { loadPackConstraintSets } from './pack-constraints';
+import { isProduction } from '../configuration/configuration.service';
 
 export interface QualityRule { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; run(c: PoolClient): Promise<string[]>; }
 export interface QualityResult { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; readonly offenders: readonly string[]; readonly passed: boolean; }
@@ -43,11 +45,11 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     run: q(`select 'criterion ' || rc.key as label from rubric_criterion rc where (rc.criterion_kind = 'skill_evidence' and rc.linked_skill_id is null) or (rc.criterion_kind <> 'skill_evidence' and rc.linked_skill_id is not null)
             union all select 'rubric ' || rv.version from rubric_version rv where rv.status = 'published' and not exists (select 1 from rubric_criterion rc where rc.rubric_version_id = rv.id) and rv.criteria is null`, (r) => String(r.label)) },
   { id: 'Q06', title: 'core skill without an evidence path (no activity measures it through a linked criterion)', severity: 'fail',
-    async run(c) { const { rows } = await c.query(`select tr.slug as role, s.slug as skill,
+    async run(c) { const { rows } = await c.query(`select tr.slug as role, s.slug as skill, rr.minimum_evidence_count as min,
         (select count(distinct rv.activity_spec_id) from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id join activity_spec a on a.id = rv.activity_spec_id
           where rc.linked_skill_id = rr.skill_id and a.target_role_id = rr.target_role_id and rv.status <> 'superseded')::int as activities
         from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id where rr.is_core`);
-      return rows.filter((r) => evidencePathStatus({ isCoreForRole: true, activitiesWithLinkedCriterion: Number(r.activities) }) === 'none').map((r) => `${r.role} → ${r.skill}`); } },
+      return rows.filter((r) => evidencePathStatus({ minimumEvidenceCount: r.min === null ? null : Number(r.min), activitiesWithLinkedCriterion: Number(r.activities) }) === 'none').map((r) => `${r.role} → ${r.skill}`); } },
   { id: 'Q07', title: 'published content without SME approval (non-demo)', severity: 'fail',
     async run(c) { const out: string[] = [];
       for (const [t, col, label] of REVIEWED) { const { rows } = await c.query(`select ${label} as label from ${t} where ${col} = 'published' and is_demo_fixture = false and reviewed_by is null`); out.push(...rows.map((r) => `${t}: ${r.label}`)); }
@@ -56,9 +58,16 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     async run(c) { const out: string[] = [];
       for (const [t, col, label] of REVIEWED) { const { rows } = await c.query(`select ${label} as label from ${t} where ${col} = 'published' and is_demo_fixture = true`); out.push(...rows.map((r) => `${t}: ${r.label}`)); }
       return out; } },
-  { id: 'Q08', title: 'learning resource without a practice link, or more than 3 per skill', severity: 'fail',
-    run: q(`select coalesce(code, id::text) as label from learning_resource where practice_activity_spec_id is null
-            union all select 'skill ' || s.slug || ' has ' || count(*) || ' resources' from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug having count(*) > 3`, (r) => String(r.label)) },
+  { id: 'Q08', title: 'learning resource without a practice link, or more per skill than the global pack constraint set allows (Phase 9; legacy baseline: 3)', severity: 'fail',
+    async run(c) {
+      const out = (await c.query(`select coalesce(code, id::text) as label from learning_resource where practice_activity_spec_id is null`)).rows.map((r) => String(r.label));
+      let max: number | null;
+      try { max = resolvePackConstraints(await loadPackConstraintSets(c), '', { production: isProduction() }).constraints.find((x) => x.type === 'resources_per_skill_max')?.max ?? null; }
+      catch (e) { return [...out, `pack constraints unavailable: ${(e as Error).message}`]; }
+      if (max === null) return [...out, 'pack constraints: resources_per_skill_max is not configured'];
+      const over = await c.query(`select 'skill ' || s.slug || ' has ' || count(*) || ' resources' as label from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug having count(*) > $1`, [max]);
+      return [...out, ...over.rows.map((r) => String(r.label))];
+    } },
   { id: 'Q09', title: 'Verified-capable activity without an approved verification path (none exists in Phase 1)', severity: 'fail',
     run: q(`select slug || '@' || version as label from activity_spec where can_yield_verified = true`, (r) => String(r.label)) },
   { id: 'Q10', title: 'invalid synonym merges (merge target not active; mutual broader/narrower; equivalent form equal to another canonical name)', severity: 'fail',
@@ -136,11 +145,11 @@ export async function runQualityChecks(pool: Pool, rules: readonly QualityRule[]
 
 /** Evidence-path status of every core skill of a role (for the report and the SME pack). */
 export async function coreSkillEvidencePaths(pool: Pool, roleSlug: string): Promise<{ skill: string; activities: string[]; status: string; canYieldVerified: false }[]> {
-  const { rows } = await pool.query(`select s.slug as skill, coalesce(array_agg(distinct a.slug) filter (where a.slug is not null), '{}') as activities
+  const { rows } = await pool.query(`select s.slug as skill, max(rr.minimum_evidence_count) as min, coalesce(array_agg(distinct a.slug) filter (where a.slug is not null), '{}') as activities
       from role_requirement rr join target_role tr on tr.id = rr.target_role_id join skill s on s.id = rr.skill_id
       left join rubric_criterion rc on rc.linked_skill_id = s.id
       left join rubric_version rv on rv.id = rc.rubric_version_id and rv.status <> 'superseded'
       left join activity_spec a on a.id = rv.activity_spec_id and a.target_role_id = tr.id
       where tr.slug = $1 and rr.is_core group by s.slug order by s.slug`, [roleSlug]);
-  return rows.map((r) => ({ skill: r.skill, activities: r.activities, status: evidencePathStatus({ isCoreForRole: true, activitiesWithLinkedCriterion: r.activities.length }), canYieldVerified: false as const }));
+  return rows.map((r) => ({ skill: r.skill, activities: r.activities, status: evidencePathStatus({ minimumEvidenceCount: r.min === null ? null : Number(r.min), activitiesWithLinkedCriterion: r.activities.length }), canYieldVerified: false as const }));
 }

@@ -165,10 +165,13 @@ reset role;
 
 -- ──────────── a share link opens one door, and revoking shuts it ───────────
 
+-- Phase 9: a case study opens only for an asset presentable NOW: approved, active,
+-- evidence-backed and grounded under the version the last completed re-grounding declared.
 insert into professional_asset (id, user_id, kind, title, body, provenance_class,
-                                provenance_source, user_approved_at)
+                                provenance_source, user_approved_at, lifecycle_state, grounding_version)
   values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', '11111111-1111-4111-8111-111111111111',
-          'case_study', 'Task board', 'body', 'system_derived', 'evaluation aaaaaaaa', now());
+          'case_study', 'Task board', 'body', 'system_derived', 'evaluation aaaaaaaa', now(), 'active', 'rls-test@1');
+insert into grounding_public_state (version, set_by, reason) values ('rls-test@1', 'rls proof', 'fixture');
 
 insert into case_study (id, user_id, asset_id, context, problem, what_i_built, result,
                         source_evaluation_result_id)
@@ -187,6 +190,33 @@ insert into share_link (id, user_id, resource_kind, resource_id, token_hash, exp
 set role anon;
 select expect_rows($$select 1 from case_study$$, 1, 'a live share link opens the case study');
 reset role;
+
+update professional_asset set lifecycle_state = 'needs_review', evidence_backed = false, review_reason = 'rls proof', review_at = now() where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+set role anon;
+select expect_rows($$select 1 from case_study$$, 0, 'an asset moved to needs_review closes its live link (Phase 9)');
+reset role;
+update professional_asset set lifecycle_state = 'active', evidence_backed = true, review_reason = null, review_at = null where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+insert into asset_evidence (asset_id, evidence_id) values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+update evidence set withdrawn_at = now(), withdrawn_reason = 'rls proof' where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+set role anon;
+select expect_rows($$select 1 from case_study$$, 0, 'an asset citing withdrawn evidence closes its live link (Phase 9)');
+reset role;
+update evidence set withdrawn_at = null, withdrawn_reason = null where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+set role anon;
+select expect_rows($$select 1 from case_study$$, 1, 'restoring the evidence reopens it (the check is live, not a stored flag)');
+reset role;
+
+update grounding_public_state set version = 'rls-test@2', set_by = 'rls proof', reason = 'new engine' where singleton;
+set role anon;
+select expect_rows($$select 1 from case_study$$, 0, 'an asset not re-grounded under the declared version stays closed (Phase 9)');
+reset role;
+update grounding_public_state set version = null, set_by = 'rls proof', reason = 'freeze' where singleton;
+set role anon;
+select expect_rows($$select 1 from case_study$$, 0, 'a frozen public grounding state opens nothing (Phase 9)');
+select expect_denied($$select 1 from grounding_public_state$$, 'anon cannot read or set the public grounding state');
+reset role;
+update grounding_public_state set version = 'rls-test@1', set_by = 'rls proof', reason = 'restore' where singleton;
 
 update share_link set revoked_at = now() where id = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 
@@ -225,6 +255,20 @@ select expect_denied($$
   update claim_policy set min_evidence_count = 1
 $$, 'a user cannot edit a claim policy');
 reset role;
+
+-- ─────────────── Phase 9: pack constraints and validation runs are not user-reachable ───────────────
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+select assert_effective_role('authenticated');
+select expect_denied($$select 1 from pack_constraint_set$$, 'a user cannot read pack constraint sets');
+select expect_denied($$update pack_constraint set max_value = 99$$, 'a user cannot change a pack constraint');
+select expect_denied($$insert into pack_validation_run (pack_id, pack_version, track_id, passed) values ('x', '1', 'x', true)$$, 'a user cannot forge a pack validation record');
+reset role;
+insert into pack_validation_run (pack_id, pack_version, track_id, passed) values ('rls_proof', '1', 'rls_proof', false);
+select expect_denied($$update pack_validation_run set passed = true$$, 'pack validation runs are append-only, even for the owner');
+select expect_denied($$delete from pack_validation_run$$, 'pack validation runs cannot be deleted');
+select expect_denied($$insert into pack_constraint (set_id, constraint_type, min_value) select id, 'task_count', 1 from pack_constraint_set where key = 'legacy_pack_constraints'$$,
+  'the baseline constraint set is frozen (it has been active)');
 
 \echo ''
 \echo 'All access-model checks passed.'

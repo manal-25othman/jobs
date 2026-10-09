@@ -8,7 +8,9 @@ import {
   SKILL_TYPES, AI_SUBSTITUTABILITY, SYNONYM_RELATIONS, IMPORTANCE, EVIDENCE_TYPES, RUBRIC_DIMENSIONS, EVALUATOR_TYPES,
   INTEGRITY_CHECK_TYPES, PRESENTATION_ASSET_TYPES, RESOURCE_QUALITY, assertSynonymWellFormed, assertPresentationRuleSane,
   assertLearningResourceHonest, INTEGRITY_EVALUATION_MODES, CRITERION_KINDS, artifactHasProducer, artifactKeysOf, assertDuplicateResolutionWellFormed, assertCriterionKindShape,
+  checkPackCounts,
   type SynonymRelation, type PresentationAssetType, type EvidenceState, type DuplicateResolution, type IntegrityEvaluationMode, type CriterionKind,
+  type PackCounts, type ResolvedPackConstraints,
 } from '@naqla/domain';
 
 export interface PackSource { code: string; source_type: 'official' | 'curated' | 'platform_generated' | 'market_signal'; source_name: string; publisher?: string | null; jurisdiction: string; language: string; url: string | null; url_verified?: boolean; retrieved_at: string | null; version: string; license_or_usage_notes: string; reliability: 'high' | 'medium' | 'low'; }
@@ -43,8 +45,33 @@ export class PackValidationError extends Error {
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
 const isArr = (v: unknown): v is unknown[] => Array.isArray(v);
 
-/** Structural + cross-reference validation. Every problem is reported. */
-export function validatePack(p: Pack): void {
+/** The counts the configurable numeric constraints (H5, Phase 9) are checked against. */
+export function packCounts(p: Pack): PackCounts {
+  const core = new Set(p.track.roleSkills.filter((x) => x.is_core_for_role).map((x) => x.skill));
+  const perSkill = new Map<string, number>();
+  for (const r of p.global.resources) perSkill.set(r.skill, (perSkill.get(r.skill) ?? 0) + 1);
+  return {
+    coreSkills: p.track.roleSkills.filter((x) => x.is_core_for_role).length,
+    tasks: p.track.tasks.length,
+    activities: p.track.activities.length,
+    activityPrimaries: p.track.activities.map((a) => {
+      const primaries = a.related_skills.filter((s) => s.depth === 'primary');
+      return { code: a.code, primaries: primaries.length, corePrimaries: primaries.filter((s) => core.has(s.skill)).length };
+    }),
+    rubricCriteria: p.track.rubrics.map((r) => ({ code: r.code, criteria: r.criteria.length })),
+    resourcesPerSkill: [...perSkill].map(([skill, resources]) => ({ skill, resources })),
+  };
+}
+
+/**
+ * Structural + cross-reference validation. Every problem is reported.
+ * Phase 9: the profession-dependent NUMBERS come from the pack constraint set
+ * in effect for the pack's track (resolved by the caller from governed
+ * configuration — there is no default). Technical, security and structural
+ * invariants below stay in code.
+ */
+export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints, 'ref' | 'constraints'>): void {
+  if (!constraints?.constraints?.length) throw new PackValidationError(['no pack constraint set was resolved for this validation (Phase 9): refusing to validate with assumed numbers']);
   const problems: string[] = [];
   const need = (cond: boolean, msg: string) => { if (!cond) problems.push(msg); };
   const codes = new Set<string>();
@@ -115,7 +142,6 @@ export function validatePack(p: Pack): void {
     refsOk(o, r.source_refs);
   }
   for (const a of PRESENTATION_ASSET_TYPES) for (const l of ['practiced', 'demonstrated', 'verified']) need(ruleKeys.has(`${a}@${l}`), `presentation rules: missing ${a}@${l} (G-14)`);
-  const perSkill = new Map<string, number>();
   for (const r of p.global.resources) {
     const o = `resource '${r.code}'`; uniq('resource', r.code);
     need(skillCodes.has(r.skill) || /^[a-z-]+$/.test(r.skill), `${o}: unknown skill '${r.skill}'`);
@@ -124,10 +150,8 @@ export function validatePack(p: Pack): void {
     need((RESOURCE_QUALITY as readonly string[]).includes(r.quality_status), `${o}: bad quality_status`);
     need(levelKeys.has(r.level), `${o}: level '${r.level}' is not on the proficiency scale`);
     try { assertLearningResourceHonest({ url: r.url, qualityStatus: r.quality_status, practiceActivityRef: r.practice_activity }); } catch (e) { problems.push(`${o}: ${(e as Error).message}`); }
-    perSkill.set(r.skill, (perSkill.get(r.skill) ?? 0) + 1);
     refsOk(o, r.source_refs);
   }
-  for (const [s, n] of perSkill) need(n <= 3, `skill '${s}' has ${n} resources; at most 3 per gap`);
 
   const m = p.track.manifest;
   need(isStr(m.pack_id) && isStr(m.pack_version), 'manifest: pack_id and pack_version are required');
@@ -141,16 +165,14 @@ export function validatePack(p: Pack): void {
   const forbiddenFrameworks = /\b(react|vue|angular|next\.js|svelte)\b/i;
   const roleText = JSON.stringify([role.description_en, role.typical_responsibilities_en, role.expected_from_junior_en, role.common_tools.map((t) => t.name)]);
   need(!forbiddenFrameworks.test(roleText), 'role: no framework may appear in the role definition, its responsibilities or its tools (framework-independent track)');
-  const mapped = new Set<string>(); let core = 0;
+  const mapped = new Set<string>();
   for (const rs of p.track.roleSkills) {
     const o = `role_skill '${rs.skill}'`;
     need(!mapped.has(rs.skill), `${o}: mapped twice`); mapped.add(rs.skill);
     need((IMPORTANCE as readonly string[]).includes(rs.importance), `${o}: bad importance`);
     need(levelKeys.has(rs.target_proficiency), `${o}: target_proficiency not on the scale`);
     bilingual(o, rs as never, 'why_required'); refsOk(o, rs.source_refs);
-    if (rs.is_core_for_role) core++;
   }
-  need(core >= 4 && core <= 5, `role: core skills must be 4–5, found ${core}`);
   for (const t of p.track.tasks) {
     const o = `task '${t.code}'`; uniq('task', t.code); bilingual(o, t as never, 'title'); bilingual(o, t as never, 'description'); bilingual(o, t as never, 'expected_output');
     need(t.related_skills.length > 0, `${o}: related skills required`);
@@ -158,8 +180,6 @@ export function validatePack(p: Pack): void {
     need(t.common_failure_modes_en.length > 0, `${o}: common failure modes are required (they seed integrity checks)`);
     refsOk(o, t.source_refs);
   }
-  need(p.track.tasks.length >= 10 && p.track.tasks.length <= 12, `tasks: 10–12 expected, found ${p.track.tasks.length}`);
-  need(p.track.activities.length === 3, `activities: exactly 3 expected in the first track, found ${p.track.activities.length}`);
   // OPEN-039: an owner-decided duplicate resolution is documented, equivalent-only, and names a pack skill as canonical.
   for (const r of p.track.manifest.duplicate_resolutions ?? []) {
     try { assertDuplicateResolutionWellFormed(r, skillCodes); } catch (e) { need(false, `duplicate_resolutions ${r.alias}→${r.canonical}: ${(e as Error).message}`); }
@@ -180,8 +200,6 @@ export function validatePack(p: Pack): void {
     bilingual(o, a as never, 'title'); bilingual(o, a as never, 'business_context'); bilingual(o, a as never, 'objective');
     need(a.can_yield_verified === false, `${o}: can_yield_verified must stay false until SME approval and a verification policy exist`);
     need(rubricCodes.has(a.rubric), `${o}: rubric '${a.rubric}' not in pack`);
-    const primaries = a.related_skills.filter((s) => s.depth === 'primary');
-    need(primaries.length >= 2 && primaries.length <= 3, `${o}: an activity measures 2–3 skills deeply (primary), found ${primaries.length}`);
     for (const s of a.related_skills) need(skillCodes.has(s.skill) || mapped.has(s.skill), `${o}: unknown skill '${s.skill}'`);
     for (const t of a.tasks) need(taskCodes.has(t), `${o}: unknown task '${t}'`);
     need(a.inputs.some((i) => i.is_platform_private), `${o}: at least one platform-private input (I1)`);
@@ -214,10 +232,6 @@ export function validatePack(p: Pack): void {
         need(isStr(c.required_producer_en), `${o}/${c.key}: a future_deterministic check documents the producer it needs`);
       }
     }
-    // Each activity measures 2–3 CORE skills deeply (the primaries are the core ones).
-    const coreCodes = new Set(p.track.roleSkills.filter((x) => x.is_core_for_role).map((x) => x.skill));
-    const corePrimaries = primaries.filter((s) => coreCodes.has(s.skill));
-    need(corePrimaries.length >= 2 && corePrimaries.length <= 3, `${o}: an activity measures 2–3 CORE skills deeply, found ${corePrimaries.length}`);
     refsOk(o, a.source_refs);
   }
   for (const r of p.track.rubrics) {
@@ -226,7 +240,6 @@ export function validatePack(p: Pack): void {
     need(r.proposes_state !== 'verified', `${o}: a rubric never proposes verified (D-059)`);
     need(r.pass_threshold > 0 && r.pass_threshold <= 1, `${o}: pass_threshold in (0,1]`);
     need(r.pass_threshold_status !== 'approved', `${o}: a pack cannot declare its pass threshold approved (OPEN-043)`);
-    need(r.criteria.length >= 5, `${o}: at least five criteria`);
     const keys = new Set<string>();
     for (const c of r.criteria) {
       const co = `${o}/${c.key}`; need(!keys.has(c.key), `${co}: duplicate key`); keys.add(c.key);
@@ -258,5 +271,7 @@ export function validatePack(p: Pack): void {
     for (const r of p.track.rubrics) if (r.criteria.some((c) => (c.criterion_kind ?? 'skill_evidence') === 'skill_evidence' && c.linked_skill === rs.skill)) acts.add(r.activity);
     need(acts.size >= 1, `core skill '${rs.skill}' has no evidence path: no activity measures it through a linked criterion`);
   }
+  // H5 (Phase 9): the configured numeric constraints, from the set in effect for this track.
+  for (const v of checkPackCounts(packCounts(p), constraints)) problems.push(v.message);
   if (problems.length) throw new PackValidationError(problems);
 }

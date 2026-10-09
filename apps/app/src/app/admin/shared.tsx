@@ -150,12 +150,16 @@ const ENUMS: Record<string, { value: string; ar: string }[]> = {
   importance: [{ value: 'critical', ar: 'حرجة' }, { value: 'high', ar: 'عالية' }, { value: 'medium', ar: 'متوسطة' }, { value: 'low', ar: 'منخفضة' }],
   readiness_contribution: [{ value: 'counts', ar: 'تُحتسب في الجاهزية' }, { value: 'informational', ar: 'للعرض فقط' }],
   language: [{ value: 'ar', ar: 'عربي' }, { value: 'en', ar: 'إنجليزي' }],
+  // Phase 9: the closed pack-constraint vocabulary (a new kind of rule is an extension, not an option here).
+  constraint_type: [['core_skill_count', 'عدد المهارات الأساسية للدور'], ['task_count', 'عدد مهام المسار'], ['activity_count', 'عدد أنشطة المسار'],
+    ['activity_primary_skill_count', 'المهارات المقيسة بعمق في كل نشاط'], ['activity_core_primary_skill_count', 'المهارات الأساسية المقيسة بعمق في كل نشاط'],
+    ['rubric_min_criteria', 'أدنى عدد معايير في الرُبريك'], ['resources_per_skill_max', 'أقصى موارد تعلّم لكل فجوة']].map(([value, ar]) => ({ value: value!, ar: ar! })),
   cls: [['framing', 'صياغة إطارية'], ['action', 'فعل مسنود بسجل'], ['skill_verb', 'فعل مهارة'], ['evaluation_term', 'مصطلح تقييم'], ['technology_term', 'تقنية'], ['context_term', 'سياق'],
     ['detect_outcome', 'كشف: نتيجة/أثر'], ['detect_professional', 'كشف: خبرة مهنية'], ['detect_credential', 'كشف: شهادة'], ['detect_quality', 'كشف: وصف جودة']].map(([value, ar]) => ({ value: value!, ar: ar! })),
   context_input: [{ value: 'required', ar: 'مطلوب' }, { value: 'optional', ar: 'اختياري' }, { value: 'excluded', ar: 'مستبعد' }],
 };
 const BOOLEAN_FIELDS = new Set(['requires_verification_decision', 'lock_until_grounded', 'is_core', 'enabled', 'mandatory']);
-const NUMBER_FIELDS = new Set(['min_evidence_count', 'min_independent_evidence', 'max_challenges', 'minimum_evidence_count', 'min_assessment_confidence', 'display_order', 'weight', 'threshold_for_skill', 'max_score']);
+const NUMBER_FIELDS = new Set(['min_value', 'max_value', 'min_evidence_count', 'min_independent_evidence', 'max_challenges', 'minimum_evidence_count', 'min_assessment_confidence', 'display_order', 'weight', 'threshold_for_skill', 'max_score']);
 const CONTEXT_LABEL_AR: Record<string, string> = {
   user_profile: 'الملف الشخصي', user_identity: 'هوية المستخدم', ai_disclosure: 'إفصاح الذكاء الاصطناعي', evidence_items: 'الأدلة', previous_attempts: 'المحاولات السابقة',
   submission_artifacts: 'مخرجات التسليم', human_review_decisions: 'قرارات المراجعة البشرية',

@@ -15,7 +15,12 @@ interface Diff extends StageView {
   fields: FieldDiff[]; children: { added: Row[]; removed: Row[]; changed: { before: Row; after: Row }[] } | null; rows: Row[] | null; childrenHelp: RuleHelp | null;
 }
 
+const CONSTRAINT_AR: Record<string, string> = {
+  core_skill_count: 'عدد المهارات الأساسية للدور', task_count: 'عدد مهام المسار', activity_count: 'عدد أنشطة المسار', activity_primary_skill_count: 'المهارات المقيسة بعمق في كل نشاط',
+  activity_core_primary_skill_count: 'المهارات الأساسية المقيسة بعمق في كل نشاط', rubric_min_criteria: 'أدنى عدد معايير في الرُبريك', resources_per_skill_max: 'أقصى موارد تعلّم لكل فجوة',
+};
 const FIELD_AR: Record<string, string> = {
+  constraint_type: 'القيد', min_value: 'الحد الأدنى', max_value: 'الحد الأقصى', track_id: 'نطاق المسار (فارغ = كل المسارات)',
   description_en: 'وصف داخلي (إنجليزي)', label_ar: 'الاسم بالعربية', label_en: 'الاسم بالإنجليزية', intro_ar: 'مقدّمة الاستبيان', lock_until_grounded: 'إخفاء حتى يُتحقق من الصياغة',
   challenge_types: 'أنواع التحدي', max_challenges: 'أقصى عدد تحديات', timing: 'التوقيت', difficulty: 'الصعوبة', skill_ids: 'المهارات', trigger_rule: 'شرط التشغيل (تعريف فقط)',
   language: 'اللغة', cls: 'الصنف', form: 'الصيغة', rule_type: 'نوع القاعدة', params: 'المعاملات', skill_id: 'المهارة', enabled: 'مفعّلة', position: 'الترتيب',
@@ -34,6 +39,7 @@ const BASIS_AR = { in_effect: 'مقارنةً بالإصدار الساري', pr
 
 function childLabel(r: Row): string {
   if (r['cls']) return `${r['language'] === 'ar' ? 'عربي' : 'إنجليزي'} · ${LEXICON_CLASS_AR[String(r['cls'])] ?? r['cls']} · «${String(r['form'])}»`;
+  if (r['constraint_type']) return `${CONSTRAINT_AR[String(r['constraint_type'])] ?? r['constraint_type']}: ${r['min_value'] ?? '—'} – ${r['max_value'] ?? '—'}`;
   if (r['rule_type']) return `${RULE_TYPE_AR[String(r['rule_type'])] ?? r['rule_type']} — ${String(r['label_ar'] ?? '')} ${show(r['params'])}`;
   return `${String(r['prompt_ar'] ?? r['key'] ?? '')}`;
 }

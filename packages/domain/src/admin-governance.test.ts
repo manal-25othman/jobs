@@ -74,9 +74,9 @@ describe('catalogue and pending decisions', () => {
     assert.equal(RULE_CATALOG['role_requirement.display_order']!.expertDependent, false);
     assert.equal(RULE_CATALOG['role_requirement.is_core']!.expertDependent, true);
   });
-  test('the owner\'s nine pending expert decisions are listed', () => {
+  test('the owner\'s nine pending expert decisions are listed, plus the Phase 9 pack constraints', () => {
     assert.deepEqual(PENDING_EXPERT_DECISIONS.map((d) => d.key), ['mandatory_skills', 'core_classification', 'readiness_thresholds', 'rubric_weights', 'evidence_counts_strengths',
-      'verification_thresholds', 'cv_bullet_at_practiced', 'challenge_triggers', 'grounding_vocabulary']);
+      'verification_thresholds', 'cv_bullet_at_practiced', 'challenge_triggers', 'grounding_vocabulary', 'pack_structure_constraints']);
   });
 });
 

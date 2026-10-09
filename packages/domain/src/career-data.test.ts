@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertReviewTransition, assertSynonymWellFormed, normalizeMatchKey, matchKeySimilarity, nearDuplicateCandidates, isExactDuplicate,
-  evidencePathStatus, verifiedPathStatus, assertPresentationRuleSane, assertLearningResourceHonest, layerOf, consumableByProduct,
+  evidencePathStatus, minimumEvidenceCount, verifiedPathStatus, assertPresentationRuleSane, assertLearningResourceHonest, layerOf, consumableByProduct,
   demoContentAllowedInProduction, integrityClassificationOf, DomainError, MissingPrerequisite, IllegalTransition,
 } from './index.js';
 
@@ -68,10 +68,14 @@ describe('skill registry — synonyms, match keys, near-duplicates', () => {
 
 describe('evidence paths, verified path, presentation rules, resources', () => {
   test('a core skill needs two activities for Verified, one for Demonstrated, none means no exit', () => {
-    assert.equal(evidencePathStatus({ isCoreForRole: true, activitiesWithLinkedCriterion: 0 }), 'none');
-    assert.equal(evidencePathStatus({ isCoreForRole: true, activitiesWithLinkedCriterion: 1 }), 'demonstrated_possible');
-    assert.equal(evidencePathStatus({ isCoreForRole: true, activitiesWithLinkedCriterion: 2 }), 'verified_possible');
-    assert.equal(evidencePathStatus({ isCoreForRole: false, activitiesWithLinkedCriterion: 1 }), 'verified_possible');
+    // Phase 9 (H3): the count comes from configuration; the legacy numbers reproduce the old answers.
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: minimumEvidenceCount(true), activitiesWithLinkedCriterion: 0 }), 'none');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: minimumEvidenceCount(true), activitiesWithLinkedCriterion: 1 }), 'demonstrated_possible');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: minimumEvidenceCount(true), activitiesWithLinkedCriterion: 2 }), 'verified_possible');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: minimumEvidenceCount(false), activitiesWithLinkedCriterion: 1 }), 'verified_possible');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: 3, activitiesWithLinkedCriterion: 2 }), 'demonstrated_possible', 'an expert-raised count is honoured');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: null, activitiesWithLinkedCriterion: 2 }), 'evidence_count_not_configured', 'missing configuration is said, not assumed');
+    assert.equal(evidencePathStatus({ minimumEvidenceCount: null, activitiesWithLinkedCriterion: 0 }), 'none');
   });
   test('Verified is not available in Phase 1 whatever an activity carries; what is missing is named', () => {
     const r = verifiedPathStatus({ hasPrivateInput: true, assessmentOnlyChecks: 2, explanationQuestions: 1, smeApprovedBy: null, verificationPolicyApproved: false });

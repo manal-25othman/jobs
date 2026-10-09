@@ -170,6 +170,9 @@ export const RULE_CATALOG: Readonly<Record<string, RuleHelp>> = {
   'rubric_criterion.mandatory': { labelAr: 'معيار إلزامي', meaningAr: 'إن لم يُستوفَ لا يُعدّ التسليم ناجحًا.', impactAr: 'تعديله يعيد حالة القيم إلى «مقترحة».', expertDependent: true },
   'disclosure_questionnaire.questions': { labelAr: 'أسئلة الإفصاح عن الذكاء الاصطناعي', meaningAr: 'ما يُسأل عنه المستخدم عند التسليم. استخدام AI مسموح والإفصاح سياق لا عقوبة.', impactAr: 'الأسئلة تُجمَّد بعد التفعيل؛ كل تسليم يحفظ إصدار الأسئلة التي أجاب عنها.', expertDependent: true },
   'challenge_policy.trigger_rule': { labelAr: 'شرط تشغيل التحدي', meaningAr: 'متى يُطلب من المستخدم شرح أو تعديل عمله.', impactAr: 'يُحفظ تعريفًا فقط؛ تفعيل التحديات غير متاح في هذه المرحلة.', expertDependent: true },
+  'pack_constraint_set.constraints': { labelAr: 'قيود بنية حزمة المسار', meaningAr: 'الأعداد التي يُتحقق بها من حزمة المسار عند استيرادها: عدد المهارات الأساسية، والمهام، والأنشطة، والمهارات المقيسة بعمق في كل نشاط، وأدنى عدد معايير، وأقصى موارد تعلّم لكل فجوة.',
+    impactAr: 'يغيّر ما تقبله عملية الاستيراد القادمة فقط؛ لا يعيد كتابة حزمة مستوردة. القيم الحالية أساس توافق غير معتمد من خبير. أي نوع قاعدة جديد يحتاج امتدادًا صريحًا لا صفًّا.', expertDependent: true },
+  'pack_constraint_set.track_id': { labelAr: 'نطاق المسار', meaningAr: 'معرّف المسار الذي تخصّه القيود، أو فارغ لكل المسارات.', impactAr: 'قيود خاصة بالمسار تتقدّم على العامة عند تفعيلها.', expertDependent: false },
   'grounding_lexicon.entries': { labelAr: 'مفردات التحقق من الصياغة', meaningAr: 'الكلمات المسموحة والعبارات المرفوضة التي يستخدمها فحص «ادعاء ← واقعة».', impactAr: 'تفعيل إصدار جديد يعيد فحص كل البنود المعتمدة في المعاملة نفسها؛ ما لا يستند لدليل يُنقل للمراجعة.', expertDependent: true },
 };
 
@@ -184,4 +187,5 @@ export const PENDING_EXPERT_DECISIONS: readonly { readonly key: string; readonly
   { key: 'cv_bullet_at_practiced', labelAr: 'بند السيرة عند «مُمارَسة»', whereAr: 'سياسة الصياغة — ممنوع التفعيل حتى يُحسم' },
   { key: 'challenge_triggers', labelAr: 'شروط تشغيل تحديات التحقق', whereAr: 'سياسة التحدي — لا تفعيل' },
   { key: 'grounding_vocabulary', labelAr: 'اعتماد مفردات التحقق من الصياغة', whereAr: 'مفردات التحقق' },
+  { key: 'pack_structure_constraints', labelAr: 'قيود بنية الحزمة (عدد المهارات الأساسية، المهام، الأنشطة، المعايير، الموارد)', whereAr: 'قيود بنية حزمة المسار — أساس توافق غير معتمد' },
 ];

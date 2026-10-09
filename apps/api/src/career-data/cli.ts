@@ -8,7 +8,11 @@
  *   config-approve <table> <id> --by <uuid> --label <name> --reason "<why>"            Phase 4: validate a configuration row (never a legacy baseline in place)
  *   config-activate <table> <id> --activation <inactive|development_only|production_active> --by <name> --reason "<why>"   audited; production_active needs an approved row; an active row is never replaced by accident
  *   config-new-version <role-uuid> --label <l> --verification key@v --context key@v --claim key@v [--challenge key@v] [--pack v] --by <name>   next DRAFT track configuration version (inactive)
- *   claims-revalidate [claim_kind] --by <name> [--reground]   Phase 7b/8 (--reground after a grounding engine change): re-check approved assets' standing against the claim policy in effect (recovery after an out-of-band change)
+ *   claims-revalidate [claim_kind] --by <name>    Phase 7b: re-check approved assets' standing against the claim policy in effect (recovery after an out-of-band change)
+ *   claims-standing                               Phase 9: read-only count of approved assets by grounding version, presentable now, needs_review (pre/post deployment)
+ *   claims-reground --dry-run [--json]            Phase 9: the re-grounding plan, same code path, rolled back — nothing written
+ *   claims-reground --operator <uuid> --reason "<why>"   Phase 9: execute (product_owner grant required); reconciliation must pass or nothing changes
+ *   claims-public-freeze --operator <uuid> --reason "<why>"   Phase 9: pre-deployment — close direct public paths until re-grounded
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
 import { Pool } from 'pg';
@@ -20,7 +24,7 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
-import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims } from '../configuration/config-admin.service';
+import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims, cliRegroundAssets, cliGroundingStanding, cliFreezePublicGrounding } from '../configuration/config-admin.service';
 import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
 import type { ReviewState, ReviewerRole } from '@naqla/domain';
@@ -38,6 +42,7 @@ export async function main(argv: string[], root: string): Promise<number> {
       const { pack, files } = loadPack(join(root, 'data', 'career'), a1!);
       const r = await importPack(pool, pack, files, { dryRun: argv.includes('--dry-run') });
       console.log(`import ${r.packId}@${r.packVersion} ${argv.includes('--dry-run') ? '(dry run, rolled back)' : ''} — DEMO fixture: ${r.isDemoFixture}`);
+      console.log(`  validated under pack constraints ${r.constraints.ref} (${r.constraints.scope}, ${r.constraints.resolution})`);
       console.log(`  snapshots: ${r.snapshots.filter((s) => s.stored === 'new').length} new, ${r.snapshots.filter((s) => s.stored === 'existing').length} existing · normalized records: ${r.normalizedRecords}`);
       console.log(`  written (draft): ${Object.entries(r.written).map(([k, v]) => `${k}=${v}`).join(' ')}`);
       if (r.skippedFrozen.length) console.log(`  not touched (past curated): ${r.skippedFrozen.join(', ')}`);
@@ -101,11 +106,34 @@ export async function main(argv: string[], root: string): Promise<number> {
       console.log(`${a1} ${r.key}@${r.version}: activation ${r.activation} (recorded in config_change)`); return 0;
     }
     if (cmd === 'claims-revalidate') {
+      if (argv.includes('--reground')) { console.error('re-grounding moved to `claims-reground` (dry run first; execution needs --operator with a product_owner grant)'); return 2; }
       const by = arg(argv, '--by'); if (!by) { console.error('claims-revalidate needs --by <name>'); return 2; }
-      const r = await cliRevalidateClaims(pool, { claimKind: a1 && !a1.startsWith('--') ? a1 : null, actor: by, reground: argv.includes('--reground') });
+      const r = await cliRevalidateClaims(pool, { claimKind: a1 && !a1.startsWith('--') ? a1 : null, actor: by });
       console.log(`claims-revalidate: ${r.checked} active asset(s) checked · ${r.keptEligible} still eligible · ${r.movedToReview} moved to needs_review (recorded in asset_standing_event)`);
-      if (r.regrounded) console.log(`re-grounding under ${r.regrounded.version}: ${r.regrounded.checked} checked · ${r.regrounded.grounded} grounded · ${r.regrounded.movedToReview} moved to needs_review`);
       return 0;
+    }
+    if (cmd === 'claims-standing') {
+      const s = await cliGroundingStanding(pool);
+      console.log(JSON.stringify(s, null, 2));
+      return 0;
+    }
+    if (cmd === 'claims-reground') {
+      const dryRun = argv.includes('--dry-run');
+      const r = await cliRegroundAssets(pool, { dryRun, operatorId: arg(argv, '--operator') ?? null, reason: arg(argv, '--reason') });
+      if (argv.includes('--json')) { console.log(JSON.stringify(r, null, 2)); return r.reconciliation.ok ? 0 : 1; }
+      console.log(`claims-reground ${dryRun ? 'DRY RUN (rolled back — nothing written)' : `executed by ${r.operator}`} under ${r.version}`);
+      console.log(`  before: ${r.before.activeClaimKinds} active approved claim assets (${r.before.underCurrentVersion} current · ${r.before.underOtherVersion} other version · ${r.before.withoutVersion} none) · ${r.before.presentableNow} presentable · ${r.before.needsReview} needs_review`);
+      console.log(`  policy re-check: ${r.revalidation.keptEligible} still eligible · ${r.revalidation.movedToReview} → needs_review`);
+      for (const d of r.revalidation.details.filter((x) => x.outcome === 'needs_review')) console.log(`    REVIEW ${d.kind} ${d.assetId} — claim policy in effect: ${d.reasons.join('; ')}`);
+      console.log(`  re-grounding: ${r.regrounding.grounded} stay grounded · ${r.regrounding.movedToReview} → needs_review`);
+      for (const d of r.regrounding.details) console.log(`    ${d.outcome === 'grounded' ? 'KEEP  ' : 'REVIEW'} ${d.kind} ${d.assetId} (was ${d.previousVersion ?? 'none'})${d.issues.length ? ` — ${d.issues.join('; ')}` : ''}`);
+      console.log(`  after: ${r.after.presentableNow} presentable · ${r.after.needsReview} needs_review · reconciliation ${r.reconciliation.ok ? 'OK' : `FAILED: ${r.reconciliation.problems.join(' | ')}`}`);
+      if (!dryRun) console.log(`  public grounding version declared: ${r.publicVersionDeclared}`);
+      return r.reconciliation.ok ? 0 : 1;
+    }
+    if (cmd === 'claims-public-freeze') {
+      const r = await cliFreezePublicGrounding(pool, { operatorId: arg(argv, '--operator') ?? '', reason: arg(argv, '--reason') ?? '' });
+      console.log(`direct public paths frozen by ${r.operator}; run claims-reground after deployment to reopen them`); return 0;
     }
     if (cmd === 'readiness-new-set') {
       const file = arg(argv, '--rules'); if (!file) { console.error('readiness-new-set needs --rules <file.json>'); return 2; }
@@ -118,7 +146,7 @@ export async function main(argv: string[], root: string): Promise<number> {
         claimPolicyRef: arg(argv, '--claim') ?? 'default@1', challengePolicy: arg(argv, '--challenge') ?? null, packVersion: arg(argv, '--pack') ?? null, notes: arg(argv, '--notes') ?? null, createdBy: arg(argv, '--by') ?? 'unknown' });
       console.log(`track_config_version ${r.id}: v${r.version} created as an inactive DRAFT`); return 0;
     }
-    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version|readiness-new-set|claims-revalidate> …'); return 2;
+    console.error('usage: career-data <import|validate|near-duplicates|review|approve-values|promote|promotion-correction|promotion-complete|config-approve|config-activate|config-new-version|readiness-new-set|claims-revalidate|claims-standing|claims-reground|claims-public-freeze> …'); return 2;
   } catch (e) {
     if (e instanceof PackValidationError || e instanceof ImportError) { console.error(e.message); return 1; }
     console.error((e as Error).message); return 1;

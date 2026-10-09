@@ -272,19 +272,30 @@ export type Importance = (typeof IMPORTANCE)[number];
 export const EVIDENCE_TYPES = ['artifact', 'decision_rationale', 'live_defense', 'process_trace'] as const;
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
-/** V8: a core skill needs two independent evidence paths for Verified; one path suffices for Demonstrated. */
+/**
+ * FROZEN REFERENCE (H3, pre-Phase 9): "a core skill needs two independent
+ * evidence paths for Verified; one suffices otherwise". Phase 9 reads the
+ * number from the role-skill configuration (`role_requirement.minimum_evidence_count`,
+ * an expert-dependent value pending validation) instead. Kept only for the
+ * equivalence proof: the shipped pack states exactly these values. Do not use.
+ * @deprecated
+ */
 export function minimumEvidenceCount(isCoreForRole: boolean): number { return isCoreForRole ? 2 : 1; }
 
 /**
- * A core skill has an evidence path when at least one activity measures it
- * through a rubric criterion linked to it. Without that, the gap has no exit.
+ * A skill has an evidence path when at least one activity measures it through
+ * a rubric criterion linked to it. Without that, the gap has no exit. Whether
+ * the paths would ever suffice for Verified depends on the configured evidence
+ * count for the skill in this role; when none is configured that is said
+ * explicitly, never assumed (Phase 9, H3).
  */
 export function evidencePathStatus(input: {
-  readonly isCoreForRole: boolean;
+  readonly minimumEvidenceCount: number | null;
   readonly activitiesWithLinkedCriterion: number;
-}): 'none' | 'demonstrated_possible' | 'verified_possible' {
+}): 'none' | 'demonstrated_possible' | 'verified_possible' | 'evidence_count_not_configured' {
   if (input.activitiesWithLinkedCriterion === 0) return 'none';
-  if (input.activitiesWithLinkedCriterion >= minimumEvidenceCount(input.isCoreForRole)) return 'verified_possible';
+  if (input.minimumEvidenceCount === null || !Number.isInteger(input.minimumEvidenceCount) || input.minimumEvidenceCount < 1) return 'evidence_count_not_configured';
+  if (input.activitiesWithLinkedCriterion >= input.minimumEvidenceCount) return 'verified_possible';
   return 'demonstrated_possible';
 }
 
