@@ -79,6 +79,8 @@ export interface EvaluationResult {
   criteria: EvaluationCriterion[];
   integrityChecks: { key: string; passed: boolean; message: string | null }[];
   transition: { from: string; to: string; evidenceId: string } | null;
+  /** D-118: what the verification policy concluded. `assessment_pending_validation` = recorded as feedback, no level. */
+  verification?: { decision: string; reason: string };
   evaluatedAt: string;
   /** Present while a person reviews the judgement criteria. No time estimate: there is no SLA yet. */
   humanReview: { pendingCriteria: string[]; completedCriteria: string[] } | null;

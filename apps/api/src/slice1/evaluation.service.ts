@@ -18,7 +18,9 @@ import {
   finalizationAllowed,
   type ReviewQueueState,
   MissingPrerequisite,
+  assessmentBasis, type AssessmentBasis, type ArtifactProvenance,
 } from '@naqla/domain';
+import { isProduction } from '../configuration/configuration.service';
 
 /**
  * Evaluation.
@@ -185,6 +187,7 @@ export class EvaluationService {
       // is recorded beside them with the policy and ruleset versions it used.
       const outcome = await this.decideAndApply(c, {
         policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'rule',
+        basis: await this.basisFor(c, rubric, artifacts, []),
         resultId, userId, skillId: primarySkillId, claimedSkillIds: skillIds, currentState, run, rubric, projectId: s.project_id,
         acceptedReason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
       });
@@ -218,6 +221,8 @@ export class EvaluationService {
           .map((i) => ({ key: i.key, passed: i.passed, message: i.message })),
         transition,
         reestablishedEvidenceId,
+        // D-118: what the policy concluded. `assessment_pending_validation` = recorded, formative, level unchanged.
+        verification: { decision: outcome.decision, reason: outcome.decisionReason },
         evaluatedAt: resultRow.rows[0].evaluated_at,
         humanReview: awaitingHuman ? { pendingCriteria: run.pendingHumanCriteria, completedCriteria: [] as string[] } : null,
       };
@@ -298,6 +303,7 @@ export class EvaluationService {
       const claimed = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1', [e.submission_id]);
       const outcome = await this.decideAndApply(c, {
         policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'human',
+        basis: await this.basisFor(c, rubric, await this.loadArtifacts(c, e.submission_id), decisions.rows.map((d) => String(d.criterion_key))),
         resultId, userId: e.user_id, skillId: primarySkillId, claimedSkillIds: claimed.rows.map((r) => r.skill_id as string), currentState, run, rubric, projectId: e.project_id,
         acceptedReason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
       });
@@ -311,7 +317,8 @@ export class EvaluationService {
         facts: { outcome: run.outcome, produced_evidence: (transition?.evidenceId ?? reestablishedEvidenceId) !== null },
         eventRef: { table: 'evaluation_result', id: resultId }, reason: run.reason, actorKind: 'system' });
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
-        integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId, evaluatedAt: resultRow.rows[0].evaluated_at };
+        integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId,
+        verification: { decision: outcome.decision, reason: outcome.decisionReason }, evaluatedAt: resultRow.rows[0].evaluated_at };
     });
   }
 
@@ -322,16 +329,19 @@ export class EvaluationService {
    * policy enables it; the seeded draft does not.
    */
   private async decideAndApply(c: PoolClient, p: {
-    policyKey: string; assessmentId: string; assessmentConfidence: number | null; trackConfigVersionId: string | null; evaluatorKind: 'rule' | 'human';
+    policyKey: string; assessmentId: string; assessmentConfidence: number | null; trackConfigVersionId: string | null; evaluatorKind: 'rule' | 'human'; basis: AssessmentBasis;
     resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; currentState: EvidenceState;
     run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string;
-  }): Promise<{ transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null; reestablishedEvidenceId: string | null; policy: VerificationPolicy }> {
+  }): Promise<{ transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null; reestablishedEvidenceId: string | null; policy: VerificationPolicy; decision: string; decisionReason: string }> {
     const { policy, resolution } = await this.assessments.loadPolicy(c, p.policyKey);
     const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, p.skillId]);
     const pd = this.assessments.decide(policy, {
       evaluationOutcome: p.run.outcome, proposedState: p.run.proposedState, currentState: p.currentState, assessmentEvaluatorKind: p.evaluatorKind,
       assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n), reason: p.acceptedReason,
+      basis: p.basis, production: isProduction(),
     });
+    // D-118: may this assessment support a level at all? (the same test the policy applied)
+    const levelSupported = policy.promotionBasis === 'legacy_any_pass' ? !isProduction() : p.basis.independentlyVerified;
     let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
     let reestablishedEvidenceId: string | null = null;
     let verificationId: string | null = null;
@@ -348,7 +358,7 @@ export class EvaluationService {
         transition = await this.promote(c, { userId: p.userId, skillId: p.skillId, from: p.currentState, to: pd.resultingState,
           evaluationResultId: p.resultId, rubricVersion: p.run.rubricVersion, projectId: p.projectId, reason: pd.reason });
       }
-    } else if (p.run.outcome === 'passed' && !p.run.proposedState
+    } else if (p.run.outcome === 'passed' && !p.run.proposedState && levelSupported
                && reestablishmentAllowed({ currentState: p.currentState, proposedState: p.rubric.proposesState,
                     primaryEvidenceStanding: await this.primaryEvidenceStanding(c, p.userId, p.skillId) })) {
       // D-077: the claim is already at this state but its evidence was withdrawn;
@@ -364,12 +374,18 @@ export class EvaluationService {
     if (policy.perSkillEvidenceDerivation && pd.legacyOutcome === 'accepted' && p.run.proposedState) {
       await this.deriveEvidencePerSkill(c, { ...p, policy, policyResolution: resolution, proposedState: p.run.proposedState });
     }
-    return { transition, reestablishedEvidenceId, policy };
+    return { transition, reestablishedEvidenceId, policy, decision: record.decision, decisionReason: record.reason };
+  }
+
+  /** D-118: whether this assessment rests on independently verified criteria with SME-approved, non-demo rubric values. */
+  private async basisFor(c: PoolClient, rubric: PublishedRubric, artifacts: readonly SubmissionArtifact[], humanDecidedCriteria: readonly string[]): Promise<AssessmentBasis> {
+    const rv = (await c.query('select is_demo_fixture, values_approved_at from rubric_version where id = $1', [rubric.rubricVersionId])).rows[0];
+    return assessmentBasis({ rubric, artifacts, humanDecidedCriteria, rubricValuesApproved: !!rv?.values_approved_at, rubricIsDemo: rv ? rv.is_demo_fixture === true : true });
   }
 
   /** H6 (policy-gated): every OTHER claimed skill whose skill_evidence criteria were all met earns the same decision. */
   private async deriveEvidencePerSkill(c: PoolClient, p: {
-    policy: VerificationPolicy; policyResolution: ConfigResolution; trackConfigVersionId: string | null; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human';
+    policy: VerificationPolicy; policyResolution: ConfigResolution; trackConfigVersionId: string | null; assessmentId: string; assessmentConfidence: number | null; evaluatorKind: 'rule' | 'human'; basis: AssessmentBasis;
     resultId: string; userId: string; skillId: string; claimedSkillIds: string[]; run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string; proposedState: EvidenceState;
   }): Promise<void> {
     const evidenced = skillsEvidencedByRun(p.rubric, p.run);
@@ -380,7 +396,7 @@ export class EvaluationService {
       const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, skillId]);
       const pd: PolicyDecision = this.assessments.decide(p.policy, {
         evaluationOutcome: p.run.outcome, proposedState: p.proposedState, currentState: current, assessmentEvaluatorKind: p.evaluatorKind,
-        assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n),
+        assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n), basis: p.basis, production: isProduction(),
         reason: `${p.acceptedReason}; per-skill derivation (policy ${p.policy.key}@${p.policy.version}): every skill_evidence criterion of this skill was met`,
       });
       let evidenceId: string | null = null;
@@ -425,13 +441,18 @@ export class EvaluationService {
     );
     const evidenceId: string = evidence.rows[0].id;
 
-    const claim = await c.query(
+    let claim = await c.query(
       `update skill_claim
           set state = $1, primary_evidence_id = $2, state_reason = $3
         where user_id = $4 and skill_id = $5
         returning id`,
       [p.to, evidenceId, p.reason, p.userId, p.skillId],
     );
+    // D-118: under the safety basis a submission records no claim, so the first earned level creates it (from `gap`).
+    if (claim.rowCount === 0 && p.from === 'gap') {
+      claim = await c.query(`insert into skill_claim (user_id, skill_id, state, state_reason, primary_evidence_id) values ($1,$2,$3,$4,$5) returning id`,
+        [p.userId, p.skillId, p.to, p.reason, evidenceId]);
+    }
     if (claim.rowCount === 0) throw new BadRequestException('no claim to promote');
 
     await c.query(
@@ -566,13 +587,17 @@ export class EvaluationService {
 
   private async loadArtifacts(c: PoolClient, submissionId: string): Promise<SubmissionArtifact[]> {
     const { rows } = await c.query(
-      `select key, kind, value_bool, value_number, value_text, locator
+      `select key, kind, value_bool, value_number, value_text, locator, upload_id
          from submission_artifact where submission_id = $1`,
       [submissionId],
     );
+    // D-118: where each fact came from. A confirmed upload proves a file was submitted; a link that a link was
+    // given; everything else the submitter sent is a declaration. Nothing here is platform-verified: no producer
+    // of verified facts exists yet (that namespace is reserved and refused from clients).
     return rows.map((r) => ({
       key: r.key,
       kind: r.kind,
+      provenance: (r.kind === 'file' && r.upload_id ? 'uploaded_file' : r.kind === 'link' ? 'submitted_link' : 'declared') as ArtifactProvenance,
       ...(r.value_bool !== null ? { valueBool: r.value_bool } : {}),
       ...(r.value_number !== null ? { valueNumber: Number(r.value_number) } : {}),
       ...(r.value_text !== null ? { valueText: r.value_text } : {}),

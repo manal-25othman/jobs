@@ -55,7 +55,13 @@ describe('verification policy — data, DRAFT, llm structurally excluded', () =>
     const items = (await http.get('/v1/verification-policies').set(auth(user)).expect(200)).body.data.items as Record<string, unknown>[];
     const d = items.find((p) => p['key'] === 'default' && p['version'] === 1)!;
     assert.equal(d['reviewStatus'], 'draft'); assert.equal(d['validated'], false); assert.match(String(d['validationNote']), /LEGACY BASELINE — NOT EXPERT-VALIDATED/);
-    assert.equal(d['activation'], 'legacy_baseline'); assert.equal(d['isLegacyBaseline'], true);
+    // D-118: default@1 (the legacy behaviour) was retired by migration 0023 and is kept as history; default@2, the
+    // restrictive SAFETY baseline, is what real environments resolve to (this suite runs a test-only compatibility row).
+    assert.equal(d['activation'], 'inactive'); assert.equal(d['promotionBasis'], 'legacy_any_pass');
+    const safety = items.find((p) => p['key'] === 'default' && p['version'] === 2)!;
+    // (In this suite the harness has the test-only compatibility row in effect, so default@2 is momentarily inactive.)
+    assert.ok(safety['baselineOf'], 'default@2 is the migration-created baseline');
+    assert.deepEqual([safety['validated'], safety['promotionBasis'], safety['practicedOnSubmission']], [false, 'independently_verified', false]);
     assert.deepEqual(d['appliesOutcomes'], ['passed']); assert.equal(d['acceptRubricProposal'], true); assert.equal(d['maxResultingState'], null);
     assert.equal(d['minAssessmentConfidence'], null); assert.equal(d['minIndependentEvidence'], null); assert.equal(d['perSkillEvidenceDerivation'], false);
     assert.deepEqual(d['decisionActors'], ['policy', 'human']);
@@ -94,7 +100,8 @@ describe('legacy behaviour preserved exactly through the draft policy', () => {
     assert.deepEqual(a.criteria[0]!.evidenceUsed, ['test.empty_state']); assert.deepEqual(a.criteria[0]!.evidenceMissing, []); assert.equal(a.criteria[0]!.recommendedNextAction, null);
     assert.equal(a.decisions.length, 1);
     const d = a.decisions[0]!;
-    assert.deepEqual(d.policy, { key: 'default', version: 1, status: 'draft', validated: false, resolution: 'legacy_baseline' });
+    // D-118: the legacy behaviour now runs only under the explicit, development-only test compatibility row.
+    assert.deepEqual(d.policy, { key: 'default', version: 900, status: 'draft', validated: false, resolution: 'development_only' });
     assert.equal(d.domainRulesetVersion, DOMAIN_RULESET_VERSION); assert.equal(d.decidedByKind, 'policy'); assert.equal(d.decision, 'accepted');
     assert.deepEqual([d.previousState, d.proposedState, d.resultingState], ['practiced', 'demonstrated', 'demonstrated']);
     assert.equal(d.evidenceId, ev.body.data.transition.evidenceId); assert.ok(d.verificationId, 'the decision points at the legacy verification row');
@@ -154,8 +161,10 @@ describe('per-skill evidence derivation (H6) stays behind the policy flag', () =
       try { await c.query('begin'); await c.query("select set_config('naqla.config_actor', 'e2e', true), set_config('naqla.config_reason', 'H6 negative test', true)"); const r = await c.query(sql, params); await c.query('commit'); return r; }
       catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
     };
-    const base = (await pool.query(`select id from verification_policy where key = 'default' and activation = 'legacy_baseline'`)).rows[0].id;
-    const v2 = (await admin(`insert into verification_policy (key, version, description_en, per_skill_evidence_derivation) values ('default', 99, 'e2e: H6 on (development only)', true) returning id`)).rows[0].id;
+    // D-118: the policy in effect for this suite is the test-only legacy-compatibility row; it is restored afterwards.
+    const baseRow = (await pool.query(`select id, activation from verification_policy where key = 'default' and activation <> 'inactive'`)).rows[0];
+    const base = baseRow.id;
+    const v2 = (await admin(`insert into verification_policy (key, version, description_en, per_skill_evidence_derivation, promotion_basis, practiced_on_submission) values ('default', 99, 'e2e: H6 on (development only)', true, 'legacy_any_pass', true) returning id`)).rows[0].id;
     await admin(`update verification_policy set activation = 'inactive' where id = $1`, [base]);
     await admin(`update verification_policy set activation = 'development_only' where id = $1`, [v2]);
     try {
@@ -171,7 +180,7 @@ describe('per-skill evidence derivation (H6) stays behind the policy flag', () =
       assert.equal(claim.rows[0].state, 'practiced', 'no derivation without criteria of its own');
     } finally {
       await admin(`update verification_policy set activation = 'inactive' where id = $1`, [v2]);
-      await admin(`update verification_policy set activation = 'legacy_baseline' where id = $1`, [base]);
+      await admin(`update verification_policy set activation = $2 where id = $1`, [base, baseRow.activation]);
     }
   });
 });

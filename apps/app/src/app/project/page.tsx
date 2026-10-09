@@ -74,9 +74,9 @@ export default function ProjectPage() {
       const componentUpload = await uploadEvidenceFile(componentFile, token);
       const testUpload = await uploadEvidenceFile(testFile, token);
 
-      const artifacts: Record<string, unknown>[] = [
-        { key: 'signal.tests_reference_component', kind: 'boolean', valueBool: true },
-      ];
+      // D-118: the ticks below are the user's DECLARATIONS (recorded as such, formative only). No platform signal is
+      // ever sent from here — `signal.tests_reference_component` was, and the API now refuses any client-written signal.
+      const artifacts: Record<string, unknown>[] = [];
       for (const d of DELIVERABLES) {
         if (d.key !== 'note.coverage' && checked[d.key]) {
           artifacts.push({ key: d.key, kind: 'boolean', valueBool: true, locator: testFile.name });
@@ -157,6 +157,7 @@ export default function ProjectPage() {
           <h2>المخرجات المطلوبة</h2>
           <span className="chip push" aria-live="polite">{progress.labelAr}</span>
         </div>
+        <p className="body-sm muted">ما تؤشّرين عليه هنا إعلان منكِ يُسجَّل كما هو ويفيد في الملاحظات، لكنه لا يرفع مستوى المهارة وحده.</p>
         <div>
           {DELIVERABLES.filter((d) => d.key !== 'note.coverage').map((d) => (
             <label key={d.key} className="check-row">

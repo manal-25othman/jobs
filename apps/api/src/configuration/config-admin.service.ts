@@ -127,6 +127,10 @@ export function assertActivationPermittedInPhase8(table: string, row: Record<str
     throw new BadRequestException(`a '${String(row['claim_kind'])}' policy below demonstrated cannot be activated: presenting a skill below demonstrated (e.g. a CV bullet at Practiced) is a pending expert and Product Owner decision`);
   }
   if (table === 'claim_policy' && row['lock_until_grounded'] === false) throw new BadRequestException('a claim policy that does not require grounding cannot be activated: evidence grounding (G1+G2) is never loosened');
+  // D-118: the legacy promotion basis (declarations may earn a level) never runs in production; the database refuses it too.
+  if (table === 'verification_policy' && row['promotion_basis'] === 'legacy_any_pass' && productionLike) {
+    throw new BadRequestException('a verification policy with the legacy promotion basis cannot be activated in production: a declaration or an upload never earns a level (D-118)');
+  }
   if (table === 'verification_policy' && row['per_skill_evidence_derivation'] === true && productionLike) {
     throw new BadRequestException('per-skill evidence derivation (H6) cannot be activated in production without explicit approval');
   }

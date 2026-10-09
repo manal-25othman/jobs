@@ -31,6 +31,7 @@ import { DomainError, InvariantViolation, MissingPrerequisite } from './errors.j
 import { EVALUATION_OUTCOMES, type EvaluationOutcome, type VerificationOutcome } from './evaluation.js';
 import { EVIDENCE_STATES, evidenceOrdinal, type EvidenceState } from './evidence-state.js';
 import { decideVerification, verificationApplies } from './verification.js';
+import { PROMOTION_BASES, type PromotionBasis, type AssessmentBasis } from './verification-integrity.js';
 
 export const DECISION_ACTOR_KINDS = ['policy', 'human'] as const;
 export type DecisionActorKind = (typeof DECISION_ACTOR_KINDS)[number];
@@ -55,6 +56,10 @@ export interface VerificationPolicy {
   blockingRule: BlockingRule;
   perSkillEvidenceDerivation: boolean;
   decisionActors: readonly DecisionActorKind[];
+  /** D-118: what a promotion must rest on. `legacy_any_pass` is development/test compatibility only, never production. */
+  promotionBasis: PromotionBasis;
+  /** D-118: whether submitting work alone records Practiced (legacy T-LINK at submission). Off in the safety baseline. */
+  practicedOnSubmission: boolean;
 }
 
 export function assertVerificationPolicySane(p: VerificationPolicy): void {
@@ -70,12 +75,14 @@ export function assertVerificationPolicySane(p: VerificationPolicy): void {
   if (p.minAssessmentConfidence !== null && (p.minAssessmentConfidence < 0 || p.minAssessmentConfidence > 1)) throw new DomainError(`policy ${p.key}: confidence floor must be within [0,1]`);
   if (p.minIndependentEvidence !== null && (p.minIndependentEvidence < 1 || !Number.isInteger(p.minIndependentEvidence))) throw new DomainError(`policy ${p.key}: evidence floor must be a positive integer`);
   if (!(BLOCKING_RULES as readonly string[]).includes(p.blockingRule)) throw new DomainError(`policy ${p.key}: unknown blocking rule '${p.blockingRule}'`);
+  if (!(PROMOTION_BASES as readonly string[]).includes(p.promotionBasis)) throw new DomainError(`policy ${p.key}: unknown promotion basis '${p.promotionBasis}'`);
 }
 
 export function verificationPolicyFromRow(r: {
   id: string; key: string; version: number | string; review_status: string; applies_outcomes: string[]; accept_rubric_proposal: boolean;
   max_resulting_state: string | null; min_assessment_confidence: string | number | null; min_independent_evidence: number | string | null;
   escalate_on: unknown; blocking_rule: string; per_skill_evidence_derivation: boolean; decision_actors: string[];
+  promotion_basis?: string | null; practiced_on_submission?: boolean | null;
 }): VerificationPolicy {
   const p: VerificationPolicy = {
     id: r.id, key: r.key, version: Number(r.version), reviewStatus: r.review_status,
@@ -86,6 +93,9 @@ export function verificationPolicyFromRow(r: {
     escalateOn: (r.escalate_on && typeof r.escalate_on === 'object' ? r.escalate_on : {}) as Record<string, unknown>,
     blockingRule: r.blocking_rule as BlockingRule, perSkillEvidenceDerivation: r.per_skill_evidence_derivation,
     decisionActors: r.decision_actors as DecisionActorKind[],
+    // A row read without these columns is treated as the safety baseline: fail closed.
+    promotionBasis: (r.promotion_basis ?? 'independently_verified') as PromotionBasis,
+    practicedOnSubmission: r.practiced_on_submission === true,
   };
   assertVerificationPolicySane(p);
   return p;
@@ -95,7 +105,7 @@ export function verificationPolicyIsValidated(p: Pick<VerificationPolicy, 'revie
   return p.reviewStatus === 'approved' || p.reviewStatus === 'published';
 }
 
-export type PolicyDecisionKind = VerificationOutcome | 'not_applicable';
+export type PolicyDecisionKind = VerificationOutcome | 'not_applicable' | 'assessment_pending_validation';
 
 export interface PolicyDecisionInput {
   readonly evaluationOutcome: EvaluationOutcome;
@@ -107,6 +117,10 @@ export interface PolicyDecisionInput {
   /** Standing independent evidence for the skill before this run, when known. */
   readonly independentEvidenceCount: number | null;
   readonly reason: string;
+  /** D-118: whether the assessment rests on independently verified criteria. Absent ⇒ not verified (fail closed). */
+  readonly basis?: AssessmentBasis;
+  /** D-118: a production environment never runs the legacy basis. */
+  readonly production?: boolean;
 }
 
 export interface PolicyDecision {
@@ -139,6 +153,14 @@ export function decideWithPolicy(policy: VerificationPolicy, input: PolicyDecisi
   // 1. Does a verification step apply at all? (legacy: verificationApplies ∧ proposedState)
   if (!policy.appliesOutcomes.includes(input.evaluationOutcome) || input.proposedState === null) {
     return hold('not_applicable', `no verification step: outcome '${input.evaluationOutcome}'${input.proposedState === null ? ', no promotion proposed' : ''} (policy ${policy.key}@${policy.version})`, null);
+  }
+  // 1b. D-118 — independent verification. A declaration, an upload or a link never earns a level by itself.
+  if (policy.promotionBasis === 'legacy_any_pass' && input.production === true) {
+    return hold('assessment_pending_validation', `policy ${policy.key}@${policy.version} uses the legacy basis, which never decides a level in production; the level is unchanged`, null);
+  }
+  if (policy.promotionBasis === 'independently_verified' && input.basis?.independentlyVerified !== true) {
+    const why = input.basis?.reasons.length ? input.basis.reasons.join('; ') : 'no independent verification was established for this assessment';
+    return hold('assessment_pending_validation', `assessment pending validation (policy ${policy.key}@${policy.version}): ${why}; the level is unchanged`, null);
   }
   // 2. Expert knobs — all null/off in the draft default, so none of these fire today.
   if (policy.minAssessmentConfidence !== null && (input.assessmentConfidence === null || input.assessmentConfidence < policy.minAssessmentConfidence)) {

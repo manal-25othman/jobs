@@ -32,7 +32,8 @@ export class AssessmentRecorderService {
   async loadPolicy(c: PoolClient, key = 'default'): Promise<ResolvedVerificationPolicy> {
     const { rows } = await c.query(
       `select id, key, version, review_status, applies_outcomes::text[] as applies_outcomes, accept_rubric_proposal, max_resulting_state, min_assessment_confidence,
-              min_independent_evidence, escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, approved_by
+              min_independent_evidence, escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, approved_by,
+              promotion_basis, practiced_on_submission
          from verification_policy where key = $1`, [key]);
     const r = resolveActiveConfig(rows.map(governedFromRow), { production: isProduction() });
     if (!r.row) throw new MissingPrerequisite('verification_policy', `no usable verification policy '${key}': ${r.reason}`);

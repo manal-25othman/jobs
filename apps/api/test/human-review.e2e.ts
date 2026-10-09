@@ -31,10 +31,8 @@ before(async () => {
 });
 after(async () => { await pool?.end(); await app?.close(); });
 
+// D-118: files come only from confirmed uploads (keyed by the activity's deliverables); a client `file.*` value is refused.
 const ARTIFACTS = [
-  { key: 'file.index_html', kind: 'boolean' as const, valueBool: true, locator: 'index.html' },
-  { key: 'file.styles_css', kind: 'boolean' as const, valueBool: true, locator: 'styles.css' },
-  { key: 'file.app_js', kind: 'boolean' as const, valueBool: true, locator: 'app.js' },
   { key: 'note.data_flow', kind: 'text' as const, valueText: 'The form submits to a state object; the list is fetched on load and re-rendered from state; loading, error and empty are three explicit states held in one place.', locator: 'notes.md' },
   { key: 'answer.clarification', kind: 'text' as const, valueText: 'The brief says four fields and the spec lists five; I implemented the four in the brief and flagged the fifth as a question.', locator: 'notes.md' },
 ];
@@ -43,12 +41,13 @@ async function reviewer(): Promise<TestUser> {
   await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'e2e operator')`, [u.id]);
   return u;
 }
-async function submitted(user: TestUser, artifacts = ARTIFACTS) {
+async function submitted(user: TestUser, artifacts = ARTIFACTS, fileCount = 3) {
   await http.post('/v1/me/bootstrap').set(auth(user)).send({ displayName: 'Sara Identity' }).expect(201);
   await http.put('/v1/me/career-goal').set(auth(user)).send({ targetRoleId: FIXTURE.roleId, confirmed: true }).expect(200);
   const project = await http.post('/v1/projects').set(auth(user)).send({ title: 'طلب إجازة', kind: 'platform_activity', activitySpecId: activityId }).expect(201);
-  const u1 = await uploadFile(app, http, user, 'index.html', COMPONENT_BYTES); const u2 = await uploadFile(app, http, user, 'app.js', TEST_BYTES);
-  const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [skillId], artifacts, uploadIds: [u1, u2], aiDisclosure: { declaredUse: ['code_completion'] } }).expect(201);
+  const u1 = await uploadFile(app, http, user, 'index.html', COMPONENT_BYTES, 'text/plain'); const u2 = await uploadFile(app, http, user, 'styles.css', TEST_BYTES, 'text/plain');
+  const u3 = await uploadFile(app, http, user, 'app.js', TEST_BYTES);
+  const sub = await http.post(`/v1/projects/${project.body.data.id}/submissions`).set(auth(user)).send({ skillIds: [skillId], artifacts, uploadIds: [u1, u2, u3].slice(0, fileCount), aiDisclosure: { declaredUse: ['code_completion'] } }).expect(201);
   const ev = await http.post(`/v1/submissions/${sub.body.data.id}/evaluate`).set(auth(user)).expect(201);
   return { submissionId: sub.body.data.id as string, ev: ev.body.data as { outcome: string; humanReview: { pendingCriteria: string[] } | null; evaluationId: string } };
 }
@@ -83,7 +82,7 @@ describe('4, 5, 12 — deterministic stage, queue contents, what the user sees',
     await http.post(`/v1/submissions/${submissionId}/evaluate`).set(auth(user)).expect(400);
   });
   test('10 — a missing mandatory deliverable blocks deterministically; nothing reaches a reviewer', async () => {
-    const user = await newUser(); const { ev } = await submitted(user, ARTIFACTS.filter((a) => a.key !== 'file.styles_css'));
+    const user = await newUser(); const { ev } = await submitted(user, ARTIFACTS, 2); // one mandatory file not uploaded
     assert.equal(ev.outcome, 'blocked_by_checks'); assert.equal(ev.humanReview, null);
     assert.equal((await pool.query('select count(*)::int n from review_queue_item where evaluation_id = $1', [ev.evaluationId])).rows[0].n, 0);
     assert.equal((await pool.query('select state from evaluation where id = $1', [ev.evaluationId])).rows[0].state, 'completed');
@@ -130,7 +129,7 @@ describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability,
     for (const forbidden of ['Sara Identity', user.id, 'display_name', 'displayName', 'email', 'username', 'university', 'user_id', 'userId', '"cv"', 'linkedin']) assert.ok(!text.includes(forbidden), `payload leaked ${forbidden}`);
     assert.doesNotThrow(() => assertBlindPayload(opened.body.data));
     assert.equal(opened.body.data.criterion.key, 'semantic_structure'); assert.ok(opened.body.data.criterion.levels.length >= 2);
-    assert.ok(opened.body.data.submission.artifacts.length >= 5); assert.equal(opened.body.data.submission.files.length, 2);
+    assert.ok(opened.body.data.submission.artifacts.length >= 5); assert.equal(opened.body.data.submission.files.length, 3);
     assert.ok(opened.body.data.submission.files.every((f: { downloadUrl: string; name: string }) => f.downloadUrl && !f.name.includes(user.id)));
     assert.ok(opened.body.data.submission.userExplanation.some((e: { key: string }) => e.key === 'note.data_flow'));
     assert.equal(opened.body.data.deterministic.criteria.length, 1);
@@ -186,7 +185,7 @@ describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability,
     // Phase 3: the interim run has a rule assessment with a not_applicable decision; the final run has a human (aggregate) assessment decided by the draft policy.
     const asm = await pool.query(`select a.evaluator_kind, a.outcome, d.decision, d.policy_key, d.policy_version, d.policy_status, d.decided_by_kind from assessment a join verification_decision d on d.assessment_id = a.id where a.evaluation_id = $1 order by a.created_at`, [ev.evaluationId]);
     assert.deepEqual(asm.rows.map((x) => [x.evaluator_kind, x.outcome, x.decision, x.decided_by_kind]), [['rule', 'needs_human_review', 'not_applicable', 'policy'], ['human', 'passed', 'accepted', 'policy']]);
-    assert.deepEqual([asm.rows[1].policy_key, Number(asm.rows[1].policy_version), asm.rows[1].policy_status], ['default', 1, 'draft']);
+    assert.deepEqual([asm.rows[1].policy_key, Number(asm.rows[1].policy_version), asm.rows[1].policy_status], ['default', 900, 'draft'], 'D-118: the test-only compatibility row (legacy basis, development only)');
     const scores = await pool.query('select criterion_key, score from evaluation_criterion_score where evaluation_result_id = (select id from evaluation_result where evaluation_id = $1 and outcome = $2) order by criterion_key', [ev.evaluationId, 'passed']);
     assert.equal(scores.rowCount, 8); assert.equal(Number(scores.rows.find((s) => s.criterion_key === 'explanation_clarity')!.score), 2, 'the superseding re-review (solid) counted, not the first decision (partial)');
     // 11 — reproducible: the recorded decisions imply exactly this total.

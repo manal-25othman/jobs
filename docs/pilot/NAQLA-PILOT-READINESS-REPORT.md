@@ -89,7 +89,7 @@ Real graduates may not use the product until each of these is resolved.
 
 | ID | Blocker | Why it blocks |
 |---|---|---|
-| **CB-1** | **Self-assertable Demonstrated.** The demo activity's rubric passes on user-ticked booleans and the presence of two allowed-type files (any content). No human review or test runner sits in the path | A graduate could hold an "evidence-backed" CV bullet that nobody checked. This is the product's core promise failing |
+| **CB-1** *(closed in code — D-118, `CRITICAL-VERIFICATION-INTEGRITY-REMEDIATION-REPORT.md`; browser G-7 pending)* | **Self-assertable Demonstrated.** The demo activity's rubric passes on user-ticked booleans and the presence of two allowed-type files (any content). No human review or test runner sits in the path | A graduate could hold an "evidence-backed" CV bullet that nobody checked. This is the product's core promise failing |
 | **CB-2** | **Pilot content is DEMO / NOT SME APPROVED.** In production mode the API refuses to start with published demo content. Running real users outside production mode would bypass the production gates the architecture relies on | There is either no content or no safety net |
 | **CB-3** | **No live environment verified.** Live Supabase checks: 0 of 12 run (`LIVE-SUPABASE-VERIFICATION-REPORT.md`). No hosting, CI, Dockerfile or deployment configuration in the repository | Nothing has run outside a scratch container |
 | **CB-4** | **No browser acceptance.** There are zero browser tests, and the journey has never been walked in a browser | The UI paths in §2 are unproven |

@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
-import { assertModeRespected, assertExternalUrlValid, type AiUsageMode } from '@naqla/domain';
+import { assertModeRespected, assertExternalUrlValid, assertClientArtifactAllowed, type AiUsageMode } from '@naqla/domain';
+import { AssessmentRecorderService } from '../assessment/assessment-recorder.service';
 import { UploadService } from './upload.service';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
@@ -27,7 +28,7 @@ export interface SubmissionArtifactInput {
 @Injectable()
 export class SubmissionService {
   constructor(private readonly db: DbService, private readonly uploads: UploadService, private readonly ledger: EvidenceLedgerService, private readonly progress: SkillProgressEngine,
-    private readonly disclosures: DisclosureService, private readonly signals: IntegritySignalService) {}
+    private readonly disclosures: DisclosureService, private readonly signals: IntegritySignalService, private readonly assessments: AssessmentRecorderService) {}
 
   async createSubmission(userId: string, projectId: string, input: {
     skillIds: string[];
@@ -50,6 +51,9 @@ export class SubmissionService {
     for (const a of input.artifacts ?? []) {
       // A file artifact is a confirmed upload, never a free-text filename.
       if (a.kind === 'file') throw new BadRequestException('file artifacts come from uploadIds, not free text');
+      // D-118: a client never writes a platform-produced fact (signal.*, verified.*, followup.*) nor impersonates the
+      // upload (file.*) or link (link.*) producers. What a client may send is a declaration, recorded as such.
+      try { assertClientArtifactAllowed(a); } catch (e) { throw new BadRequestException((e as Error).message); }
       if (a.kind === 'link') assertExternalUrlValid(a.valueText ?? '');
     }
     for (const url of input.externalUrls ?? []) assertExternalUrlValid(url);
@@ -145,7 +149,9 @@ export class SubmissionService {
       // A submission moves a claim to `practiced` at most: the user showed the
       // skill in their own work. It never reaches `demonstrated` here.
       for (const skillId of input.skillIds) {
-        await this.ensurePracticedClaim(c, userId, skillId, projectId, submissionId);
+        // D-118: submitting work records a level only when the verification policy in effect says so (legacy compatibility);
+        // the safety baseline records none — the submission, its files and the journey are recorded either way.
+        if ((await this.assessments.loadPolicy(c)).policy.practicedOnSubmission) await this.ensurePracticedClaim(c, userId, skillId, projectId, submissionId);
       }
 
       // Phase 1: the submission is also recorded in the evidence ledger (typed

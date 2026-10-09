@@ -181,6 +181,15 @@ function EvaluationInner() {
             </button>
           </div>
         </div>
+      ) : result.verification?.decision === 'assessment_pending_validation' ? (
+        <section className="card">
+          <h2>سُجِّل عملك — والمستوى بانتظار تحقق مستقل</h2>
+          <p className="body-sm">
+            ما أعلنتِه وما رفعتِه سُجِّل، والملاحظات أعلاه للتعلّم. لكن الإعلان لا يُعدّ دليلًا، ورفع ملف يثبت أنه قُدِّم لا أن محتواه يستوفي المعيار.
+            لا يتغيّر مستوى المهارة إلا بعد تحقق مستقل: مراجعة بشرية بمعايير معتمدة، أو فحص تجريه المنصّة بنفسها.
+          </p>
+          <p className="body-sm muted">مهارتك تبقى حيث هي — لا تنزل.</p>
+        </section>
       ) : (
         <section className="card">
           <h2>لم يُنتَج دليل</h2>

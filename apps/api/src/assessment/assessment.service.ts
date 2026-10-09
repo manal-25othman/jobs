@@ -11,13 +11,13 @@ export class AssessmentService {
     return this.db.asService(async (c) => {
       const { rows } = await c.query(
         `select id, key, version, description_en, applies_outcomes::text[] as applies_outcomes, accept_rubric_proposal, max_resulting_state, min_assessment_confidence, min_independent_evidence,
-                escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, review_status, validation_note_en
+                escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, review_status, validation_note_en, promotion_basis, practiced_on_submission
            from verification_policy order by key, version`);
       return rows.map((r) => ({
         id: r.id, key: r.key, version: Number(r.version), descriptionEn: r.description_en, appliesOutcomes: r.applies_outcomes, acceptRubricProposal: r.accept_rubric_proposal,
         maxResultingState: r.max_resulting_state, minAssessmentConfidence: r.min_assessment_confidence === null ? null : Number(r.min_assessment_confidence),
         minIndependentEvidence: r.min_independent_evidence === null ? null : Number(r.min_independent_evidence), escalateOn: r.escalate_on, blockingRule: r.blocking_rule,
-        perSkillEvidenceDerivation: r.per_skill_evidence_derivation, decisionActors: r.decision_actors, activation: r.activation, isLegacyBaseline: r.activation === 'legacy_baseline', baselineOf: r.baseline_of, reviewStatus: r.review_status,
+        perSkillEvidenceDerivation: r.per_skill_evidence_derivation, decisionActors: r.decision_actors, promotionBasis: r.promotion_basis, practicedOnSubmission: r.practiced_on_submission, activation: r.activation, isLegacyBaseline: r.activation === 'legacy_baseline', baselineOf: r.baseline_of, reviewStatus: r.review_status,
         validated: verificationPolicyIsValidated({ reviewStatus: r.review_status }), validationNote: r.validation_note_en,
       }));
     });

@@ -31,7 +31,54 @@ export async function newUser(): Promise<TestUser> {
   return { id, token: await makeToken(id) };
 }
 
-export async function bootApp(): Promise<INestApplication> {
+/**
+ * D-118 — TEST-ONLY legacy compatibility. The suites written before the
+ * verification-integrity remediation exercise flows that start from a
+ * Demonstrated level reached by the slice-1 demo rubric (declarations). Their
+ * subject is NOT how a level is earned, so they run under an explicit,
+ * development-only policy with the legacy basis. It can never reach a real
+ * environment: the database refuses a legacy-basis row as production_active
+ * or as a baseline, and refuses development_only activation in production.
+ * The remediation itself is tested in verification-integrity.e2e.ts against
+ * the safety baseline (and in production mode).
+ */
+export const E2E_COMPAT_DESCRIPTION = 'E2E TEST COMPATIBILITY ONLY (D-118): legacy promotion basis for pre-remediation suites; development_only; never production.';
+export async function useLegacyVerificationCompat(): Promise<void> {
+  const { Pool } = await import('pg');
+  const pool = new Pool({ connectionString: process.env['DATABASE_URL'] });
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    await c.query("select set_config('naqla.config_actor', 'e2e harness', true), set_config('naqla.config_reason', 'test-only legacy compatibility for pre-remediation suites (D-118)', true)");
+    const inEffect = (await c.query(`select id, promotion_basis from verification_policy where key = 'default' and activation <> 'inactive'`)).rows[0];
+    if (inEffect?.promotion_basis === 'legacy_any_pass') { await c.query('commit'); return; }
+    let compat = (await c.query(`select id from verification_policy where key = 'default' and description_en = $1`, [E2E_COMPAT_DESCRIPTION])).rows[0]?.id as string | undefined;
+    if (!compat) {
+      compat = (await c.query(`insert into verification_policy (key, version, description_en, promotion_basis, practiced_on_submission)
+        values ('default', 900, $1, 'legacy_any_pass', true) returning id`, [E2E_COMPAT_DESCRIPTION])).rows[0].id as string;
+    }
+    if (inEffect) await c.query(`update verification_policy set activation = 'inactive' where id = $1`, [inEffect.id]);
+    await c.query(`update verification_policy set activation = 'development_only' where id = $1`, [compat]);
+    await c.query('commit');
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); await pool.end(); }
+}
+
+/** D-118: puts the migration-created safety baseline back in effect (the real-environment default). */
+export async function useSafetyBaseline(): Promise<void> {
+  const { Pool } = await import('pg');
+  const pool = new Pool({ connectionString: process.env['DATABASE_URL'] });
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    await c.query("select set_config('naqla.config_actor', 'e2e harness', true), set_config('naqla.config_reason', 'restore the D-118 safety baseline', true)");
+    await c.query(`update verification_policy set activation = 'inactive' where key = 'default' and activation <> 'inactive' and not (version = 2 and baseline_of is not null)`);
+    await c.query(`update verification_policy set activation = 'legacy_baseline' where key = 'default' and version = 2 and baseline_of is not null and activation <> 'legacy_baseline'`);
+    await c.query('commit');
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); await pool.end(); }
+}
+
+export async function bootApp(opts: { legacyVerificationCompat?: boolean } = {}): Promise<INestApplication> {
+  if (opts.legacyVerificationCompat !== false) await useLegacyVerificationCompat();
   process.env['SUPABASE_JWT_SECRET'] = JWT_SECRET;
   // TEST DOUBLE for storage; proves ownership/provenance/report boundary, not Supabase.
   process.env['STORAGE_DRIVER'] = 'memory';
@@ -60,7 +107,7 @@ export const COMPLETE_ARTIFACTS = [
   { key: 'test.error_message', kind: 'boolean' as const, valueBool: true, locator: 'HabitList.test.jsx:44' },
   { key: 'note.coverage', kind: 'text' as const,
     valueText: 'Covers empty, loading and error states; does not cover pagination.', locator: 'notes.md' },
-  { key: 'signal.tests_reference_component', kind: 'boolean' as const, valueBool: true },
+  // D-118: `signal.tests_reference_component` was sent here (and by the UI) — a platform fact no client may write. Removed; the API refuses it.
 ];
 
 /** The same submission with the mandatory error-message test missing. */

@@ -14,6 +14,8 @@ import {
 const DRAFT_DEFAULT: VerificationPolicy = {
   id: 'p1', key: 'default', version: 1, reviewStatus: 'draft', appliesOutcomes: ['passed'], acceptRubricProposal: true, maxResultingState: null,
   minAssessmentConfidence: null, minIndependentEvidence: null, escalateOn: {}, blockingRule: 'mandatory_criteria_unmet_blocks', perSkillEvidenceDerivation: false, decisionActors: ['policy', 'human'],
+  // D-118: the 0013 row IS the legacy basis (outside production only).
+  promotionBasis: 'legacy_any_pass', practicedOnSubmission: true,
 };
 
 describe('DRAFT default policy == legacy behaviour (exhaustive over outcomes × proposed × current)', () => {

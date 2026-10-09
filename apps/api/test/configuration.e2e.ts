@@ -48,9 +48,13 @@ describe('activation model — the baseline is not a draft, and a draft is never
   test('the registry shows the legacy baseline as NOT validated and distinct from draft; production would resolve to it, never to a draft', async () => {
     const user = await bootstrapped();
     const r = (await http.get('/v1/config/policies').set(auth(user)).expect(200)).body.data;
-    const vp = r.verificationPolicies.items.find((p: { key: string; version: number }) => p.key === 'default' && p.version === 1);
-    assert.equal(vp.activation, 'legacy_baseline'); assert.equal(vp.isLegacyBaseline, true); assert.equal(vp.validated, false); assert.equal(vp.reviewStatus, 'draft');
-    assert.match(vp.validationNote, /LEGACY BASELINE — NOT EXPERT-VALIDATED/);
+    // D-118: default@1 retired (history); default@2 is the restrictive safety baseline — not validated, never a draft.
+    const v1 = r.verificationPolicies.items.find((p: { key: string; version: number }) => p.key === 'default' && p.version === 1);
+    assert.equal(v1.activation, 'inactive'); assert.match(v1.validationNote, /LEGACY BASELINE — NOT EXPERT-VALIDATED/);
+    const vp = r.verificationPolicies.items.find((p: { key: string; version: number }) => p.key === 'default' && p.version === 2);
+    assert.ok(vp.baselineOf, 'default@2 is the migration-created baseline (momentarily inactive while this suite runs the test-only compatibility row)');
+    assert.equal(vp.validated, false); assert.equal(vp.reviewStatus, 'draft');
+    assert.match(vp.validationNote, /SAFETY BASELINE — restricts, never grants/);
     assert.match(r.activationModel.legacy_baseline, /NOT validated/);
     const cx = r.assessmentContextPolicies.items[0];
     assert.equal(cx.activation, 'legacy_baseline'); assert.equal(cx.inputs.user_identity, 'excluded');
@@ -94,7 +98,8 @@ describe('activation model — the baseline is not a draft, and a draft is never
     const c = await pool.connect();
     try {
       await c.query('begin');
-      const base = (await c.query(`select id from verification_policy where key = 'default' and activation = 'legacy_baseline'`)).rows[0].id;
+      // D-118: the row in effect (the test-only compatibility row for this suite) — any row that has been active.
+      const base = (await c.query(`select id from verification_policy where key = 'default' and activation <> 'inactive'`)).rows[0].id;
       await expectRejected(c, `update verification_policy set activation = 'inactive' where id = $1`, [base], /needs naqla.config_actor and naqla.config_reason/);
       await expectRejected(c, `update verification_policy set min_assessment_confidence = 0.9 where id = $1`, [base], /has been active; its content is immutable/);
       await expectRejected(c, `update assessment_context_policy set inputs = inputs || '{"user_identity":"optional"}' where key = 'default'`, [], /identity_excluded|immutable/);
@@ -103,7 +108,7 @@ describe('activation model — the baseline is not a draft, and a draft is never
   });
 
   test('the admin acts: approve, activate (audited in config_change), never replacing an active row by accident; the baseline cannot be approved in place', async () => {
-    const base = (await pool.query(`select id from verification_policy where key = 'default' and activation = 'legacy_baseline'`)).rows[0].id;
+    const base = (await pool.query(`select id from verification_policy where key = 'default' and baseline_of is not null order by version desc limit 1`)).rows[0].id;
     await assert.rejects(cliApprove(pool, { table: 'verification_policy', id: base, approvedBy: 'sme-1', approvedByLabel: 'SME One', reason: 'x' }), /not approved in place/);
     const v = (await withActor((c) => c.query(`insert into verification_policy (key, version, description_en) values ('default', 96, 'e2e candidate') returning id`))).rows[0].id;
     await assert.rejects(cliActivate(pool, { table: 'verification_policy', id: v, activation: 'production_active', actor: 'ops', reason: 'go' }), /DRAFT \/ NOT VALIDATED|validated row approved/);
@@ -128,7 +133,7 @@ describe('every new assessment names its configuration; history keeps the versio
     assert.equal(first.assessment.inputsUsed['identity_excluded'], true);
     assert.equal(first.assessment.inputsUsed['context_policy'], 'default@1');
     assert.ok(Array.isArray(first.assessment.inputsUsed['excluded']) && (first.assessment.inputsUsed['excluded'] as string[]).includes('user_identity'));
-    assert.equal(first.assessment.decisions[0]!.policy.resolution, 'legacy_baseline', 'the decision records that the baseline — not a validated policy — decided');
+    assert.equal(first.assessment.decisions[0]!.policy.resolution, 'development_only', 'the decision records which non-validated policy decided (here the test-only compatibility row, D-118)');
     assert.equal(first.assessment.decisions[0]!.trackConfigVersionId, first.assessment.versions.trackConfigVersionId);
 
     // A new draft version of the track configuration: created inactive; activated for development only after deactivating v1 explicitly.
