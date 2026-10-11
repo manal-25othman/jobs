@@ -2,6 +2,8 @@
 
 **Date:** 2026-10-11 · **Status:** PROPOSAL. Nothing is implemented, activated, published or approved.
 
+> **Revised (2026-10-11):** the Product Owner accepted this plan's direction conditionally and did not approve its configuration. The revision is `NAQLA-JUNIOR-FRONTEND-SME-REVISED-DECISION-PACK.md`. Its §10 lists exactly which sections of this plan it supersedes. This file stays as the record of the first proposal.
+
 **What this is not.**
 - It does not edit the SRS.
 - It activates no policy and publishes no track.
