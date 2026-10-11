@@ -1,107 +1,134 @@
-> **DRAFT · NOT SME APPROVED · NOT PUBLISHED · NOT IMPORTED.** Candidate specifications for the two distinct short validation tasks (C3).
-> - Durations, thresholds and mandatory flags are SME values.
-> - Each task belongs to a **different variant family** from the integrated task and from each other (EXT-2, I-2), so the same solution cannot satisfy two of them.
+> **DRAFT · NOT SME APPROVED · NOT PUBLISHED · NOT IMPORTED.** The two distinct short practical tasks (C3, F5), Rev. 2.
+> - **Both adapted from 0.2.1 activities**, so working content is reused, not discarded (decision pack §H).
+> - Durations, weights, thresholds and mandatory flags are SME values.
 
-# Short validation tasks (candidate)
+# Short practical tasks (candidate)
 
-## Short Task A: `act_fe_short_profile_card`
+## Task A: `act_fe_short_accessible_registration`
 
-| Field | Candidate value |
+**Derived from `act_fe_debug_improve@0.1.0`** («تسجيل في ورشة»).
+
+| Field | Value |
 |---|---|
-| `variant_family` | `short_profile_card_fetch` (different domain, data shape, layout and state set from `integrated_support_tickets`) |
-| `is_validation_activity` | **true** (C3: the distinct short task; EXT-2, I-1) |
-| `can_yield_verified` | false |
-| `ai_usage_mode` | `ai_assisted` |
-| `estimated_minutes` | SME value (draft 45–60) |
-| Primary skills | `skl_css_responsive`, `skl_api_data_states` (2; both `is_core` under P-1) |
-| Secondary skills | html, js, ui_state, accessibility |
-| Git | not placed (DM-4: keeps the task short) |
-
-**Inputs:**
-- `brief.profile_card` (visible).
-- `api.mock_profile` (private behaviour): success, not found (404), server error, slow. Needs CAP-4.
-- No starter code: the learner builds from scratch, unlike the integrated task.
-
-**Deliverables:**
-
-| Key | Kind | Mandatory |
-|---|---|---|
-| `file.index_html`, `file.styles_css`, `file.app_js` | file | yes |
-| `answer.states_explained` | text | yes |
-
-**Criteria:** 7 including the gate (≥ 5 ✓).
-
-| Criterion | Skill | Mandatory (proposed) |
-|---|---|---|
-| `semantic_structure` | html | yes |
-| `responsive_layout` | css | yes |
-| `data_states` (loading / not-found / error / success) | api_states | yes |
-| `state_transitions` (a "show more / less" toggle and a retry, both state-driven) | ui_state | yes |
-| `js_correctness` | js | yes |
-| `a11y_keyboard` | accessibility | no; never blocks other skills |
-| `deliverables_complete` | — | gate |
-
-**Learner brief (Arabic):**
-> **بطاقة عضو الفريق**
-> اعرضي بطاقة متجاوبة لعضو فريق تُجلب بياناته من الخادم: الاسم والدور وصورة ونبذة قصيرة مع زر «عرض المزيد / أقل».
-> اعرضي كل الحالات: جارٍ التحميل، والعضو غير موجود، وخطأ مع إعادة المحاولة، والبطاقة.
-> البطاقة تبقى مقروءة على الهاتف والحاسوب، ويمكن الوصول إلى أزرارها بلوحة المفاتيح.
-> اشرحي في فقرة قصيرة كيف تنتقل الواجهة بين الحالات في كودك.
-
-## Short Task B: `act_fe_short_bugfix`
-
-| Field | Candidate value |
-|---|---|
-| `variant_family` | `short_cart_total_bugfix` (different code base, bug class and data from the integrated task's planted bug) |
+| `variant_family` | `workshop_registration_form` (different domain, starting code and behaviours from INT) |
 | `is_validation_activity` | **true** |
 | `can_yield_verified` | false |
 | `ai_usage_mode` | `ai_assisted` |
-| `estimated_minutes` | SME value (draft 30–45) |
-| Primary skills | `skl_frontend_debugging`, `skl_code_reading` (2; both `is_core` under P-1; under P-2 this task would fail `activity_core_primary_skill_count`) |
-| Secondary skills | version_control (G-P1, G-P3), technical_explanation |
-| Git | placed in **G-P1** and G-P3 |
+| `estimated_minutes` | SME value (0.2.1: 90; draft 60) |
+| Primary skills | html, css, js (unchanged) |
+| Secondary skills | accessibility, forms_validation, debugging, code_reading |
+| Covers (F5) | semantic HTML, accessibility incl. **forms and keyboard**, responsive, JS validation without a framework |
+| Git | not assessed (F4) |
 
-**Inputs:**
-- `repo.cart` (private, `contains_planted_issue`): a small cart page. The total shows «1005» instead of «15» because quantity input values are strings and are concatenated, not added. A second function, `formatPrice`, is used in the code-reading question.
-- `report.bug` (visible).
+**Inputs (reused):**
+- `repo.registration_page` (private): an existing page with the 0.2.1 planted issues:
+  - a hidden-overflow mask that hides a width fault;
+  - a «زر لا يعمل» complaint whose cause is focus or handler, not the button;
+  - an e-mail field that accepts invalid input;
+  - non-semantic controls.
+- `report.complaints` (private): three user complaints, one describing a symptom rather than a cause.
+
+**Deliverables (reused):**
+- `file.index_html`, `file.styles_css`, `file.app_js`;
+- `note.root_causes`;
+- `answer.explanation` («إحدى الشكاوى تقول "الزر لا يعمل". ما السبب الفعلي الذي وجدتِه، وكيف تأكدتِ؟»).
+
+**Rubric** (values blank; 7 criteria including the gate, ≥ 5 ✓):
+
+| # | Criterion | Skill | Mandatory (proposed) | Status | Reviewer observes |
+|---|---|---|---|---|---|
+| 1 | `semantic_fixed` | html | yes | reused | buttons are buttons, headings ordered, the form uses form/label |
+| 2 | `a11y_keyboard_forms` | accessibility | no; never blocks other skills | adapted from `a11y_basics_fixed` | every control labelled, **error messages tied to their fields**, form usable by keyboard alone, focus visible |
+| 3 | `responsive_fixed` | css | yes | reused | no horizontal scroll at 360 px; the mask removed and the width cause fixed; sidebar at 1024 px |
+| 4 | `validation_fixed` | js | yes | reused | an invalid e-mail is rejected with a message beside the field; a reasonable check (does not reject common valid addresses); the error is not swallowed |
+| 5 | `root_cause_note` | debugging | yes | reused | one line per fault naming the cause, not the symptom |
+| 6 | `scope_discipline` | code_reading | no | reused | changes at the fault locations; the page not rewritten |
+| 7 | `deliverables_complete` | — | gate | reused | files and note present |
+
+**Integrity checks (reused):**
+- `explain_symptom_vs_cause`;
+- `planted_hidden_overflow`;
+- `deterministic_email_signal`;
+- `files_present`.
+
+`followup_change_breakpoint` and `output_consistency_layout` stay `future_deterministic` and inactive (F3: no universal follow-up).
+
+**Learner brief (Arabic):**
+> **صفحة التسجيل في الورشة**
+> صفحة «تسجيل في ورشة» قائمة تلقّت شكاوى: تنكسر على الجوال، ولا تعمل بلوحة المفاتيح، وتقبل بريدًا غير صالح. مسؤولة التسويق تريد إطلاقها خلال يومين.
+> أصلحي البنية الدلالية وإتاحة النموذج (تسميات واضحة، ورسائل خطأ مرتبطة بحقولها، واستخدام كامل بلوحة المفاتيح مع تركيز ظاهر)، والسلوك المتجاوب، والتحقق من البريد، **دون إعادة كتابة الصفحة**.
+> اكتبي لكل عطل سطرًا يسمّي سببه لا عَرَضه، وأجيبي: إحدى الشكاوى تقول «الزر لا يعمل»؛ ما السبب الفعلي الذي وجدتِه، وكيف تأكدتِ؟
+
+## Task B: `act_fe_short_read_and_fix`
+
+**Derived from `act_fe_change_request@0.1.0`** («مهام الفريق»).
+
+| Field | Value |
+|---|---|
+| `variant_family` | `team_tasks_change` (different domain and code base from INT). INT *builds* states from scratch; B *diagnoses* a misclassified state in existing code |
+| `is_validation_activity` | **true** |
+| `can_yield_verified` | false |
+| `ai_usage_mode` | `ai_assisted` |
+| `estimated_minutes` | SME value (0.2.1: 90; draft 60) |
+| Primary skills | **code_reading, debugging, js** (0.2.1: js, ui_state, api_states) |
+| Secondary skills | ui_state, api_states, technical_explanation |
+| Covers (F5) | Code Reading of existing code (read, explain, trace), basic debugging, JS; plus UI state and the empty API state |
+| Git | not assessed (F4) |
+
+**Inputs (reused):**
+- `repo.team_tasks` (private; planted: `app.js` treats an empty list `[]` as an error);
+- `request.change` (filter by status + the bug report);
+- `api.mock_tasks` (may return an empty list).
 
 **Deliverables:**
 
-| Key | Kind | Mandatory |
+| Key | Status | Mandatory |
 |---|---|---|
-| `file.app_js` | file | yes |
-| `note.bug_cause` | text | yes |
-| `answer.code_reading` («ماذا تفعل الدالة formatPrice ومتى تُستدعى؟») | text | yes |
-| `link.pull_request` + `text.head_sha` | link + text | yes in G-P1 / G-P3 |
-| `answer.git_diff_explained` | text | yes in G-P1 / G-P3 |
+| `file.app_js` | reused | yes |
+| `file.index_html` | reused | no |
+| `answer.component_explained` («ماذا تفعل الدالة `renderTasks` حين تكون الحالة كذا؟») | **new** | yes |
+| `note.decision` (where the problem originates, what changed, the rejected alternative) | reused | yes |
+| `answer.explanation` | reused | yes |
 
-**Criteria:** 7 including the gate (≥ 5 ✓).
+**Rubric** (values blank; 8 criteria including the gate, ≥ 5 ✓):
 
-| Criterion | Skill | Mandatory (proposed) |
-|---|---|---|
-| `root_cause_fixed` (converts at the input boundary, not by patching the displayed string) | debugging | yes |
-| `cause_located_in_code` | code_reading | yes |
-| `code_explained` (formatPrice: what, when, edge case) | code_reading | yes, **assessed even if the fix fails** (Alt. B independence) |
-| `no_regression` (reviewer checklist: add, remove, zero quantity) | debugging | no |
-| `git_workflow` | version_control | yes where placed |
-| `fix_explained` | technical_explanation | no |
-| `deliverables_complete` | — | gate |
+| # | Criterion | Skill | Mandatory (proposed) | Status | Reviewer observes |
+|---|---|---|---|---|---|
+| 1 | `component_explained` | code_reading | yes | **new** | explains correctly what the given component does with the given state, from the code |
+| 2 | `problem_traced` | code_reading | yes | adapted from `code_reading` | `note.decision` names where the empty-as-error problem originates and why; the change is in that place within the existing structure |
+| 3 | `root_cause_fixed` | debugging | yes | reused | the "list is empty" condition is fixed at its cause, not hidden (e.g. a try/catch around rendering) |
+| 4 | `filter_in_state` | ui_state | yes | reused | the filter changes state and the view follows; one source of truth |
+| 5 | `empty_state_correct` | api_states | yes | reused | an empty list and an empty filter result show a state message, not an error |
+| 6 | `js_correctness` | js | yes | reused | no accidental globals, rejection handled, no scattered shared mutation |
+| 7 | `decision_explained` | technical_explanation | no | reused | names the root cause, what changed and the rejected alternative |
+| 8 | `deliverables_complete` | — | gate | reused | script and note present |
+
+**Separation (F1):**
+- Criteria 1–2 (Code Reading) and criterion 3 (Debugging) are scored separately.
+- A learner who traces correctly but fixes wrongly gets a Code Reading result and no Debugging result, and the other way round.
+
+**Integrity checks (reused):**
+- `explain_rejected_alternative`;
+- `planted_empty_as_error`;
+- `deterministic_state_signal`;
+- `edge_empty_after_filter`;
+- `files_present`.
+
+`followup_second_filter` stays inactive.
 
 **Learner brief (Arabic):**
-> **إصلاح مجموع السلة**
-> بلاغ من مستخدم: «أضفت منتجين، فظهر المجموع 1005 بدل 15».
-> أصلحي الخطأ من سببه على فرع جديد، وقدّمي Pull Request يشرح ما تغيّر ولماذا، وأرسلي رابطه ورمز آخر إيداع.
-> اكتبي أين كان السبب في الكود ولماذا أنتج هذا الرقم.
-> اشرحي ماذا تفعل الدالة `formatPrice` ومتى تُستدعى.
+> **قائمة مهام الفريق: اقرئي ثم أصلحي**
+> قائمة «مهام الفريق» تعمل منذ شهر. صاحب المنتج يطلب: (١) تصفية المهام بالحالة، (٢) إصلاح بلاغ: عند خلو القائمة تظهر رسالة خطأ بدل «لا مهام».
+> قبل أن تعدّلي: اقرئي الكود القائم واشرحي ماذا تفعل الدالة `renderTasks` حين تكون الحالة كما في المثال المرفق.
+> ثم حدّدي أين ينشأ سبب البلاغ ولماذا، وأصلحيه في موضعه، ونفّذي التصفية ضمن البنية الحالية.
+> اشرحي قرارك والبديل الذي رفضتِه.
 
-## Why these count as distinct (for SME review, DM-3)
+## Why INT, A and B are distinct (for SME confirmation)
 
-| | Integrated | Task A | Task B |
+| | INT | A | B |
 |---|---|---|---|
-| Domain | support tickets | team profile | shopping cart |
-| Starting point | starter code + planted bug | from scratch | existing code + different bug class |
-| API states | list: loading / error / empty / success | single resource: loading / not-found / error / success | none |
-| Bug class | async state not reset | — | type coercion at an input boundary |
-| Code reading | own code walkthrough | — | unfamiliar function explained |
-
-**SME question:** are these differences enough that the same solution, or a lightly edited copy, cannot meet the second task's criteria (I-2)?
+| Domain | leave requests | workshop registration | team tasks |
+| Starting point | starter shell + planted async-state bug | existing page with 4 planted faults | existing project with a planted state-classification bug |
+| Main behaviour assessed | build responsive UI + API states; trace and fix; Git | semantics, accessible form, responsive repair, validation | read and explain a component; trace and fix; state-driven filter |
+| API states | builds loading / error / empty / success | — | corrects empty-vs-error classification |
+| Code Reading | traces the bug in the starter | (extra: scope) | explains a component + traces |

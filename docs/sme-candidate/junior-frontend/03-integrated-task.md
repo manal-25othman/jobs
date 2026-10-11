@@ -1,110 +1,90 @@
-> **DRAFT · NOT SME APPROVED · NOT PUBLISHED · NOT IMPORTED.** Candidate specification for the integrated practical assessment (C5 condition 3).
-> - Durations, thresholds, weights, mandatory flags and the borderline band are **SME values** (V-4, V-6), not set here.
-> - Private inputs are described for reviewers only.
+> **DRAFT · NOT SME APPROVED · NOT PUBLISHED · NOT IMPORTED.** Integrated practical assessment (C5 condition 3), Rev. 2.
+> - **Adapted from `act_fe_build_interface@0.1.0`** («طلب إجازة»). Its scenario and working criteria are reused (decision pack §H).
+> - Durations, weights, thresholds, mandatory flags and the borderline band are SME values.
 
-# Integrated practical task: `act_fe_integrated_junior` (candidate)
+# INT: `act_fe_integrated_leave_requests` (candidate)
 
 ## 1. Specification
 
-| Field | Candidate value |
+| Field | Value |
 |---|---|
-| `code` | `act_fe_integrated_junior` |
-| `level` | junior |
-| `variant_family` (EXT-2 field, proposed) | `integrated_support_tickets` |
-| `is_validation_activity` | false (this is the "project" in C3) |
-| `can_yield_demonstrated` | true, only through an approved non-demo rubric and the authorized basis (D-118) |
+| Derived from | `act_fe_build_interface@0.1.0` (`source_refs` + `CHANGES.md`) |
+| `variant_family` (ENG-2) | `leave_requests_list` |
+| `is_validation_activity` | false ("the project", C3) |
 | `can_yield_verified` | **false** (D-102) |
-| `ai_usage_mode` | `ai_assisted` (allowed; disclosure is context, never a penalty, BR-025) |
-| `estimated_minutes` | **V-6**: SME to set; first plan range 150–180 |
-| Primary skills (declared) | `skl_css_responsive`, `skl_api_data_states`, `skl_frontend_debugging` (3) |
-| Secondary skills (declared) | html, js, ui_state, code_reading, version_control, accessibility, technical_explanation |
-| Readiness role | Its **pass** (pass rule DM-6) is the fact EXT-1 reads. Its **criterion results** are per-skill evidence |
+| `ai_usage_mode` | `ai_assisted` (disclosure is context only, BR-025) |
+| `estimated_minutes` | SME value (0.2.1: 120; with the bug fix and Git, draft 150) |
+| Primary skills | css, api_states, debugging |
+| Secondary skills | html, js, ui_state, code_reading, version_control, accessibility, technical_explanation, requirements_reading |
+| Tasks | `tsk_fe_build_from_brief`, `tsk_fe_fetch_api`, `tsk_fe_data_states`, `tsk_fe_responsive_page`, `tsk_fe_fix_ui_bug`, **`tsk_fe_version_control_flow` (new)** |
+| Readiness role | Its **pass** (pass rule J-4) is the fact EXT-1 reads. Its **criteria** feed per-skill paths |
 
-### 1.1 Inputs
+### Inputs
 
-| Key | Learner sees | Private? | Content |
-|---|---|---|---|
-| `brief.support_tickets` | yes | no | The brief (§2) and acceptance list |
-| `repo.starter` | «مادة تُقدَّم مع النشاط» until work starts | **yes** (`contains_planted_issue`) | Starter HTML/CSS/JS with a ticket list rendered from state, a status filter, and a **planted bug** (§1.4) |
-| `api.mock_tickets` | described as «نقطة نهاية تجريبية» | **yes** (behaviour) | Mock endpoint with scenarios: success (n tickets), empty list, server error (500), slow response. Needs **CAP-4**. Until it exists the activity cannot be delivered as designed, and the UI says so (D-120: materials unavailable, never simulated) |
+| Key | Status | Learner sees | Private | Content |
+|---|---|---|---|---|
+| `brief.leave_requests` | adapted from `brief.leave_request` | yes | no | Page for previous leave requests, plus an acceptance list. Contains one deliberate conflict with the API data (sort order) |
+| `repo.starter` | **new** | «مادة تُقدَّم مع النشاط» | **yes** (`contains_planted_issue`) | Page shell + `requests.js` that loads the list, with a **planted bug** (§3) |
+| `api.mock_requests` | reused | described | behaviour private | 200 (list) · 500 · empty list · slow. Needs ENG-4 |
 
-### 1.2 Deliverables
+### Deliverables
 
-Mapping is explicit (no positional mapping).
+| Key | Status | Kind | Mandatory | Feeds |
+|---|---|---|---|---|
+| `file.index_html`, `file.styles_css`, `file.app_js` | reused | file | yes | html, css, api, ui, debugging |
+| `note.data_flow` | reused | text | yes | `code_understanding` |
+| `answer.clarification` | reused | text | yes | `judgment_assumption_check` |
+| `note.bug_trace` | new | text | yes | `problem_traced` |
+| `answer.decisions` | new | text | yes | `decision_clarity` |
+| `link.pull_request` + `text.head_sha` | new | link + text | yes | `git_workflow` |
+| `answer.git_diff_explained` | new | text | yes | `git_workflow` (G-4) |
 
-| Key | Kind | Mandatory | Purpose |
-|---|---|---|---|
-| `file.index_html` | file | yes | Structure |
-| `file.styles_css` | file | yes | Responsive layout |
-| `file.app_js` | file | yes | Fetch, states, filter, fix |
-| `note.bug_cause` | text | yes | Root cause of the planted bug, pointing to the code location |
-| `answer.decision_1`, `answer.decision_2` | text | yes | Two decisions in their own code and why |
-| `answer.code_walkthrough` | text | yes | Walk through how a status change reaches the screen (`code_understanding`, R1) |
-| `link.pull_request` + `text.head_sha` | link + text | yes (Git placed here in every DM-4 option) | Branch, commits, PR. See `02-skills-and-git.md` §3 |
-| `answer.git_diff_explained` | text | yes | G-4 |
-| *(follow-up round)* `file.app_js@followup`, `note.followup_change` | — | — | Needs **CAP-7**. Not part of the deliverable set until built |
+## 2. Rubric (values blank)
 
-### 1.3 Criteria
+| # | Criterion | Skill | Mandatory (proposed, SME-25 basis) | Status | Reviewer observes |
+|---|---|---|---|---|---|
+| 1 | `semantic_structure` | html | yes | reused | ordered headings, landmarks, the list as a list, a labelled filter/control |
+| 2 | `responsive_layout` | css | **yes** (was no) | adapted | usable at 360 px and 1024 px with no horizontal scroll |
+| 3 | `data_states` | api_states | yes | reused | loading, error with retry, empty and success are each visible and understandable |
+| 4 | `state_transitions` | ui_state | yes | reused | state explicit, view follows it; retry resets state; no two contradictory states |
+| 5 | `problem_traced` | code_reading | yes | new | `note.bug_trace` names the location in the **starter code** and how it produced the symptom |
+| 6 | `root_cause_fixed` | debugging | yes | new | the planted bug fixed at its cause, not hidden |
+| 7 | `code_understanding` | js | yes (F2: everyone) | adapted from `explanation_clarity` | `note.data_flow` explains, with reference to **own** code, where state lives and how data reaches the view |
+| 8 | `git_workflow` | version_control | yes | new | G-1…G-4 (`02-skills-and-git.md` §3) |
+| 9 | `decision_clarity` | technical_explanation | no | new | two decisions, each with a reason |
+| 10 | `judgment_assumption_check` | requirements_reading | no | adapted | the brief/API conflict is named and a choice stated |
+| 11 | `a11y_basics` | accessibility | no; **never blocks other skills** | new | keyboard path through the controls; visible focus |
+| 12 | `deliverables_complete` | — | gate | reused | files and notes present (presence only, not skill evidence) |
 
-Each criterion feeds only its own skill (decision pack §6.2).
+**Pass (J-4):**
+- PR-1 = gate + mandatory 1–8 + total; or PR-2 = gate + mandatory 1–8.
+- Borderline → human review (C4).
+- Counts for EXT-1 only when standing, accepted and on an approved non-demo version.
 
-| Criterion | Skill | Mandatory (proposed) | Notes |
-|---|---|---|---|
-| `semantic_structure` | html | proposed yes | Landmarks, heading order, list semantics for tickets, labelled filter |
-| `responsive_layout` | css | proposed yes | Configured viewports (SME: which ones). No horizontal overflow |
-| `data_states` | api_states | proposed yes | Loading, error (with retry), empty and success each visible and correct |
-| `state_transitions` | ui_state | proposed yes | Filter and data states driven by state; retry resets state correctly |
-| `root_cause_fixed` | debugging | proposed yes | Planted bug fixed at its cause |
-| `cause_located_in_code` | code_reading | proposed yes | `note.bug_cause` names the location and why it produced the symptom |
-| `code_understanding` | js | proposed yes under R1 (DM-5) | See §1.5 |
-| `git_workflow` | version_control | proposed yes | G-1…G-4 |
-| `decision_clarity` | technical_explanation | no | Two decisions explained with a reason |
-| `a11y_basics` | accessibility | no; **never blocks other skills** | Keyboard path through filter and retry; visible focus |
-| `no_regression` | debugging | no (needs CAP-1 to be fair; reviewer checklist until then) | Filter still works after the fix |
-| `deliverables_complete` | — | gate | Presence only (D-118: not skill evidence) |
+**Not required:** a live modification round (F3), or any AI-specific challenge (F2).
 
-12 criteria including the gate (≥ 5 ✓).
+## 3. Planted bug (reviewer-only; SME to confirm)
 
-### 1.4 Planted bug (private; for SME confirmation, V-6)
+After a 500 response, the user presses «إعادة المحاولة». The list appears, but the loading indicator stays.
+- **Cause:** `isLoading` is set again on retry but cleared only in the first-load success branch.
+- **Fixed at the cause:** clearing it on a path common to success and failure.
+- **Not credited:** hiding it with CSS, or deleting it.
 
-After a failed load, pressing «إعادة المحاولة» shows the tickets but the loading indicator never disappears. The `loading` flag is set again in the retry path but cleared only in the first-load success branch.
+## 4. Learner brief (Arabic)
 
-- **Fix at the cause:** clear `loading` in a path common to success and failure.
-- **Symptom-hiding fix (not credited):** hiding the indicator with CSS, or removing it.
+**صفحة طلبات الإجازة: بناء وإصلاح وتسليم عبر Pull Request**
 
-### 1.5 `code_understanding` (R1) until CAP-7 exists
-
-The SME's method is modification + explanation. Without a follow-up round, the only honest interim is:
-- a written walkthrough of the learner's own code (`answer.code_walkthrough`);
-- `answer.git_diff_explained`.
-
-**Open item OI-1 (SME):** does this interim suffice for a *blocking* criterion?
-- **If not:** `code_understanding` is non-mandatory until CAP-7. This weakens the SME's "blocks" intent.
-- **If so:** it stays mandatory, with the interim evidence.
-
-Either way, AI disclosure plays **no** part in the outcome (BR-025).
-
-### 1.6 Pass rule
-
-DM-6: PR-1 (gate + all mandatory + total) or PR-2 (gate + all mandatory).
-- The borderline band routes to human review (C4).
-- A result is "passed" for EXT-1 only when it is standing, accepted (not `pending_validation`) and on an approved, non-demo version.
-
-## 2. Learner brief (Arabic, candidate)
-
-**العنوان:** لوحة طلبات الدعم: بناء وإصلاح وتسليم عبر Pull Request
-
-**سياق العمل:** فريق الدعم يحتاج صفحة تعرض طلبات الدعم من الخادم، مع تصفيتها حسب الحالة. بدأ زميل العمل عليها ثم انتقل لمهمة أخرى، وترك بلاغًا: «بعد فشل التحميل والضغط على إعادة المحاولة، تظهر الطلبات لكن مؤشر التحميل لا يختفي».
+**سياق العمل:** يريد فريق الموارد البشرية صفحة يرى فيها الموظف طلبات إجازته السابقة، تُجلب من خدمة داخلية. بدأ زميل العمل على الصفحة ثم انتقل إلى مهمة أخرى، وترك بلاغًا: «بعد فشل التحميل والضغط على إعادة المحاولة، تظهر الطلبات لكن مؤشر التحميل لا يختفي».
 
 **المطلوب منك:**
-1. اجعلي الصفحة متجاوبة وبنيتها دلالية: قائمة الطلبات وعناصر التصفية واضحة على الهاتف والحاسوب.
+1. ابني الصفحة ببنية دلالية، واجعليها مقروءة على الجوال والحاسوب دون تمرير أفقي.
 2. اعرضي حالات البيانات كلها: جارٍ التحميل، وخطأ مع إمكانية إعادة المحاولة، ولا طلبات، والطلبات.
-3. أصلحي البلاغ من سببه، واكتبي أين كان السبب ولماذا أنتج هذا العَرَض.
-4. اشرحي قرارين اتخذتِهما في كودك ولماذا.
-5. اشرحي كيف يصل تغيير الحالة في التصفية إلى ما يظهر على الشاشة، خطوة بخطوة في كودك.
-6. اعملي على فرع، بإيداعات صغيرة موصوفة، وقدّمي Pull Request يشرح ما تغيّر ولماذا. أرسلي رابط الـPR ورمز آخر إيداع.
+3. حدّدي أين سبب البلاغ في الكود المُقدَّم ولماذا أنتج هذا العَرَض، ثم أصلحيه من سببه.
+4. اشرحي في ملاحظة قصيرة، بالإشارة إلى كودك، أين تُحفظ الحالة وكيف تصل البيانات إلى الشاشة.
+5. اذكري قرارين اتخذتِهما ولماذا، وإن وجدتِ تعارضًا بين الوصف والبيانات فاذكريه وما قرّرتِه.
+6. اعملي على فرع، بإيداعات صغيرة موصوفة، وقدّمي Pull Request يشرح ما تغيّر ولماذا. أرسلي رابطه ورمز آخر إيداع، واشرحي أهم ما غيّرتِه بالإشارة إلى أسطر محددة.
 
 **ملاحظات:**
-- استخدام أدوات الذكاء الاصطناعي مسموح؛ الإفصاح عنه سياق للمراجعة وليس سببًا لأي نتيجة.
-- المهم أن تفهمي ما تسلّمينه وتستطيعي شرحه.
+- استخدام أدوات الذكاء الاصطناعي مسموح، والإفصاح عنه سياق للمراجعة ولا يؤثر في النتيجة.
+- المطلوب أن تفهمي ما تسلّمينه وتستطيعي شرحه.
 - التسليم لا يمنح مستوى بذاته؛ يُقيَّم عملك وفق معايير معلنة.

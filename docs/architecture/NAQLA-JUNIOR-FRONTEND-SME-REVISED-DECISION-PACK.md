@@ -1,508 +1,483 @@
 # نَقْلة / NAQLA — Junior Frontend: Revised SME Integration Decision Pack
 
-**Date:** 2026-10-11 · **Status:** DECISION PACK. Nothing here is implemented, activated, published or approved.
-**Supersedes, where stated (§10):** `NAQLA-JUNIOR-FRONTEND-SME-INTEGRATION-PLAN.md` (commit `41327f9`). That plan stays in the repository as the record of the first proposal.
-**Draft-only candidate content:** `docs/sme-candidate/junior-frontend/` (§8). The importer does not read it, and nothing in it is published.
+**Revision 2 · 2026-10-11 · Status:** DECISION PACK, updated with the SME's final clarifications. Nothing here is implemented, activated, published or approved.
+
+**Revision history:**
+- **Rev. 1** (commit `2b6d72a`): options for the Product Owner.
+- **Rev. 2** (this file): the SME's final clarifications **F1–F5** resolve five of those options. §13 lists exactly what changed from Rev. 1.
+- The first plan (`NAQLA-JUNIOR-FRONTEND-SME-INTEGRATION-PLAN.md`, `41327f9`) stays as the record of the first proposal.
+
+**Draft-only candidate content:** `docs/sme-candidate/junior-frontend/`.
+- It is outside `data/career/`, so neither the importer nor `verify:docs` reads it.
+- The package to send to the SME is `09-sme-validation-package.md` (deliverable L).
 
 **What this pack does not do:**
-- It does not edit the canonical SRS.
-- It activates no policy, readiness rule set, pack-constraint set or track version.
-- It publishes no content, and the candidate is not exposed to graduates (§9).
-- It grants no verification level and adds no production rule.
-- It does not implement EXT-1, EXT-2, sandboxed runners or automated promotion.
-- It creates no approval record and alters no historical result.
-- It does not touch `apps/web` (frozen) or the graduate UI (`apps/app`).
+- It does not edit the SRS or production track files.
+- It runs no migration and activates no configuration.
+- It publishes nothing and grants no verification level.
+- It starts no automated assessment tool.
+- It changes no CV or LinkedIn policy.
+- It does not touch `apps/web` or `apps/app`.
 
 **Still in force:**
 - D-118: the safety baseline `default@2`; promotion only on an independently verified basis.
 - D-119: graduates see published, role-scoped content only.
 - D-120: the graduate UI.
-- Verified stays blocked (D-102). H6 stays inactive. No challenge activation. No readiness thresholds.
+- Verified is blocked in P1 (D-102).
+- H6 is inactive. No challenge activation.
 - RISK-GROUNDING-01 and RISK-GROUNDING-02 stay open.
 
-**How to read the decision status in this pack:**
+**Sources:**
 
-| Mark | Meaning |
+| ID | Source |
 |---|---|
-| **SME-stated** | The SME wrote it, in SRC-A (the PDF) or SRC-B (the clarifications). It is a professional input, not an authorization to publish |
-| **PO decision** | A product or governance choice the Product Owner makes |
-| **SME calibration** | A numeric or descriptive value the SME has to set or confirm. It is usually validated against real or golden submissions |
-| **Engineering** | A capability that has to be built. Each one is its own reviewed change |
+| **SRC-A** | The SME's filled review form (PDF), sha256 `b47b89f2…8471`. Reviewer SME-JFE-01 |
+| **SRC-B** | The SME's clarifications C1–C5 |
+| **SRC-C** (new) | The SME's **final clarifications F1–F5**, relayed by the Product Owner on 2026-10-11, together with the Product Owner's directions 6–9 for this revision |
+
+**SRC-C as recorded:**
+- **F1 (Code Reading):** Must. It stays a separate registry skill from Debugging. At Junior level it means reading a simple component, explaining its behaviour and tracing a basic problem. No Mid-level architectural complexity. A shared activity may assess both skills, but each needs its own observable criterion and an independently justified result.
+- **F2 (Understanding submitted code):** required of every graduate, whether or not AI was used. Disclosure must create no disadvantage. A working solution alone does not prove skill without demonstrated understanding. The former "AI-output verification" criterion means general code understanding and validation. No AI-specific challenge for every graduate.
+- **F3 (Explanation vs independent application):** explaining and modifying the same code is not required in every assessment.
+  - A correct solution, a credible explanation and other independently assessed practical evidence can together establish competence.
+  - Working code plus a theoretical explanation, with no independent practical demonstration, is incomplete.
+  - Requirements are designed at the evidence-path level.
+  - A live modification round is not a universal blocking condition.
+- **F4 (Git):** one project can suffice for foundational Git if it shows commit, branch and pull request, and the graduate explains the changes. Git stays Must. A repository URL without inspection is submitted material, not verified evidence.
+- **F5 (Activity scope):** one integrated practical assessment plus two genuinely distinct short practical tasks. Together they cover: semantic HTML and accessibility (forms, keyboard); JavaScript fundamentals without a framework; Code Reading; responsive UI with API loading, error and empty states; basic debugging; practical Git.
 
 ---
 
-## 1. Decision matrix
+## A. Decision matrix
 
-| # | Topic | SME-stated (source) | Options in this pack | PO decision | SME confirmation / calibration | Proposal, if any (not activated) |
-|---|---|---|---|---|---|---|
-| **DM-1** | Code Reading classification | One table row «Code Reading/Debugging: Must · Working · 2 · Bug» (SME-12). The mandatory list names Debugging, **not** Code Reading (SME-17). The criterion «فهم الكود» is Critical and blocks Demonstrated (SME-25) | **A:** both Must · **B:** Debugging Must, Code Reading Core, assessed independently (§3) | **Choose A or B** | Confirm which reading of SME-12 / SME-17 was meant | **None.** Both alternatives are presented, neither is chosen |
-| **DM-2** | Proficiency vs verification level | Proficiency per skill: Working or Familiar (SME-06…12) | The two axes are kept separate (§2). The readiness `min_level` is set per class: **V-a** Demonstrated for Must and Core · **V-b** Demonstrated for Must, Practiced for Core · **V-c** deferred until calibration | **Choose V-a, V-b or V-c**. The verification ladder is unchanged | Level descriptors that say what *Working* and *Familiar* look like in each criterion | No automatic Demonstrated. The level is reached only through the D-118 path (§2.3) |
-| **DM-3** | Independence of two evidence items | «مشروع عملي مع مهمة قصيرة مستقلة… ليس فقط تكرار نفس الحل» (C3) | Auditable criteria I-1…I-6 (§5): purpose, variant, assessed behaviour, provenance, artifact reuse, resubmission | Approve the criteria and register EXT-2 (inactive) | Confirm that the task variants really differ (content review) | Different activity IDs alone are **not** proof |
-| **DM-4** | Git activity placement | Git is assessed inside practical tasks, not by a theory test. Commit, Branch, PR, and understanding the change (C1) | **G-P1:** integrated task + Short Task B · **G-P2:** integrated task only · **G-P3:** integrated + Task B + `change_request` (§4) | Choose a placement. Git is not required in every activity | V-3: how many observations, and what counts as an acceptable commit, branch or PR | A repository URL alone never counts (§4.3) |
-| **DM-5** | AI-output verification applicability | «التحقق من مخرجات AI»: Important, but **blocks** Demonstrated. Proven by modification + explanation (SME-25) | **R1:** understanding of submitted code, for **every** submission · **R2:** only when AI material is used (§6.4) | Choose R1 or R2. BR-025 constrains R2 | Confirm the SME meant understanding, not AI provenance | **R1** recommended. Disclosure is never a failure reason (BR-025) |
-| **DM-6** | Integrated-task criteria and pass rule | Responsive UI, API with Loading/Error, a simple bug fix (C5 condition 3) | Per-skill criteria, not every criterion on every skill (§6.2). Pass rule **PR-1** gate + all mandatory + total, or **PR-2** gate + all mandatory (§6.3) | Choose PR-1 or PR-2, and which criteria are mandatory | V-4: thresholds, borderline band, duration | — |
-| **DM-7** | Pack-constraint counts | The SME asked for an integrated task and a distinct short task (C3, C5). They set no counts | **K-1:** restructure to 3 activities (integrated + 2 short) · **K-2:** keep the 3 and add 3 (6). Core: **P-1** a new track-scoped set with `core_skill_count` 9 · **P-2** keep `is_core` at 5 and express Must/Core by `category` (§7) | Choose K-1 or K-2 and P-1 or P-2. Any numeric change is a **new governed version** plus CHG-017 | Confirm that 2 short tasks + 1 integrated task is enough evidence (C3) | No ad hoc bypass. The legacy global set is unchanged |
-| **DM-8** | CHG-017 scope | — | §11: CR-1…CR-9 | Approve the CHG text before it is applied to the SRS | Review the professional wording (Must/Core semantics) | Proposed only. The SRS is not edited |
-
-**What the SME has professionally approved:** the inputs in SRC-A and SRC-B, as recorded verbatim in the first plan §1.
-- Professional direction: Must + minimum Core + an integrated practical assessment, instead of a count or a percentage.
-- Git assessed in practice (C1).
-- Project + distinct short task (C3).
-- Automated assessment with human review for exceptions (C4).
-
-**What the SME has not approved:** none of the following has been signed off yet. All are still SME values (V-1…V-8, §13.2):
-- rubric values;
-- level descriptors;
-- the briefs;
-- the task variants;
-- thresholds;
-- the borderline band;
-- the calibration set;
-- any wording in `docs/sme-candidate/`.
-
----
-
-## 2. Proficiency is not the verification level
-
-### 2.1 Two independent axes
-
-| Axis | Question it answers | Where it lives today | Who sets it |
-|---|---|---|---|
-| **Professional proficiency** (`foundation` = SME «Familiar», `working` = SME «Working») | *How well* must a Junior do this? | `role_requirement.target_proficiency` (text, descriptive), `proficiency_scale@1.0.0` level descriptors, and rubric level descriptors | SME (V-1, V-2) |
-| **Verification level** (evidence ladder: `gap → self_reported → practiced → demonstrated → verified`) | *How strongly* is the user's claim supported, and on what basis? | The claim state, moved only by an evaluation under the active verification policy (D-118) | The system, under governed policy. Never set by configuration |
-
-**Rules this pack keeps:**
-1. **The verification ladder is unchanged.** No new state, no rename, no change to transition rules.
-2. **Proficiency never moves a claim, and a claim never implies a proficiency** beyond what the criteria that produced it measured.
-3. **Demonstrated is never assigned automatically.** It is reached only when an approved, non-demo rubric is evaluated through the authorized basis:
-   - today, that is a named human reviewer (blind review, the D-118 path);
-   - later, possibly a separately approved `platform_verified` basis (§12, S6).
-
-   Configuration, readiness rules and this candidate grant no level.
-4. **Readiness reads verification levels only** (BR-024: a report, never a change of level).
-
-**The gap.** The platform does not record which proficiency an evaluation established. A Demonstrated claim at Junior level is only as "Working" as the rubric thresholds that produced it.
-
-| Option | How proficiency is carried | Cost | Status |
-|---|---|---|---|
-| **PF-1** | Through calibration. Mandatory-criterion thresholds and level descriptors are calibrated by the SME so that *meeting them* means `working` or `foundation` | Content and calibration only | Recommended starting point |
-| **PF-2** | As a fact. The evaluation records `proficiency_observed` per skill from the rubric descriptor band; readiness reads it | New column, domain change, rule parameter. **Engineering + CHG** | Not proposed for now. Listed so it is not lost |
-
-### 2.2 Per-skill mapping
-
-The *required level for readiness* is the DM-2 option the Product Owner chooses, so it is not filled in. "Route" is how a claim can move up under today's rules.
-
-| Skill (registry) | SME proficiency (Junior minimum) | What the evidence must show at that proficiency (indicators, for SME calibration) | Evidence route to Practiced / Demonstrated (unchanged ladder) | Readiness implication if Must (non-compensable) | If Core (required minimum) |
-|---|---|---|---|---|---|
-| `skl_html_semantic` | Working | Correct landmarks, headings and form semantics without prompting; chooses elements by meaning | Practiced: not awarded on submission under `default@2`. Demonstrated: approved rubric, named reviewer, mandatory criterion met | Missing ⇒ `not_satisfied`, and nothing offsets it | — |
-| `skl_css_responsive` | Working | Layout holds at the configured viewports with no horizontal overflow; uses flex or grid deliberately | same | same | — |
-| `skl_js_fundamentals` | Working | Correct DOM, event and array logic; handles the edge cases in the brief | same | same | — |
-| `skl_frontend_debugging` | Working | Finds the root cause and fixes it at the cause, not the symptom; no regression | same | same | — |
-| `skl_code_reading` | Working | Explains what the given code does and where the defect is, from the code itself | same | **Alt. A** | **Alt. B** (§3) |
-| `skl_version_control_basics` | Familiar (SME: «Git الأساسي») | Small described commits, a branch, a PR description, and explains their own diff (§4.2) | same, and only where Git is placed (§4.4) | Must per SME-17 / C1 | — |
-| `skl_ui_state_interaction` | Working | State drives the view; transitions are correct and not reset by accident | same | — | Must reach the minimum. Variation above it is accepted (C2) |
-| `skl_api_data_states` | Working | Loading, error, empty and success are each handled and visible | same | — | same |
-| `skl_accessibility_basics` | Familiar | Keyboard reachable, labels present, focus visible | same | — | same. Its absence does not block Demonstrated in **other** skills (SME-25) |
-| `skl_forms_validation` | (SME silent) | — | same | Supporting: no readiness rule | — |
-| `skl_technical_explanation` | (SME silent; explanation is an evaluator input, SME-26) | — | same | Supporting: no readiness rule. Explanation stays a criterion inside activities | — |
-| `skl_requirements_reading` | (SME silent) | — | same | Supporting: no readiness rule | — |
-
-### 2.3 DM-2 options, compared
-
-| Option | Must rule `min_level` | Core rule `min_level` | Implication today (D-118: no Practiced on submission) | Risk |
+| # | Topic | Status | Resolution / remaining question | Decided by |
 |---|---|---|---|---|
-| **V-a** | demonstrated | demonstrated | Every Must and Core skill needs a reviewed result. Readiness is reachable only with reviewer capacity | Reviewer load. This is the honest reading of C5 ("passed at the required level") |
-| **V-b** | demonstrated | practiced | Under `default@2`, Practiced also needs an independently verified basis, so in practice it is **no easier** than V-a today. It differs only once a future policy defines Practiced differently | Looks lighter than it is. Could be misread as "Core is optional" |
-| **V-c** | not set | not set | The readiness set stays without values; readiness reports `not_yet_configured` | Delays the pilot's readiness report. No false signal |
+| DM-1 | Code Reading classification | ✅ **Resolved (F1)** | **Must.** Separate from Debugging. Junior scope = read a simple component, explain its behaviour, trace a basic problem. Own criterion and own result in shared activities | SME |
+| DM-5 | "AI-output verification" | ✅ **Resolved (F2)** | Reframed as **`code_understanding`**: understanding of submitted code, for **every** graduate. No AI-specific challenge. Disclosure creates no disadvantage (BR-025) | SME |
+| DM-3a | Explanation vs live modification | ✅ **Resolved (F3)** | **No universal live-modification round.** Competence is established per **evidence path** (§E). Code + theory alone is incomplete | SME |
+| DM-4 | Git placement and count | ✅ **Resolved (F4)** | **One project** (the integrated task) with observed commit, branch and PR + explanation of the changes. No second Git activity | SME |
+| DM-7a | Activity scope | ✅ **Resolved (F5)** | **Three activities:** integrated + Short Task A + Short Task B. Six-activity option dropped | SME |
+| DM-3b | Per-skill evidence paths | ◐ Direction resolved; values to confirm | Per-skill, versioned requirements (§E). The SME confirms each path in the validation package (L) | SME confirmation |
+| DM-2 | Required verification level for Must and Core | ⬜ **Open** | V-a: Demonstrated for both · V-b: Demonstrated for Must, Practiced for Core · V-c: deferred. **Never auto-selected** (§G) | PO with SME |
+| DM-6 | Integrated pass rule | ⬜ **Open** | PR-1 (gate + all mandatory + total) or PR-2 (gate + all mandatory); mandatory set; borderline band | SME calibration + PO |
+| DM-7b | Representation of Must/Core in pack data (`is_core`) | ⬜ **Open** | P-1: `is_core` = Must ∪ Core (9) through a governed track-scoped constraint set + CHG-017 · P-2: `is_core` stays the OD-2 five (§H.3) | PO |
+| DM-9 | Per-skill assessment results from one evaluation (H6 revision) | ⬜ **Open** (new) | Required for the three-activity design (§I, ENG-1). Approval to *build* it inactive. H6 stays off | PO |
+| DM-8 | CHG-017 text | ⬜ **Open** | §I.3. Proposed, not applied | PO |
 
-**C2** («يمكن قبول تفاوت في مستوى إتقانها، بشرط الوصول إلى الحد الأدنى») is about *proficiency* above the Junior minimum, not about a weaker verification basis. V-a and V-b both honour it. The choice is the Product Owner's.
+**What the SME has now professionally confirmed (SRC-A, SRC-B, SRC-C):**
+- the skill classes (§B);
+- the Junior proficiencies;
+- the minimum evidence counts per skill (SME table);
+- Git by one project;
+- three activities;
+- code understanding for everyone;
+- evidence paths instead of identical challenges.
 
----
+**What the SME has still not approved (calibration):**
+- rubric weights, thresholds and level descriptors;
+- the borderline band;
+- the briefs and planted issues as written;
+- the per-skill path wording;
+- the variant distinctness of the three tasks.
 
-## 3. Code Reading and Debugging: two alternatives (not chosen)
-
-**Common to both alternatives:**
-- Two registry skills stay two skills. No merge, no alias.
-- No history is rewritten: existing claims, evidence and results stay as recorded.
-- Each skill has **its own criterion and its own evidence count**. A debugging result never stands in for a code-reading result, or the other way round.
-
-| | **Alternative A: both Must** | **Alternative B: Debugging Must, Code Reading Core (assessed independently)** |
-|---|---|---|
-| SME basis | SME-12 (one row: Must · Working · 2 · Bug); SME-25 «فهم الكود» Critical and blocking | SME-17 mandatory list names Debugging, not Code Reading; C2 Core semantics |
-| `category` | both `must` | debugging `must`, code reading `core` |
-| Readiness rules | `non_compensable_skill` ×2 | `non_compensable_skill` (debugging) + `required_skill_at_level` (code reading) |
-| Evidence | Each needs 2 independent items (§5). One bug-fix run can carry both criteria, but each criterion is counted for its own skill only | Debugging: 2 independent items. Code reading: its own items, from a **reading** criterion (explain the given code, locate the defect) that is assessed even when the fix fails |
-| Readiness report | Two non-compensable lines. A user who fixes bugs but cannot explain the code is **not ready**, and the report names code reading | Code reading shows as a Core minimum. Same not-ready outcome **below the minimum**. Above it, variation is accepted (C2) |
-| Product meaning | "A Junior who cannot read unfamiliar code is not employable." Strict and simple | "Reading code is required at a minimum and can vary above it." Matches C2 |
-| Graduate UI (copy only, later) | Both labelled «مهارة إلزامية» | Debugging «إلزامية», code reading «أساسية» |
-| Pack counts | `is_core` count is the same in both (§7) | same |
-| Risk | Two blocking skills fed by the same activity family. A weak code-reading item design blocks many users | The reading criterion must be designed to stand alone, otherwise "independent" is nominal |
-
-**Practical difference today:** under DM-2 V-a the readiness outcome is the same. Both alternatives need the code-reading minimum. They differ in:
-- the report's wording (non-compensable vs minimum);
-- future policy flexibility.
-
----
-
-## 4. Git
-
-### 4.1 One skill, reused
-
-`skl_version_control_basics` is the only Git skill. There is no new skill, synonym or alias. Its definition gains the indicators in §4.2, through content review.
-
-### 4.2 Observable indicators (draft, for SME calibration, V-3)
-
-| ID | Indicator | Observable from | Today's assessor |
-|---|---|---|---|
-| G-1 | Work done on a **branch** other than the default | The repository's branch list / the PR's head branch | Human reviewer, from the link at a recorded commit |
-| G-2 | **Small, described commits.** Each message says what changed; no single "final" commit holding everything | The commit list on the PR | Human reviewer |
-| G-3 | A **PR** whose description states what changed and why | The PR page | Human reviewer |
-| G-4 | **Explains their own diff**: one answer in the activity's text deliverables that refers to specific changed lines | A text deliverable (`answer.git_diff_explained`) | Human reviewer (later CAP-8, structured) |
-| G-5 | **Resolves a small follow-up on the same branch** (optional, integrated task only) | Follow-up round | Needs CAP-7 |
-
-### 4.3 What never counts
-
-- **A repository URL alone.** A link is a `submitted_link` (D-118 provenance). It proves the user typed a URL, not that the user did the work.
-- **Client-supplied facts.** Commit counts, branch names or "PR merged" sent by the client are refused (`verified.*` / `signal.*` → 400, unchanged).
-- **The criterion's evidence is the reviewer's observation of G-1…G-4 at a recorded commit, together with G-4.**
-  - The submission records the PR URL and the **head commit SHA** the user declares.
-  - The reviewer records the SHA they actually reviewed.
-  - If the two differ, or the history is missing or rewritten, the result is "insufficient evidence" (an escalation case, never an accusation).
-- **Automated Git evidence (`verified.git.*`) needs CAP-6.** That is a read-only repository-facts producer with consent and a privacy review. **Not built.**
-
-### 4.4 Placement (DM-4): selected activities only, not every activity
-
-| Activity (candidate) | Commit | Branch | PR | Explains diff | Git criterion? |
-|---|---|---|---|---|---|
-| Integrated task | ✓ | ✓ | ✓ | ✓ | **yes** in G-P1, G-P2, G-P3 |
-| Short Task B (bug fix) | ✓ (fix commit) | ✓ (fix branch) | ✓ (fix PR) | ✓ | yes in **G-P1** and G-P3 |
-| `change_request` (existing; K-2 only) | ✓ | ✓ | ✓ | ✓ | yes in **G-P3** only |
-| Short Task A (component + fetch) | possible | — | — | — | no (keeps the task short) |
-| `build_interface`, `debug_improve` (K-2 only) | — | — | — | — | no |
-
-- **G-P1** gives Git two independent observations (integrated + Task B), which matters if V-3 sets the minimum at 2.
-- **G-P2** gives one observation; enough only if V-3 sets the minimum at 1.
-
-**Fail-closed today:**
-- without a `git_workflow` criterion on a published, approved rubric, the Git Must rule cannot be satisfied;
-- readiness stays unattainable rather than satisfied without proof.
+The package in L asks for exactly these.
 
 ---
 
-## 5. Independent evidence: an auditable definition (EXT-2 design, inactive)
+## B. Final proposed skill classification
 
-**The problem.** `min_evidence_per_skill` counts standing evidence rows. Two submissions of the same solution would count twice, and two different activity IDs could still hold the same work.
+| Skill (registry, unchanged) | Class | Junior proficiency | Min. distinct practical tasks | Evidence path (§E) | Readiness rule | Required verification level | `is_core` | Thresholds / descriptors |
+|---|---|---|---|---|---|---|---|---|
+| `skl_html_semantic` | **Must** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-HTML | `non_compensable_skill` | **DM-2** (PO) | DM-7b (PO) | calibration |
+| `skl_css_responsive` | **Must** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-CSS | `non_compensable_skill` | DM-2 | DM-7b | calibration |
+| `skl_js_fundamentals` | **Must** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-JS | `non_compensable_skill` | DM-2 | DM-7b | calibration |
+| `skl_frontend_debugging` | **Must** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-DBG | `non_compensable_skill` | DM-2 | DM-7b | calibration |
+| `skl_code_reading` | **Must** · SME ✅ (F1) | working, **Junior scope per F1** · SME ✅ | 2 · SME ✅ | P-READ | `non_compensable_skill` | DM-2 | DM-7b | calibration |
+| `skl_version_control_basics` | **Must** · SME ✅ (C1, F4) | foundation ("Git الأساسي") · SME ✅ | **1** · SME ✅ (F4) | P-GIT | `non_compensable_skill` | DM-2 | DM-7b | calibration (G-1…G-4 acceptance) |
+| `skl_ui_state_interaction` | **Core** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-UI | `required_skill_at_level` | DM-2 | DM-7b | calibration |
+| `skl_api_data_states` | **Core** · SME ✅ | working · SME ✅ | 2 · SME ✅ | P-API | `required_skill_at_level` | DM-2 | DM-7b | calibration |
+| `skl_accessibility_basics` | **Core** · SME ✅ | foundation ("Familiar") · SME ✅ | 1 · SME ✅ | P-A11Y | `required_skill_at_level` | DM-2 | DM-7b | calibration |
+| `skl_forms_validation` | Supporting (SME silent; PO default) | unchanged | — | — | none | — | false | — |
+| `skl_technical_explanation` | Supporting (SME-25: "decision clarity" does not block) | unchanged | — | — | none | — | false | — |
+| `skl_requirements_reading` | Supporting (SME silent; PO default) | unchanged | — | — | none | — | false | — |
 
-### 5.1 Definition
+**Where Must/Core is recorded (role-classification semantics).**
+- `role_requirement.category` exists today as a **display-only, non-professional** field ("تجميع للعرض · عرضي فقط", approvable operationally).
+- Using it for Must/Core would silently turn it into a professional field.
+- **Proposal:** the **readiness rule set** is the single authoritative carrier of Must/Core:
+  - `non_compensable_skill` = Must;
+  - `required_skill_at_level` = Core.
 
-Two evidence items E1 and E2 for skill S are **independent** only if **all** of I-1…I-6 hold:
-
-| ID | Criterion | Fact used (existing unless marked) | Why |
-|---|---|---|---|
-| **I-1 Purpose** | At least one of E1, E2 comes from an activity whose purpose is **validation** (`activity_spec.is_validation_activity = true`); the other from a different activity | `is_validation_activity` (exists) | C3: "a distinct short task" |
-| **I-2 Task variant** | The two activities belong to **different variant families**. They have different starter material and a different defect, data or brief, declared in content as `variant_family`. Two versions of one activity are the same family | **new content field** `activity_spec.variant_family` (EXT-2) | Different IDs are not proof (PO item 4) |
-| **I-3 Assessed behaviour** | Each item rests on **its own** criterion result for S that meets its threshold in its own evaluation. A criterion result is counted at most once | `criterion_result` per `evaluation_result` (exists) | The behaviour must be shown twice, not inferred twice from one result |
-| **I-4 Provenance** | Each evaluation is standing (not withdrawn or superseded), uses an approved non-demo rubric version, and has an accepted verification decision under the active policy (D-118: not `pending_validation`). In production, no demo content | Exists (D-118, D-119) | Only authorized results count |
-| **I-5 No artifact reuse** | The two submissions share **no** `upload_id`, and no confirmed `checksum_sha256` **of a learner-authored file** relevant to S. Text deliverables are compared by a normalized hash. Platform-provided starter files are excluded from the comparison (their hash is the same by design) | `upload.checksum_sha256` (exists, measured server-side); normalized text hash (**new**, EXT-2) | Resubmitting the same solution must not count (PO item 4) |
-| **I-6 Not a resubmission** | All attempts on the same `activity_spec` (any version) or the same variant family count as **one** item (the latest standing one) | `project.activity_spec_id`, `evidence_item.attempt_number` (exist) | Repetition is not independent application (C3) |
-
-### 5.2 What I-5 is and is not
-
-- It detects an **identical** artifact reused across tasks.
-- It does **not** try to detect near-copies, similarity or "AI-generated" work. That would be guessing the source, which BR-025 forbids.
-- Near-copies are prevented by I-2. When the variants differ, the same solution cannot meet the second task's criteria.
-- **A reuse finding is never an integrity accusation.**
-  - The item simply does not count as independent.
-  - The user sees a neutral message: «تحتاج المهمة الثانية حلًّا خاصًا بها؛ لم يُحتسب هذا الدليل دليلًا مستقلًا».
-
-### 5.3 Audit record
-
-Each EXT-2 evaluation emits an **independence report** with:
-- the pairs considered;
-- for each pair, the I-1…I-6 outcome and the facts it read (ids, variant families, checksums compared);
-- the count it produced.
-
-The report is stored with the readiness report, so every "2 independent items" is reconstructible.
-
-### 5.4 Status
-
-**Design only.** It needs:
-- an extension-register row (PO);
-- the `variant_family` content field;
-- a domain rule type with tests;
-- a Track Builder kind;
-- CHG-017 CR-5.
-
-It ships **inactive**. Until then, R-E1 does not exist, and readiness says so instead of counting rows.
+  It is professional, SME-approved, versioned and governed.
+- `category` may mirror it as a display label only, with a new consistency check (ENG-6) so the two cannot disagree.
+- `is_core` is DM-7b (§H.3).
 
 ---
 
-## 6. Integrated practical task (draft)
+## C. Three-activity coverage matrix
 
-The full specification is in `docs/sme-candidate/junior-frontend/03-integrated-task.md`. This section records the decisions.
+**Candidate activities:**
 
-### 6.1 Scope (C5 condition 3)
+| ID | Code | Derived from | Variant family | Validation activity? |
+|---|---|---|---|---|
+| **INT** | `act_fe_integrated_leave_requests` (integrated) | `act_fe_build_interface@0.1.0` | `leave_requests_list` | no ("the project") |
+| **A** | `act_fe_short_accessible_registration` | `act_fe_debug_improve@0.1.0` | `workshop_registration_form` | **yes** |
+| **B** | `act_fe_short_read_and_fix` | `act_fe_change_request@0.1.0` | `team_tasks_change` | **yes** |
 
-- A responsive view.
-- Consuming a mock API with loading, error and empty states.
-- A planted bug to fix.
-- A short explanation of two decisions.
-- Git (branch, commits, PR).
-- An optional follow-up modification (needs CAP-7; the task is valid without it).
+**Every Must and Core skill maps to exact criteria and observable evidence.** M = mandatory (proposed, on the basis of SME-25). "Extra" = assessed and recorded, not needed for the path.
 
-### 6.2 Criteria per skill: not every criterion on every skill
+| Skill | INT criterion → observable evidence | A criterion → observable evidence | B criterion → observable evidence | Path needs |
+|---|---|---|---|---|
+| HTML (Must) | `semantic_structure` (M) → `file.index_html`: landmarks, heading order, list semantics | `semantic_fixed` (M) → `file.index_html`: real buttons, ordered headings, form/label | — | INT + A |
+| CSS (Must) | `responsive_layout` (M) → `file.styles_css` at 360 px / 1024 px, no horizontal scroll | `responsive_fixed` (M) → `file.styles_css`: no overflow at 360 px; sidebar at 1024 px | — | INT + A |
+| JS (Must) | `code_understanding` (M) → `note.data_flow`: explains own code (understanding element) | `validation_fixed` (M) → `file.app_js`: invalid email rejected beside the field; error not swallowed | `js_correctness` (M) → `file.app_js`: no accidental globals, rejection handled | A + B, and INT `code_understanding` |
+| Debugging (Must) | `root_cause_fixed` (M) → `file.app_js`: planted retry bug fixed at its cause | `root_cause_note` (M) → `note.root_causes` (extra) | `root_cause_fixed` (M) → `file.app_js`: empty-list condition fixed at its cause, not hidden | INT + B |
+| Code Reading (Must) | `problem_traced` (M) → `note.bug_trace`: names the location in the starter code and how it produced the symptom | `scope_discipline` → changes in place (extra) | `component_explained` (M) → `answer.component_explained`: what `renderTasks` does with a given state · `problem_traced` (M) → `note.decision`: where and why | INT + B (B item = both criteria) |
+| Git (Must) | `git_workflow` (M) → `link.pull_request`, `text.head_sha`, `answer.git_diff_explained` (G-1…G-4) | — | — | INT only (F4) |
+| UI state (Core) | `state_transitions` (M) → `file.app_js`: state drives the view; retry resets state | — | `filter_in_state` (M) → `file.app_js`: the filter changes state, the view follows | INT + B |
+| API states (Core) | `data_states` (M) → loading, error with retry, empty, success visible | — | `empty_state_correct` (M) → empty list and empty filter show a state message, not an error | INT + B |
+| Accessibility (Core) | `a11y_basics` → keyboard path, visible focus (extra) | `a11y_keyboard_forms` → labels, errors tied to fields, keyboard operation, visible focus | — | A (1) |
+| Forms (Supporting) | — | (validation is assessed for JS via `validation_fixed`) | — | — |
+| Technical explanation (Supporting) | `decision_clarity` | — | `decision_explained` | — |
+| Requirements reading (Supporting) | `judgment_assumption_check` | — | — | — |
 
-Each criterion feeds **only** the skill it measures. A skill the task does not assess is not affected by it.
+**Coverage of F5:**
 
-| Criterion | Skill it feeds | Mandatory (proposed) | Blocks Demonstrated of *that* skill (SME-25) |
-|---|---|---|---|
-| `semantic_structure` | html | yes | yes |
-| `responsive_layout` | css | yes | yes |
-| `data_states` (loading / error / empty / success) | api_states | yes | yes |
-| `state_transitions` | ui_state | yes | yes |
-| `root_cause_fixed` | debugging | yes | yes |
-| `cause_located_in_code` | code_reading | yes | yes |
-| `code_understanding` (§6.4) | the skill of the code explained (js) | yes under R1 | yes (SME: blocks) |
-| `git_workflow` (G-1…G-4) | version_control | yes | yes |
-| `decision_clarity` | technical_explanation | no | no |
-| `a11y_basics` | accessibility | no | **no**, and never blocks other skills |
-| `no_regression` | debugging | no (needs CAP-1 to be fair) | no |
-| `deliverables_complete` (gate) | — | gate | — |
-
-**Primary skills declared on the activity** (for pack constraints): css, api_states and debugging = 3, within `activity_primary_skill_count` 2–3. The other skills are secondary, and their criteria still feed them.
-
-### 6.3 Pass rule (DM-6)
-
-The integrated task's **pass** is the fact EXT-1 reads. It is separate from per-skill evidence.
-
-| Option | Rule |
+| F5 area | Covered by |
 |---|---|
-| **PR-1** | The gate passes **and** every mandatory criterion meets its threshold **and** the weighted total meets the rubric pass threshold |
-| **PR-2** | The gate passes **and** every mandatory criterion meets its threshold (no total) |
+| Semantic HTML + accessibility (forms, keyboard) | A, plus INT HTML |
+| JS fundamentals without a framework | A, B, INT |
+| Code Reading of existing code | INT starter, B |
+| Responsive UI + API loading/error/empty | INT, plus A responsive, plus B empty |
+| Basic debugging | INT, B |
+| Practical Git | INT |
 
-- The thresholds, weights and borderline band are SME calibration (V-4).
-- A result inside the borderline band goes to human review (C4), never to an automatic pass or fail.
-
-### 6.4 AI-output verification (DM-5)
-
-**SME wording:** «التحقق من مخرجات AI»: Important, but it blocks Demonstrated. Proven by modification + explanation.
-
-| Reading | Applies to | Consequence |
-|---|---|---|
-| **R1 (recommended): understanding of the submitted code** | **Every** submission, whether or not AI was used | The user explains and modifies their own submitted code. The SME's evidence method (modification + explanation) is exactly an understanding check. Consistent with BR-025 («النزاهة تُقاس بإثبات المستخدم فهمَه للعمل الذي قدّمه وتحقّقَه منه وتعديلَه») |
-| **R2: only when AI material is used** | Only users who disclose AI use | Disclosure would trigger an extra blocking criterion. That makes disclosure a **cost**, which contradicts BR-025 (disclosure is context, not a penalty, and does not by itself route work to review). It also rewards non-disclosure |
-
-**Under either reading:**
-- **AI disclosure is never a reason for failure** (BR-025 · D-113).
-- No inference of AI origin from style or patterns.
-- No "cheating score".
-- Disclosure is context for the reviewer only (assessment context: optional input).
-
-Under R1, the criterion is named `code_understanding`, not "AI verification". **The SME must confirm R1** (§13.1).
+No standalone test is added.
 
 ---
 
-## 7. Pack constraints: audit and interaction with the counts
+## D. Git evidence requirements (one-project exception)
 
-### 7.1 What is in effect
+| Item | Requirement |
+|---|---|
+| Skill | `skl_version_control_basics` (existing). **Must** · foundation |
+| Where | **INT only** (F4). A and B do not ask for Git. A learner may still use Git in them; it is not assessed there |
+| Path | **One** project with all of G-1…G-4 met |
+| G-1 | Work on a non-default branch |
+| G-2 | At least 2 small commits, each message saying what changed. Not a single "everything" commit (count: SME calibration) |
+| G-3 | A pull request whose description says what changed and why |
+| G-4 | Explains own changes, referring to specific changed lines (`answer.git_diff_explained`) |
+| Submitted material | `link.pull_request` (through the existing `externalUrls`) + `text.head_sha` (a text deliverable). **Submitted, not verified:** a URL without inspection proves nothing (D-118) |
+| **Now: human-review path** | 1. A named reviewer opens the PR **at the declared SHA**. 2. They record the SHA actually reviewed, and G-1…G-3 observations, in the criterion's supporting excerpt. 3. They read G-4 against the diff. 4. Declared ≠ reviewed SHA, missing or rewritten history, or no access ⇒ **insufficient evidence**: routed to review, never an accusation. This needs **no code**: the criterion, reviewer prompt and existing `criterion_result.supporting_excerpt` carry it |
+| **Later: independently verified producer** | CAP-6: read-only repository-facts producer writing `verified.git.*` (branch, commits, PR, head SHA) with recorded provenance. Needs a consent and privacy review. Not built. Client-sent `verified.*` stays refused (400) |
+| Never evidence | A URL alone · client-declared commit counts or merge state · a screenshot of a Git client · AI disclosure in either direction |
 
-`legacy_pack_constraints@1`: global scope, `legacy_baseline`. Frozen once active. Four eyes. Separation of duties.
+---
 
-| Constraint | Value | Candidate K-1 (3 activities) | Candidate K-2 (6 activities) |
-|---|---|---|---|
-| `core_skill_count` | 4–5 | **9** under P-1 (Must ∪ Core, both A and B) ✗ · 5 under P-2 ✓ | same |
-| `task_count` | 10–12 | 11–12 (one Git task added at most) ✓ | ✓ |
-| `activity_count` | exactly 3 | **3** ✓ | **6** ✗ |
-| `activity_primary_skill_count` | 2–3 | integrated 3 · A 2 · B 2 ✓ | ✓ |
-| `activity_core_primary_skill_count` | 2–3 | P-1: integrated 3, A 2, B 2 ✓ · **P-2: Task B (debugging, code reading) = 0** ✗ | same |
-| `rubric_min_criteria` | ≥ 5 (gates included) | A: 6 · B: 6 (drafted to fit) ✓ | ✓ |
-| `resources_per_skill_max` | ≤ 3 | unchanged ✓ | ✓ |
+## E. Independent-evidence design (per skill, no universal two-activity rule)
 
-### 7.2 Constraints outside `pack_constraint_set`
+### E.1 Model
 
-These fix the same numbers. Any change to them is CHG-017, not configuration.
-
-- **SRS §3.1:** "5 مهارات أساسية … 11 مهمة … 3 أنشطة".
-- **SRS scope:** "3 أنشطة فقط".
-- **OD-2:** "المجموعة الأساسية الخمس مضبوطة؛ SME يوصي ولا يستبدل بصمت". The SME recommendation is exactly the non-silent route OD-2 requires.
-- **`scripts/verify-docs.mjs` §3** asserts that the canonical pack has exactly 5 core skills and 3 activities. It must change **in the same commit** that publishes a canonical pack with other counts, and only after CHG-017 is applied. The drafts in `docs/sme-candidate/` are not the canonical pack and do not trip it.
-
-### 7.3 How one integrated task plus two short tasks interacts with the counts
-
-- **K-1 (restructure, 3 activities): the integrated task is the "project" and Tasks A and B are the "distinct short tasks" (C3).**
-  - The candidate version replaces `build_interface`, `debug_improve` and `change_request` with **integrated + A + B**.
-  - The earlier activities and every result on them stay as history (versioned, never rewritten).
-  - `activity_count` = 3 holds, with **no numeric change**.
-  - Each Must or Core skill gets project + distinct-task coverage, provided A and B together cover HTML, CSS, JS, UI state and API states, and B covers debugging, code reading and Git (see `05-rubrics-and-evidence.md`, coverage table).
-- **K-2 (additive, 6 activities):** more practice and more evidence paths. It needs `activity_count` 6 via a new governed version **and** a CHG-017 change to "3 أنشطة فقط".
-- **Core count (both):**
-  - **P-1:** `is_core` = Must ∪ Core = 9. Needs `core_skill_count` 9 (or a range covering it) in a new governed version, plus CHG-017 (§3.1, OD-2).
-  - **P-2:** keep `is_core` = the current 5 and carry Must/Core in `category`. No numeric change. However:
-    - "core" would then mean two things;
-    - Task B would fail `activity_core_primary_skill_count`;
-    - `all_core_skills_at_level` would silently cover the wrong set.
-
-  **P-2 is listed, not recommended.**
-
-### 7.4 Proposed governed version (draft text only, not created)
+Each skill has a **versioned evidence-path requirement**. It is part of the readiness rule set version, SME-approved, and never activated automatically:
 
 ```text
-pack_constraint_set  key trk_frontend_junior_constraints · version 1 · scope track (trk_frontend_junior)
-                     review_status draft · activation none
-                     values — only those the chosen options need; every other value copied from legacy_pack_constraints@1:
-                       core_skill_count            9–9   (P-1)                ← SME/PO value
-                       activity_count              3–3   (K-1, unchanged) | 6–6 (K-2) ← PO value
-                       task_count                  10–12 (unchanged)
-                       activity_primary_skill_count 2–3, activity_core_primary_skill_count 2–3,
-                       rubric_min_criteria ≥5, resources_per_skill_max ≤3 (unchanged)
-                     rationale: SME-JFE-01 (SRC-A/B) · CHG-017 · DM-7
+skill_evidence_path {
+  skill, version,
+  min_distinct_tasks,                 // SME value per skill (2, or 1 for Git and accessibility)
+  counted_criteria: [activity.criterion | activity.criterion+criterion, ...],   // the only criteria that count, per task
+  require_validation_activity,        // true only when min_distinct_tasks ≥ 2
+  understanding: 'integrated_code_understanding' | 'within_criterion' | 'none'
+}
 ```
 
-**Path:**
-1. Drafted by track_admin.
-2. Approved by a different person (four eyes).
-3. Activated by a third role (separation of duties) at `development_only`, for staging validation of the candidate pack.
-4. Then `production_active` only with the candidate's publication (S7).
+### E.2 Paths
 
-- The global `legacy_pack_constraints@1` is not touched.
-- Resolution picks the track-scoped set once it is in effect. Until then the candidate **fails validation**, which is correct: fail-closed, never bypassed.
-
----
-
-## 8. Safe parallel drafts (produced, draft-only)
-
-`docs/sme-candidate/junior-frontend/`. Markdown only, outside `data/career/`, so neither the importer nor `verify:docs` reads it. Every file opens with a **DRAFT / NOT SME APPROVED / NOT PUBLISHED** banner.
-
-| File | Content (PO item 7) |
-|---|---|
-| `README.md` | Status, index, and what must happen before any of it becomes content |
-| `01-role-description.md` | Updated role description (SME-03, SME-05, SME-15) |
-| `02-skills-and-git.md` | Skill definitions, candidate classifications (both Code Reading alternatives) and Git evidence indicators |
-| `03-integrated-task.md` | Integrated-task specification and learner-facing brief |
-| `04-short-tasks.md` | Short Task A and Short Task B specifications and learner-facing briefs |
-| `05-rubrics-and-evidence.md` | Proposed rubrics (criteria, mandatory, linked skill; **values blank**), evidence requirements and the coverage table |
-| `06-readiness-and-constraints-candidate.md` | Candidate readiness configuration (per DM option) and the candidate pack-constraint set |
-| `07-ext-1-ext-2-design.md` | EXT-1 and EXT-2 design specifications |
-| `08-sme-review-checklist.md` | SME review and approval checklist |
-
----
-
-## 9. Graduate UI: independent and unchanged
-
-- **No change to `apps/app` in this pack.** The Phase 2 screens read the API's catalogue and evaluation views and adapt to whatever is published (data-driven, D-120).
-- **The candidate cannot reach a graduate before approval:**
-  1. It exists only as Markdown.
-  2. When later authored as content, it is created **non-demo, draft** through the promotion and review flow. Graduates see only `published` activities of their role (`graduate_content_visible`, D-119). Draft, curated and sme_reviewed content is invisible.
-  3. Pack import validates against the constraint set in effect. The candidate fails until §7.4 is approved and in effect.
-  4. The readiness set stays inactive. Readiness reports `not_yet_configured`.
-- **UI work that would follow later is copy only:**
-  - Must and Core labels on skill pages;
-  - the readiness report naming non-compensable lines;
-  - the integrated-task chip.
-
-  It is a separate, later change.
-
----
-
-## 10. Precise diff against the first plan (`41327f9`)
-
-| First plan | It said | Revised | Why (PO item) |
-|---|---|---|---|
-| §3 table, "required level" column = `demonstrated` for every Must and Core skill | Demonstrated as the default required level | **Removed.** The column is replaced by the per-skill proficiency → evidence → readiness mapping (§2.2). The required level is a PO option (DM-2: V-a / V-b / V-c) | 1 |
-| §5.4 (D-1) | Proposed "required level = demonstrated", proficiency carried by calibration | **Replaced** by §2: two axes, ladder unchanged, no automatic Demonstrated, PF-1 / PF-2 | 1 |
-| §3 row `skl_code_reading` = Must; §5.2 D-6 | Both Must, shared evidence path | **Two alternatives, not chosen** (§3). Each skill has its own criterion and evidence count | 2 |
-| §4 Git | `link.repository` + `git_workflow` added to **each** practical activity and the integrated task | **Selected activities only** (§4.4, DM-4). Indicators G-1…G-5. Declared + reviewed SHA. URL alone never counts | 3 |
-| §5.3, EXT-2 | Independence = different activities + one validation activity | **Auditable I-1…I-6** (§5). Adds `variant_family`, artifact checksum and normalized-text reuse, and resubmission collapse. Audit report. Inactive | 4 |
-| §8.4 rubric | Every SME criterion on the integrated task; AI verification as a follow-up criterion linked to js (D-8) | **Per-skill criteria** (§6.2). AI verification **reframed as `code_understanding`** (R1 vs R2, DM-5). Disclosure never a failure reason | 5 |
-| §8.4 pass rule (V-4) | Gate + all mandatory + total | **Two options**, PR-1 / PR-2 (DM-6) | 5 |
-| §6.1 activities | Keep 3, add 2 short + 1 integrated (6) | **K-1 (restructure to 3) or K-2 (6)**. Pack-constraint, SRS §3.1, OD-2 and `verify-docs` conflicts made explicit (§7) | 6 |
-| §3 net effect, `is_core` = 9 | Stated without a constraint check | Core count conflicts with `core_skill_count` 4–5 → **P-1 (new governed track-scoped version) or P-2** (§7.3) | 6 |
-| §12.3 D-4 (CHG-017) | Outline | **CR-1…CR-9** with affected SRS sections (§11) | 9 |
-| §14 stages S0–S7 | Order | **Re-prioritized** (§12). Drafts produced now. Engineering waits for DM decisions | 7, 10 |
-| — | — | **New:** draft-only candidate files (§8); decision matrix (§1); SME checklist | 7, 9 |
-| §7 rules R-M / R-C | `min_level: demonstrated` | `min_level` = the DM-2 option; rule shapes otherwise unchanged; R-M5 vs R-C4 per DM-1 | 1, 2 |
-| §9, §10, §11 | Assessment boundaries, CAP-1…15, claims unchanged | **Unchanged**, except CAP-6 is now "required only for automated Git" and the Git placement follows DM-4 | — |
-
----
-
-## 11. Proposed CHG-017 requirements (not applied)
-
-**CHG-017 — Junior Frontend expert model (SME-JFE-01).** Functional level only. To be drafted against SRS v1.11 and applied **only after** PO approval.
-
-| CR | Proposed requirement (functional wording) | SRS area affected |
-|---|---|---|
-| **CR-1** | A role's skills are classified **Must**, **Core** or **Supporting**. Must: no readiness without the proven minimum, never compensated. Core: the minimum is required; variation above it is accepted. Supporting: no readiness effect | §3.1, new BR |
-| **CR-2** | **Professional proficiency** (expected Junior level per skill) is distinct from the **verification level** of a claim. Configuration never assigns a verification level. The ladder is unchanged | new BR (with BR-024, D-118) |
-| **CR-3** | Readiness for a role = all Must at the required level + all Core minimums + a passed integrated practical assessment. **Never a percentage or a count of skills** | readiness BRs. **BR-024 unchanged** (a report, never a level change) |
-| **CR-4** | Git is assessed inside selected practical activities through observable behaviour (branch, commits, PR, explaining one's own diff). A repository link alone is not evidence | evidence rules |
-| **CR-5** | Where a skill requires two evidence items, they must be **independent**: a distinct validation task of a different variant, its own assessed behaviour, an authorized basis, no reused artifact, no resubmission. Independence is recorded and auditable | evidence rules, DR |
-| **CR-6** | An integrated practical assessment is a readiness condition. Only a standing, accepted result on an approved activity version satisfies it | readiness BRs |
-| **CR-7** | Understanding of submitted code (modification + explanation) is assessed for every submission. AI disclosure remains context and never a failure reason | consistent with BR-025 (unchanged) |
-| **CR-8** | The P1 Frontend track's core set and activity count follow the SME-reviewed configuration. They are recorded as a governed track-scoped constraint version, not as fixed numbers in the SRS | §3.1 counts, scope "3 أنشطة فقط", OD-2 (amended, not removed) |
-| **CR-9** | Human review is the exception mechanism (borderline, conflicting signals, ambiguous results, calibration sample) **once** an automated basis is approved. Until then, human review is the authorized basis | consistent with §2.7 / D-101 (unchanged) |
-
-**Unchanged by CHG-017:**
-- BR-024 · BR-025 · BR-026;
-- D-101, D-102 (Verified blocked), D-118, D-119;
-- claim policies.
-
----
-
-## 12. Prioritized implementation sequence
-
-| Priority | Step | Depends on | Who | Touches | Parallel-safe now? |
+| Path | Skill | Tasks | Counted criteria (one item per task) | Validation activity required | Understanding element |
 |---|---|---|---|---|---|
-| **P0** | PO decisions DM-1…DM-8 · SME answers in `08-sme-review-checklist.md` | this pack | PO, SME | docs | — |
-| **P1** | SME review of the drafts in `docs/sme-candidate/`; V-1, V-3, V-6, V-7 | P0 (DM-1, DM-4, DM-5, DM-7) | SME | docs | **yes**, already drafted |
-| **P2** | CHG-017 text drafted → PO approval → applied to the SRS, with `verify-docs` updated in the same change | P0 | PO | SRS, `scripts/verify-docs.mjs` | after P0 |
-| **P3** | Candidate content authored as **non-demo draft** via the promotion flow (K-1 or K-2) | P1, P2 | content author → SME | `data/career` candidate dir, review records (draft) | after P2 |
-| **P4** | Governed drafts: pack-constraint set §7.4, `track_config_version` v2 (track-skill changes), readiness set (R-M / R-C per DM-1 / DM-2) | P0, P2 | track_admin → approver → activator | governed config (draft, inactive) | after P2 |
-| **P5** | EXT-2 then EXT-1: register rows, `variant_family`, domain types + tests, Track Builder kinds. Inactive | P0 (register), P2 (CR-5, CR-6) | engineering | `packages/domain`, readiness API, admin only | after P2 |
-| **P6** | Rubric values (V-2, V-4) approved by a named SME on non-demo content; human-reviewed pilot path possible from here (D-118) | P3, P4 | SME, PO | review records | — |
-| **P7** | Producers in order CAP-10 → CAP-4 → CAP-1 → CAP-2 → CAP-3 → CAP-5 → CAP-7 → CAP-6 → CAP-8, each with its own security/privacy review | separate PO approval (D-10) | engineering | new services | no |
-| **P8** | Calibration (golden set, agreement, borderline band) → new verification policy draft for automated basis (C4) | P7 | SME, reviewers, PO | config (draft) | no |
-| **P9** | Activation: content published, constraint set + v2 + readiness set validated and activated, staging tests (first plan §13 + EXT tests), UI copy change | P3–P6 (P7/P8 only for automation), staging, pilot blockers | PO | activation records | no |
+| P-HTML | html | 2 | INT `semantic_structure` · A `semantic_fixed` | yes | INT `code_understanding` met |
+| P-CSS | css | 2 | INT `responsive_layout` · A `responsive_fixed` | yes | INT `code_understanding` |
+| P-JS | js | 2 | A `validation_fixed` · B `js_correctness` | yes | INT `code_understanding` (this criterion feeds JS) |
+| P-DBG | debugging | 2 | INT `root_cause_fixed` · B `root_cause_fixed` (A `root_cause_note` allowed as the second item) | yes | within criterion (fix at cause + note) |
+| P-READ | code_reading | 2 | INT `problem_traced` · B `component_explained` **+** `problem_traced` | yes | within criterion (explain / trace) |
+| P-GIT | version_control | **1** | INT `git_workflow` | no | within criterion (G-4) |
+| P-UI | ui_state | 2 | INT `state_transitions` · B `filter_in_state` | yes | INT `code_understanding` |
+| P-API | api_states | 2 | INT `data_states` · B `empty_state_correct` | yes | INT `code_understanding` |
+| P-A11Y | accessibility | **1** | A `a11y_keyboard_forms` (INT `a11y_basics` allowed) | no | INT `code_understanding` |
 
-**Independent of all of the above:** the graduate UI. No step before P9 changes it, and P9's UI change is copy only.
+**F3 encoded:**
+- For a 2-task skill, one task's working code plus an explanation is **incomplete**. The path needs a second, independently assessed practical task.
+- For Git and accessibility, the SME's minimum is one *practical* observation, not a theoretical one.
+- No path requires a live modification round. CAP-7 is downgraded to an **optional** tool a reviewer may use in an exception case.
+
+### E.3 Independence conditions (apply when a path needs 2 tasks)
+
+| ID | Condition | Fact |
+|---|---|---|
+| I-1 Purpose | One counted item comes from a validation activity (`is_validation_activity`) | exists |
+| I-2 Variant | The two items come from **different `variant_family`** values. Versions of one activity share a family | new content field (ENG-2) |
+| I-3 Behaviour | Each item is the listed criterion (or criteria) for that task, met in **its own** evaluation. A criterion result counts once | `criterion_result` (exists) |
+| I-4 Provenance | Standing, accepted (not `pending_validation`), approved non-demo rubric version; no demo content in production | exists (D-118 / D-119) |
+| I-5 Reuse | No shared `upload_id` or confirmed `checksum_sha256` of learner-authored files; no identical normalized text deliverables. Starter files excluded | checksum exists; text hash new (ENG-2) |
+| I-6 Resubmission | All attempts on one activity or family count as one item | exists |
+
+- Different activity IDs alone are not proof (I-2, I-3). Duplicated files do not count (I-5).
+- There is no similarity scoring and no inference about where work came from (BR-025).
+- A non-counted item gets a neutral message, never an accusation.
+
+### E.4 Per-skill results (prerequisite, DM-9)
+
+**Today, with H6 off, an evaluation moves only the first skill the learner claims** (`evaluation.service.ts`: `primarySkillId`).
+- The H6 code, when enabled, gives secondary skills the **same** decision as the whole run. That is not the "independently justified result" F1 requires.
+- **ENG-1 proposes per-skill results instead:**
+  - one evaluation yields, for each skill its rubric measures, an outcome based **only** on that skill's criteria (the existing `thresholdForSkill` field), plus the gate;
+  - each outcome goes through the verification policy separately;
+  - it is policy-gated, inactive, and needs its own PO approval;
+  - it does **not** activate H6.
+- **Without ENG-1:** the three-activity design cannot move nine skills, so readiness stays unreachable. That is fail-closed, never satisfied without proof.
 
 ---
 
-## 13. Open items for the SME and the Product Owner
+## F. Rubric specifications
 
-### 13.1 Questions for the SME (also in `08-sme-review-checklist.md`)
+Full tables are in `05-rubrics-and-evidence.md` and `09-sme-validation-package.md`. **All weights, thresholds, max scores and level descriptors are blank and unapproved** (OPEN-043; a named SME decides on non-demo content).
 
-1. SME-12 vs SME-17: is Code Reading **Must** (A) or **Core, assessed on its own** (B)?
-2. «التحقق من مخرجات AI»: did you mean understanding of the submitted code for **everyone** (R1)?
-3. Git: in how many practical activities must it be observed (1 or 2)? What makes a commit, branch or PR acceptable at Junior level?
-4. Is one integrated task plus two short tasks (K-1) enough evidence, or do you want the three existing activities kept as well (K-2)?
-5. Integrated task: which criteria are mandatory? What are the duration and the borderline band?
-6. Are the short-task variants different enough that the same solution cannot pass both (I-2)?
-7. Testing (C-4), forms validation and requirements reading (C-5): confirm Supporting.
+| Activity | Criteria (incl. gate) | Mandatory (proposed) | Reused / adapted / new | Primary skills |
+|---|---|---|---|---|
+| INT | 12 | 8 (html, css, api, ui, read, debug, js-understanding, git) | 4 reused · 3 adapted · 5 new | css, api_states, debugging |
+| A | 7 | 4 (html, css, js-validation, debugging note). Accessibility not mandatory: it never blocks other skills (SME-25), and its own path reads its criterion directly | 6 reused · 1 adapted | html, css, js |
+| B | 8 | 6 | 6 reused · 1 adapted · 1 new | code_reading, debugging, js |
 
-### 13.2 SME values (carried from the first plan, still open)
+**Common to all three:**
+- `can_yield_verified = false`.
+- I1 (a platform-private input), I2 (an assessment-only check) and I3 (an explanation question) are kept.
+- Checks without a producer stay `future_deterministic` and inactive.
+- Every skill criterion is **human-scored today** by a named reviewer (the D-118 authorized basis).
 
-- V-1: confirm each skill row: category, proficiency, evidence composition.
-- V-2: rubric weights, thresholds and level descriptors (OPEN-043).
-- V-3: Git observations and acceptance criteria.
-- V-4: integrated-task pass rule, mandatory criteria, borderline band.
-- V-5: escalation triggers and calibration sample.
-- V-6: integrated and short-task content (brief, planted bugs, mock-API scenarios, variants).
-- V-7: item bank and learner-safe wording of private inputs.
-- V-8: golden set.
+---
 
-### 13.3 Risks (additions to the first plan §12.4)
+## G. Readiness configuration proposal
 
-1. **K-1 retires the three existing activities from the candidate version.** Their history stays, but a pilot user's earlier work on them would not count towards the new readiness set unless mapped. Since there are no real users, nothing is lost today.
-2. **The `variant_family` discipline is content-dependent.** If two variants are too close, I-2 is nominal. SME review of each variant pair is the control.
-3. **Declared vs reviewed SHA (Git)** depends on reviewer diligence until CAP-6.
-4. **P-1 makes "core" mean 9 skills.** Every place that reads `is_core` must be checked: UI chips, `all_core_skills_at_level`, the claim summaries. This check is part of P4.
+Rule set `junior_frontend_readiness` v1. Candidate text only; not created.
+
+| Condition | Rules | Status |
+|---|---|---|
+| **1. Every Must skill meets its approved required level** | R-M1…R-M6 `non_compensable_skill` (html, css, js, debugging, code_reading, version_control), `min_level` = **DM-2 value** · R-P (EXT-2) path rule for each | rule types exist (R-M); EXT-2 not built |
+| **2. Every Core skill meets its approved Junior minimum** | R-C1…R-C3 `required_skill_at_level` (ui_state, api_states, accessibility), `min_level` = **DM-2 value** · R-P (EXT-2) per skill | same |
+| **3. The integrated practical assessment is passed** | R-I1 `integrated_assessment_passed` (EXT-1) `{activity_code: act_fe_integrated_leave_requests, pass_rule: DM-6, allowed_versions}` | EXT-1 not built |
+
+**The two axes stay separate.**
+- *Proficiency* (`foundation` / `working`) is carried by SME-calibrated thresholds and level descriptors (PF-1).
+- *Verification level* (Practiced / Demonstrated) is the claim state the rules read.
+- **No threshold is auto-selected (DM-2):**
+
+| Option | Meaning |
+|---|---|
+| V-a | Demonstrated for Must and Core |
+| V-b | Demonstrated for Must, Practiced for Core. Under `default@2`, Practiced also needs an independently verified basis, so it is no easier today |
+| V-c | Set not created; readiness reports `not_yet_configured` |
+
+**Assessment basis:**
+- **Human review is the interim basis:** named, blind, approved non-demo rubric (D-118).
+- **Later it becomes the exception path** (borderline, conflicting signals, ambiguous results, calibration sample, C4) once an automated basis exists.
+- **Automated promotion stays unavailable** until runners (CAP-1/2/4/5/6) are built, calibrated (golden set, agreement) and approved in a new verification-policy version.
+- Verified stays disabled. BR-024 holds: readiness never changes a level.
+
+---
+
+## H. Existing three activities vs proposed three: reuse
+
+### H.1 Comparison
+
+| | `act_fe_build_interface` → **INT** | `act_fe_debug_improve` → **A** | `act_fe_change_request` → **B** |
+|---|---|---|---|
+| Scenario kept | «طلب إجازة»: list of previous requests from an internal service | «تسجيل في ورشة»: existing page with complaints (breaks on mobile, no keyboard, accepts a bad e-mail) | «مهام الفريق»: existing list, filter by status, empty-list-as-error report |
+| Role in the SME model | Integrated practical assessment (C5 condition 3) | Distinct short task: semantic HTML, accessibility (forms, keyboard), responsive, JS validation | Distinct short task: reading existing code, tracing and fixing a basic problem |
+| Main change | Adds a small **starter** with a planted retry bug, Git (branch, commits, PR) and `code_understanding`; responsive becomes mandatory. **Form part moves to A** (forms assessed there) | Accessibility criterion sharpened for forms and keyboard; `is_validation_activity` → true | Adds `component_explained`; splits tracing (code reading) from fixing (debugging); primaries become code_reading, debugging, js; `is_validation_activity` → true |
+| Recommendation | **Adapt** | **Adapt** (nearly as-is) | **Adapt** |
+
+### H.2 Criterion by criterion
+
+| 0.2.1 criterion | Disposition | Candidate |
+|---|---|---|
+| build_interface `semantic_structure` | **reuse** | INT `semantic_structure` |
+| build_interface `form_validation` | **superseded in INT**; forms assessed in A | A `validation_fixed` |
+| build_interface `data_states` | **reuse** | INT `data_states` |
+| build_interface `state_transitions` | **reuse** | INT `state_transitions` |
+| build_interface `responsive_layout` (non-mandatory) | **adapt** → mandatory (CSS is Must) | INT `responsive_layout` |
+| build_interface `explanation_clarity` | **adapt** → `code_understanding` (F2), linked to JS | INT `code_understanding` |
+| build_interface `judgment_assumption_check` | **adapt**: conflict now between brief and API data, not form fields | INT `judgment_assumption_check` |
+| build_interface `deliverables_complete` | **reuse** | INT gate |
+| debug_improve `responsive_fixed`, `semantic_fixed`, `validation_fixed`, `root_cause_note`, `scope_discipline`, `deliverables_complete` | **reuse** | A, same keys |
+| debug_improve `a11y_basics_fixed` | **adapt** → `a11y_keyboard_forms` (labels, errors tied to fields, keyboard path) | A |
+| change_request `root_cause_fixed`, `filter_in_state`, `js_correctness`, `empty_state_correct`, `decision_explained`, `deliverables_complete` | **reuse** | B, same keys |
+| change_request `code_reading` ("change in the right place") | **adapt** → `problem_traced` (F1: trace a basic problem) | B |
+| — | **new** | INT `problem_traced`, `root_cause_fixed`, `git_workflow`, `decision_clarity`, `a11y_basics` · B `component_explained` |
+
+**Inputs, deliverables, checks and tasks:**
+- **Reused** wherever the scenario is kept: all integrity checks, all planted issues, `api.mock_*`, `note.*`, `answer.*`.
+- **New:**
+  - INT `repo.starter` (private, planted bug), `note.bug_trace`, `link.pull_request`, `text.head_sha`, `answer.git_diff_explained`, `answer.decisions`;
+  - B `answer.component_explained`;
+  - task `tsk_fe_version_control_flow` (tasks 11 → 12).
+
+### H.3 Identity, preservation, constraints and document checks
+
+**Identity (recommended, PO to confirm):** **new activity codes** with `source_refs` naming the 0.2.1 activity each derives from, plus a `CHANGES.md` entry.
+- **Why not new versions of the old codes?** The purpose changes (validation flag, readiness gate), and EXT-1 / EXT-2 must not count 0.2.1 attempts.
+- **What is preserved:**
+  - the 0.2.1 pack stays canonical and unchanged until the candidate is published;
+  - its activities, rubrics and every result on them stay as history;
+  - nothing is deleted or rewritten.
+
+**Pack constraints in effect** (`legacy_pack_constraints@1`, global; **not modified**):
+
+| Constraint | Value | Candidate (3 activities) |
+|---|---|---|
+| `activity_count` | exactly 3 | 3 ✓ |
+| `task_count` | 10–12 | 12 ✓ |
+| `activity_primary_skill_count` | 2–3 | 3 / 3 / 3 ✓ |
+| `rubric_min_criteria` | ≥ 5 | 12 / 7 / 8 ✓ |
+| `resources_per_skill_max` | ≤ 3 | unchanged ✓ |
+| `core_skill_count` | 4–5 | **P-1: 9 ✗** · P-2: 5 ✓ |
+| `activity_core_primary_skill_count` | 2–3 | P-1: 3 / 3 / 3 ✓ · **P-2: B = 1 ✗** (only js is in the OD-2 five) unless B's primaries become js, ui_state, code_reading, which understates debugging |
+
+**DM-7b options (PO):**
+- **P-1:** `is_core` = Must ∪ Core.
+  - Explicit, not silent: track-skill changes + a **new track-scoped** `pack_constraint_set` `trk_frontend_junior_constraints` v1 with `core_skill_count` 9–9 (everything else copied).
+  - Draft → four eyes → separate activator. The global set is untouched.
+  - Plus CHG-017.
+  - **Recommended:** it states the SME model honestly in the data.
+- **P-2:** `is_core` stays the OD-2 five. No numeric change.
+  - "core" then means "OD-2 structural set", unrelated to SME "Core".
+  - Task B's primaries must be bent to pass. Debugging, Code Reading and Git (all Must) would read `is_core = false`.
+
+**SRS and document checks that conflict at publication (not now):**
+
+| Where | States | Candidate |
+|---|---|---|
+| SRS §3.1 | `trk_frontend_junior@0.2.1`, "5 مهارات أساسية", "11 مهمة", "3 أنشطة" with the three 0.2.1 codes, "22 بند رُبريك (19 + 3 بوابات)" | new version, 12 tasks, new codes, 27 criteria (24 + 3 gates), core 9 (P-1) |
+| SRS scope | "3 أنشطة فقط" | **holds** |
+| OD-2 | "المجموعة الأساسية الخمس مضبوطة؛ SME يوصي ولا يستبدل بصمت" | amended by CHG-017 (the SME recommendation is the non-silent route OD-2 requires) |
+| `scripts/verify-docs.mjs` §3 | (a) manifest version = the version quoted in §3.1; (b) **`is_demo_fixture === true`**; (c) exactly 5 core skills; (d) 3 activities | (a) and (b) **must change** at publication of an SME-approved non-demo pack; (c) changes under P-1; (d) holds. Updated **in the same commit** as CHG-017's application and the publication, never before |
+
+The drafts in `docs/sme-candidate/` do not trip any check today. `npm run verify` passes.
+
+---
+
+## I. Engineering dependencies and extension-register items
+
+### I.1 Needed for a human-reviewed pilot of the candidate
+
+| ID | Item | Kind | Notes |
+|---|---|---|---|
+| **ENG-1** | Per-skill assessment results from one evaluation (§E.4) | verification-policy behaviour + code | **Critical path.** Policy-gated, inactive, separate PO approval (DM-9). H6 stays off |
+| **EXT-2** | `skill_evidence_path` readiness rule (§E) | **extension register** | Replaces Rev. 1's `min_independent_evidence_per_skill`: per-skill, versioned, `counted_criteria`, `min_distinct_tasks` |
+| **EXT-1** | `integrated_assessment_passed` readiness rule | **extension register** | Unchanged design (`07-…`) |
+| ENG-2 | `activity_spec.variant_family` content field + server-side normalized text hash | content schema + code | Used by EXT-2 (I-2, I-5) |
+| ENG-3 | Starter materials delivery (private, versioned) | capability (CAP-14) | All three activities need starter material. The graduate UI already says "materials unavailable" honestly (D-120). No UI change |
+| ENG-4 | Mock API scenarios (200 / 500 / empty / slow) | capability (CAP-4) | INT and B |
+| ENG-5 | `verify-docs` update at publication | docs check | §H.3, with CHG-017 |
+| ENG-6 | Category ↔ readiness-rule consistency check | quality rule | §B. Only if `category` mirrors Must/Core |
+| — | Git human-review path | **none** | Reviewer prompt + `supporting_excerpt` (§D) |
+
+### I.2 Later: automation only (not needed for the pilot; each with its own security and privacy review)
+
+| CAP | What |
+|---|---|
+| CAP-10 | `platform_verified` provenance |
+| CAP-1 | Test runner |
+| CAP-2 | Rendering runner |
+| CAP-3 | Static analysis |
+| CAP-5 | Accessibility checks |
+| CAP-6 | Git facts |
+| CAP-8 | Structured explanation capture |
+| CAP-13 | Calibration tooling |
+| CAP-7 | Follow-up round: **optional**, no longer a dependency (F3) |
+
+### I.3 CHG-017 (proposed requirements, not applied)
+
+| CR | Requirement | Change from Rev. 1 |
+|---|---|---|
+| CR-1 | Must / Core / Supporting classification and semantics (C2). The readiness rule set is the authoritative carrier | carrier stated |
+| CR-2 | Professional proficiency ≠ verification level. Configuration never assigns a level. Ladder unchanged | — |
+| CR-3 | Readiness = all Must at the approved level + all Core at the approved Junior minimum + the integrated assessment passed. Never a percentage or count. BR-024 unchanged | — |
+| CR-4 | Git is assessed in practice. **One project suffices** when commit, branch and PR are observed and the changes explained. A link alone is not evidence | **F4** |
+| CR-5 | **Per-skill, versioned evidence paths.** Where a path needs more than one task, the tasks are independent (variant, assessed behaviour, authorized basis, no reuse, no resubmission). **No universal two-activity minimum** | **F3, item 6** |
+| CR-6 | The integrated assessment is a readiness condition. Only a standing, accepted result on an approved version counts | — |
+| CR-7 | **Understanding of submitted code is required of every graduate**, through the evidence path. Not a universal live-modification round, not an AI-specific challenge. Disclosure never disadvantages (BR-025 unchanged) | **F2, F3** |
+| CR-8 | The P1 Frontend track's counts follow the SME-reviewed configuration, recorded as a governed track-scoped constraint version. **3 activities kept.** Amends §3.1 and OD-2 | **F5** |
+| CR-9 | Human review is the interim authorized basis and, once an automated basis is approved, the exception mechanism. It is not a permanent requirement | item 8 |
+| CR-10 | Each skill assessed in a shared activity has its own criterion and its own result | **F1** (new) |
+
+---
+
+## J. Remaining decisions (genuinely unresolved only)
+
+| # | Decision | Who | Options |
+|---|---|---|---|
+| J-1 | Required verification level for Must and for Core (DM-2) | PO with SME | V-a · V-b · V-c |
+| J-2 | `is_core` representation (DM-7b) | PO | P-1 (recommended) · P-2 |
+| J-3 | Approve building ENG-1, EXT-1, EXT-2 and ENG-2 (all inactive) (DM-9) | PO | yes / no / later |
+| J-4 | Integrated pass rule and mandatory set (DM-6) | SME + PO | PR-1 · PR-2 |
+| J-5 | Calibration values: weights, thresholds, level descriptors, borderline band, durations, Git acceptance (G-2 count) | SME | in L |
+| J-6 | Per-skill path wording and variant distinctness of INT / A / B | SME | in L |
+| J-7 | New activity codes with `source_refs` (recommended), or new versions of the 0.2.1 codes | PO | — |
+| J-8 | CHG-017 text (CR-1…CR-10) | PO | approve / change |
+
+**No longer open:** Code Reading class · AI-output criterion · live modification · Git count · activity scope · six activities.
+
+---
+
+## K. Minimal implementation sequence
+
+Compatible with the separately ongoing Graduate Activity UI work: **no step touches `apps/app` until the last one, and that is copy only.**
+
+| Step | What | Depends on | Touches |
+|---|---|---|---|
+| K0 | PO approves this pack; the validation package (L) goes to the SME | — | docs |
+| K1 | SME returns L (J-4…J-6) | K0 | docs |
+| K2 | CHG-017 drafted → PO approves → applied to the SRS **together with** `verify-docs` (ENG-5), at publication time | K1, J-8 | SRS, `scripts/` |
+| K3 | Content authored as **non-demo draft** via the promotion flow, plus starter materials and mock-API scenarios | K1, J-7 | candidate content (draft), review records |
+| K4 | Backend extensions, **inactive**: ENG-1, ENG-2, EXT-2, EXT-1 (+ register rows, tests, Track Builder kinds) | J-3 | `packages/domain`, API readiness/evaluation, admin |
+| K5 | Governed drafts, inactive: track-skill changes, constraint set (P-1), readiness set (J-1 values) | K2, K4, J-1, J-2 | governed config (draft) |
+| K6 | SME approves rubric values on non-demo content; staging validation with human review (§13 tests of the first plan + EXT/ENG tests) | K3, K5 | review records |
+| K7 | PO activation and publication (separation of duties). Graduate UI copy for Must/Core labels (read from the readiness rules) | K6, pilot blockers | activation records, `apps/app` copy |
+| later | Automation: CAP-10 → CAP-4/1/2/3/5/6/8 → calibration → automated-basis policy | separate approvals | new services |
+
+---
+
+## L. SME validation package
+
+`docs/sme-candidate/junior-frontend/09-sme-validation-package.md`. It is self-contained and ready to send:
+- the three task briefs (Arabic, learner-facing);
+- the reviewer-only notes (planted issues);
+- the three rubrics (blank values);
+- the per-skill evidence paths;
+- the Git acceptance questions;
+- a short answer sheet.
+
+---
+
+## 13. Changes from Rev. 1
+
+| Rev. 1 | Rev. 2 | Source |
+|---|---|---|
+| DM-1 Code Reading: alternatives A / B | **Must**; Junior scope defined; own criterion and result | F1 |
+| DM-5 AI verification: R1 / R2 | **`code_understanding` for all**, no AI-specific challenge | F2 |
+| OI-1 / CAP-7 follow-up round as possible blocker | **Not universal**; evidence paths; CAP-7 optional | F3 |
+| Git in 1–3 activities (G-P1/2/3); V-3 count open | **INT only, one project** | F4 |
+| K-1 (3 activities) vs K-2 (6) | **K-1** | F5 |
+| Rev. 1 short tasks: profile card (A), cart bug (B), new integrated scenario | **Adapted from the 0.2.1 activities** (§H): A ← debug_improve, B ← change_request, INT ← build_interface | item 7 |
+| EXT-2 `min_independent_evidence_per_skill` with `min_count` | **EXT-2 `skill_evidence_path`**: per-skill, versioned, counted criteria, distinct-task count | item 6 |
+| H6 noted as a capability "behind a flag" | **ENG-1 per-skill results**, a prerequisite; H6 stays off | F1, code audit |
+| `category` assumed to carry Must/Core | **The readiness rule set carries Must/Core**; `category` stays display-only | item 7, code audit |
+| `verify-docs` conflict: 5 core / 3 activities | **Adds the DEMO-fixture and version checks** | item 7, audit |
+| Readiness `min_level` options | Unchanged (DM-2 open); human review interim, not permanent | item 8 |
 
 ---
 
 **Stopped. Awaiting Product Owner approval.**
-- The canonical SRS is not modified.
-- No policy or configuration is created or activated.
-- The candidate track is not published or imported.
-- No verification level is granted.
-- No production deployment.
-- EXT-1, EXT-2, runners and automated promotion are not implemented.
+- No SRS edit, no production track file change, no migration.
+- No configuration activated, nothing published.
+- No automated assessment tool started.
+- CV and LinkedIn policies unchanged.
