@@ -370,7 +370,7 @@ The drafts in `docs/sme-candidate/` do not trip any check today. `npm run verify
 
 | ID | Item | Kind | Notes |
 |---|---|---|---|
-| **ENG-1** | Per-skill assessment results from one evaluation (§E.4) | verification-policy behaviour + code | **Critical path.** Policy-gated, inactive, separate PO approval (DM-9). H6 stays off |
+| **ENG-1** | Per-skill assessment results from one evaluation (§E.4) | verification-policy behaviour + code | **Critical path.** Policy-gated, inactive, separate PO approval (DM-9). H6 stays off. **Engineering design:** `ENG-1-PER-SKILL-ASSESSMENT-DESIGN.md` |
 | **EXT-2** | `skill_evidence_path` readiness rule (§E) | **extension register** | Replaces Rev. 1's `min_independent_evidence_per_skill`: per-skill, versioned, `counted_criteria`, `min_distinct_tasks` |
 | **EXT-1** | `integrated_assessment_passed` readiness rule | **extension register** | Unchanged design (`07-…`) |
 | ENG-2 | `activity_spec.variant_family` content field + server-side normalized text hash | content schema + code | Used by EXT-2 (I-2, I-5) |
