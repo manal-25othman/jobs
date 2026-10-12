@@ -67,6 +67,13 @@ export interface RubricCriterion {
   /** Written when the criterion passes / fails. Never generated at runtime. */
   readonly rationaleWhenMet: string;
   readonly rationaleWhenUnmet: string;
+  /**
+   * ENG-1 P0 audit: the per-skill threshold stored on `rubric_criterion.threshold_for_skill`, and its value status.
+   * Carried for the per-skill model (P1) and for review display ONLY. The legacy evaluator never reads it:
+   * grading here is unchanged (mandatory criteria at full marks + the rubric pass threshold).
+   */
+  readonly thresholdForSkill?: number | null;
+  readonly thresholdStatus?: string | null;
 }
 
 export interface PublishedRubric {

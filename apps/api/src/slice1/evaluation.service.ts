@@ -20,6 +20,8 @@ import {
   MissingPrerequisite,
   assessmentBasis, type AssessmentBasis, type ArtifactProvenance,
   workStatus, type WorkStatus,
+  attributeLegacyPrimarySkill, skillsCoveredByRubric, isValidSkillEvidenceCriterion, withheldPromotion, resolveRubricVersion, unattributedDecision,
+  type LegacyAttribution, type RubricResolution,
 } from '@naqla/domain';
 import { isProduction } from '../configuration/configuration.service';
 
@@ -75,7 +77,9 @@ export class EvaluationService {
           : 'this submission already has a completed evaluation; a correction creates a new submission');
       }
 
-      const rubric = await this.loadPublishedRubric(c, s.activity_spec_id, s.activity_spec_version);
+      // ENG-1 P0 (F-8): the rubric bound to the submission's activity version — never "the latest published".
+      const pin = await this.resolveRubricVersionId(c, s.activity_spec_id, s.activity_spec_version);
+      const rubric = await this.loadPublishedRubric(c, s.activity_spec_id, s.activity_spec_version, pin.rubricVersionId);
       assertRubricProposalSane(rubric);
 
       const artifacts = await this.loadArtifacts(c, submissionId);
@@ -94,14 +98,18 @@ export class EvaluationService {
       );
       const evaluationId: string = evalRow.rows[0].id;
 
+      // ENG-1 P0 (F-1/F-2/F-9): the ONE skill a whole-activity result may move is chosen by an explicit mapping
+      // (claimed ∩ activity-primary ∩ measured by the rubric), never by row order. Otherwise nothing is promoted.
+      const attribution = await this.attributeLegacyResult(c, s.activity_spec_id, skillIds, rubric);
+      const primarySkillId: string | null = attribution.kind === 'attributed' ? attribution.skillId : null;
       // The state before this run decides whether a promotion is even earned.
-      const primarySkillId = skillIds[0]!;
-      const currentState = await this.currentClaimState(c, userId, primarySkillId);
+      const currentState: EvidenceState = primarySkillId ? await this.currentClaimState(c, userId, primarySkillId) : 'gap';
 
       /* ── 3. the domain decides; this service does not ── */
-      const run: EvaluationRun = runDeterministicEvaluation({
+      let run: EvaluationRun = runDeterministicEvaluation({
         rubric, artifacts, integritySpecs, currentState,
       });
+      if (attribution.kind === 'unattributed') run = withheldPromotion(run, attribution.reason);
 
       assertEvaluationResultValid({
         outcome: run.outcome,
@@ -178,7 +186,8 @@ export class EvaluationService {
         eventType: awaitingHuman ? 'evaluation.queued_for_human' : 'evaluation.completed',
         userId, actorKind: 'system', subjectTable: 'evaluation_result', subjectId: resultId,
         reason: run.reason,
-        payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, pendingHumanCriteria: run.pendingHumanCriteria },
+        payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, pendingHumanCriteria: run.pendingHumanCriteria,
+          rubricResolution: pin.resolution, attribution: attribution.kind === 'attributed' ? { skillId: attribution.skillId } : { unattributed: attribution.cause, candidates: attribution.candidates } },
       });
 
       /* ── 5. verification, then the transition — same transaction ── */
@@ -189,12 +198,15 @@ export class EvaluationService {
       // draft equals the pre-Phase-3 rule exactly). The legacy `verification` row
       // and the promotion are written exactly as before; the structured decision
       // is recorded beside them with the policy and ruleset versions it used.
-      const outcome = await this.decideAndApply(c, {
-        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'rule',
-        basis: await this.basisFor(c, rubric, artifacts, []),
-        resultId, userId, skillId: primarySkillId, claimedSkillIds: skillIds, currentState, run, rubric, projectId: s.project_id,
-        acceptedReason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
-      });
+      const outcome = primarySkillId
+        ? await this.decideAndApply(c, {
+          policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'rule',
+          basis: await this.basisFor(c, rubric, artifacts, []),
+          resultId, userId, skillId: primarySkillId, claimedSkillIds: skillIds, currentState, run, rubric, projectId: s.project_id,
+          acceptedReason: `deterministic evaluation met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
+        })
+        : await this.recordUnattributed(c, { assessmentId: assessment.assessmentId, resultId, userId, claimedSkillIds: skillIds, trackConfigVersionId: assessment.trackConfigVersionId,
+          confidence: assessment.confidence, reason: (attribution as Extract<LegacyAttribution, { kind: 'unattributed' }>).reason });
       transition = outcome.transition; reestablishedEvidenceId = outcome.reestablishedEvidenceId;
 
       // Phase 1: the run is recorded in the evidence ledger and, when it produced an
@@ -206,7 +218,8 @@ export class EvaluationService {
       });
 
       // Phase 2: the journey records the run; produced_evidence is a fact, not a verdict.
-      await this.progress.apply(c, { userId, skillId: primarySkillId,
+      // ENG-1 P0: an unattributed run is recorded on every claimed skill's journey and produces evidence for none.
+      await this.progress.applyAll(c, primarySkillId ? [primarySkillId] : skillIds, { userId,
         trigger: awaitingHuman ? 'evaluation.queued_for_human' : 'evaluation.completed',
         facts: { outcome: run.outcome, produced_evidence: (transition?.evidenceId ?? reestablishedEvidenceId) !== null },
         eventRef: { table: 'evaluation_result', id: resultId }, reason: run.reason, actorKind: 'system' });
@@ -275,11 +288,15 @@ export class EvaluationService {
         `select distinct on (queue_item_id) queue_item_id, criterion_key, score, rationale from criterion_review where queue_item_id = any($1::uuid[]) order by queue_item_id, created_at desc`,
         [queue.rows.map((q) => q.id)]);
       // OPEN-039: a claim on an alias skill is honoured on its canonical skill.
-      const primarySkill = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1 limit 1', [e.submission_id]);
-      const primarySkillId: string = primarySkill.rows[0].skill_id;
-      const currentState = await this.currentClaimState(c, e.user_id, primarySkillId);
+      // ENG-1 P0 (F-2): the same explicit attribution as the initial run, on the same pinned rubric — never `limit 1`.
+      const claimedRows = await c.query('select distinct canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1', [e.submission_id]);
+      const claimedSkillIds: string[] = claimedRows.rows.map((r) => r.skill_id as string);
+      const attribution = await this.attributeLegacyResult(c, e.activity_spec_id, claimedSkillIds, rubric);
+      const primarySkillId: string | null = attribution.kind === 'attributed' ? attribution.skillId : null;
+      const currentState: EvidenceState = primarySkillId ? await this.currentClaimState(c, e.user_id, primarySkillId) : 'gap';
 
-      const run = aggregateWithHumanDecisions({ rubric, deterministic, decisions: decisions.rows.map((d) => ({ criterionKey: d.criterion_key, score: Number(d.score), rationale: d.rationale })), currentState });
+      let run = aggregateWithHumanDecisions({ rubric, deterministic, decisions: decisions.rows.map((d) => ({ criterionKey: d.criterion_key, score: Number(d.score), rationale: d.rationale })), currentState });
+      if (attribution.kind === 'unattributed') run = withheldPromotion(run, attribution.reason);
       assertEvaluationResultValid({ outcome: run.outcome, rubricVersion: run.rubricVersion, activitySpecVersion: run.activitySpecVersion, criteria: run.criteria });
 
       const resultRow = await c.query(
@@ -296,7 +313,8 @@ export class EvaluationService {
       }
       await c.query(`update evaluation set state = 'completed', completed_at = now() where id = $1`, [evaluationId]);
       await emitAuditEvent(c, { eventType: 'evaluation.completed', userId: e.user_id, actorKind: 'system', subjectTable: 'evaluation_result', subjectId: resultId,
-        reason: `${run.reason} (aggregated from deterministic results and ${decisions.rowCount} human decision(s))`, payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, supersedes: interim.rows[0].id } });
+        reason: `${run.reason} (aggregated from deterministic results and ${decisions.rowCount} human decision(s))`, payload: { outcome: run.outcome, score: run.totalScore, maxScore: run.maxScore, supersedes: interim.rows[0].id,
+          attribution: attribution.kind === 'attributed' ? { skillId: attribution.skillId } : { unattributed: attribution.cause, candidates: attribution.candidates } } });
       // Phase 3: the aggregate assessment (rule facts + human criterion decisions) beside the final result.
       const assessment = await this.assessments.recordAssessment(c, {
         evaluationResultId: resultId, evaluationId, submissionId: e.submission_id, userId: e.user_id, evaluatorKind: 'human',
@@ -304,20 +322,22 @@ export class EvaluationService {
         humanDecisions: decisions.rows.map((d) => ({ criterionKey: d.criterion_key as string, score: Number(d.score), rationale: d.rationale as string })),
       });
 
-      const claimed = await c.query('select canonical_skill_id(skill_id) as skill_id from submission_claimed_skill where submission_id = $1', [e.submission_id]);
-      const outcome = await this.decideAndApply(c, {
-        policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'human',
-        basis: await this.basisFor(c, rubric, await this.loadArtifacts(c, e.submission_id), decisions.rows.map((d) => String(d.criterion_key))),
-        resultId, userId: e.user_id, skillId: primarySkillId, claimedSkillIds: claimed.rows.map((r) => r.skill_id as string), currentState, run, rubric, projectId: e.project_id,
-        acceptedReason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
-      });
+      const outcome = primarySkillId
+        ? await this.decideAndApply(c, {
+          policyKey: 'default', assessmentId: assessment.assessmentId, assessmentConfidence: assessment.confidence, trackConfigVersionId: assessment.trackConfigVersionId, evaluatorKind: 'human',
+          basis: await this.basisFor(c, rubric, await this.loadArtifacts(c, e.submission_id), decisions.rows.map((d) => String(d.criterion_key))),
+          resultId, userId: e.user_id, skillId: primarySkillId, claimedSkillIds, currentState, run, rubric, projectId: e.project_id,
+          acceptedReason: `deterministic checks and human review met every mandatory criterion (${run.totalScore}/${run.maxScore})`,
+        })
+        : await this.recordUnattributed(c, { assessmentId: assessment.assessmentId, resultId, userId: e.user_id, claimedSkillIds, trackConfigVersionId: assessment.trackConfigVersionId,
+          confidence: assessment.confidence, reason: (attribution as Extract<LegacyAttribution, { kind: 'unattributed' }>).reason });
       const transition = outcome.transition; const reestablishedEvidenceId = outcome.reestablishedEvidenceId;
       await this.ledger.recordEvaluation(c, {
         userId: e.user_id, submissionId: e.submission_id, projectId: e.project_id, activitySpecId: e.activity_spec_id, evaluationResultId: resultId,
         outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore,
         evidenceId: transition?.evidenceId ?? reestablishedEvidenceId, skillId: primarySkillId,
       });
-      await this.progress.apply(c, { userId: e.user_id, skillId: primarySkillId, trigger: 'evaluation.completed',
+      await this.progress.applyAll(c, primarySkillId ? [primarySkillId] : claimedSkillIds, { userId: e.user_id, trigger: 'evaluation.completed',
         facts: { outcome: run.outcome, produced_evidence: (transition?.evidenceId ?? reestablishedEvidenceId) !== null },
         eventRef: { table: 'evaluation_result', id: resultId }, reason: run.reason, actorKind: 'system' });
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
@@ -532,6 +552,56 @@ export class EvaluationService {
     try { return await this.loadPublishedRubric(c, activitySpecId, activitySpecVersion); } catch (e) { if (e instanceof BadRequestException) return null; throw e; }
   }
 
+  /**
+   * ENG-1 P0 (F-8): the rubric version bound to the submission's activity version (domain `resolveRubricVersion`).
+   * Refused — before anything is written — when it cannot be resolved without guessing.
+   */
+  private async resolveRubricVersionId(c: PoolClient, activitySpecId: string, submissionActivityVersion: string | null): Promise<{ rubricVersionId: string; resolution: Exclude<RubricResolution['kind'], 'unresolved'> }> {
+    const cands = await c.query(`select id, status::text as status, activity_spec_version from rubric_version where activity_spec_id = $1`, [activitySpecId]);
+    const act = await c.query('select version from activity_spec where id = $1', [activitySpecId]);
+    const r = resolveRubricVersion({
+      candidates: cands.rows.map((x) => ({ id: x.id as string, status: x.status as string, activitySpecVersion: (x.activity_spec_version as string | null) ?? null })),
+      submissionActivityVersion, currentActivityVersion: act.rows[0]?.version as string,
+    });
+    if (r.kind === 'unresolved') throw new BadRequestException(`[rubric_version_unresolved] ${r.reason}`);
+    return { rubricVersionId: r.rubricVersionId, resolution: r.kind };
+  }
+
+  /**
+   * ENG-1 P0 (F-1/F-2/F-9): which ONE claimed skill a whole-activity result may move — or none.
+   * Inputs are canonical ids from governed content: the activity's `primary` mapping and the rubric's valid criteria.
+   */
+  private async attributeLegacyResult(c: PoolClient, activitySpecId: string, claimedCanonicalSkillIds: readonly string[], rubric: PublishedRubric): Promise<LegacyAttribution> {
+    const primaries = await c.query(`select distinct canonical_skill_id(skill_id) as id from activity_skill where activity_spec_id = $1 and depth = 'primary'`, [activitySpecId]);
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const linked = [...new Set(rubric.criteria.filter(isValidSkillEvidenceCriterion).map((x) => x.skillId!))].filter((id) => UUID.test(id));
+    const canon = linked.length ? (await c.query('select x::text as id, canonical_skill_id(x)::text as canonical from unnest($1::uuid[]) as x', [linked])).rows : [];
+    const map = new Map(canon.map((r) => [r.id as string, r.canonical as string]));
+    return attributeLegacyPrimarySkill({
+      claimedSkillIds: claimedCanonicalSkillIds,
+      activityPrimarySkillIds: primaries.rows.map((r) => r.id as string),
+      coveredSkillIds: skillsCoveredByRubric(rubric, (id) => map.get(id) ?? id),
+    });
+  }
+
+  /**
+   * ENG-1 P0: the result could not be attributed to one skill. A `not_applicable` decision is recorded for each
+   * claimed skill (so the record is complete); no verification row, no evidence, no transition.
+   */
+  private async recordUnattributed(c: PoolClient, p: {
+    assessmentId: string; resultId: string; userId: string; claimedSkillIds: readonly string[]; trackConfigVersionId: string | null; confidence: number | null; reason: string;
+  }): Promise<{ transition: null; reestablishedEvidenceId: null; policy: VerificationPolicy; decision: string; decisionReason: string }> {
+    const { policy, resolution } = await this.assessments.loadPolicy(c, 'default');
+    let last = '';
+    for (const skillId of [...new Set(p.claimedSkillIds)].sort()) {
+      const d = unattributedDecision(policy, { currentState: await this.currentClaimState(c, p.userId, skillId), reason: p.reason });
+      last = d.reason;
+      await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId, policy, policyResolution: resolution,
+        trackConfigVersionId: p.trackConfigVersionId, decision: d, confidence: p.confidence, verificationId: null, evidenceId: null });
+    }
+    return { transition: null, reestablishedEvidenceId: null, policy, decision: 'not_applicable', decisionReason: last };
+  }
+
   private async loadPublishedRubric(
     c: PoolClient, activitySpecId: string, activitySpecVersion: string, rubricVersionId: string | null = null,
   ): Promise<PublishedRubric> {
@@ -553,7 +623,7 @@ export class EvaluationService {
     const crit = await c.query(
       `select key, name_ar, linked_skill_id, criterion_kind, max_score, mandatory, evaluator_type, check_type,
               check_artifact_key, check_min_value, check_min_length, check_artifact_keys,
-              rationale_when_met_ar, rationale_when_unmet_ar
+              rationale_when_met_ar, rationale_when_unmet_ar, threshold_for_skill, threshold_status::text as threshold_status
          from rubric_criterion where rubric_version_id = $1 order by position, key`,
       [rv.id],
     );
@@ -580,6 +650,8 @@ export class EvaluationService {
           key: r.key, label: r.name_ar, maxScore: Number(r.max_score), kind: r.criterion_kind, skillId: r.linked_skill_id, mandatory: r.mandatory,
           evaluatorType: r.evaluator_type, check: r.evaluator_type === 'rule' ? toCheck(r) : null,
           rationaleWhenMet: r.rationale_when_met_ar, rationaleWhenUnmet: r.rationale_when_unmet_ar,
+          // ENG-1 P0 audit: carried, never read by the legacy evaluator (grading unchanged).
+          thresholdForSkill: r.threshold_for_skill === null ? null : Number(r.threshold_for_skill), thresholdStatus: r.threshold_status ?? null,
         })),
       };
     }

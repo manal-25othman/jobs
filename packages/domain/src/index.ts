@@ -36,8 +36,9 @@ export * from './integrity.js';
 export * from './pack-constraints.js';
 export * from './verification-integrity.js';
 export * from './activity-catalogue.js';
+export * from './skill-attribution.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
-export const DOMAIN_RULESET_VERSION = '0.18.0';
+export const DOMAIN_RULESET_VERSION = '0.19.0';
 export * from './career-claims.js';
 export * from './admin-governance.js';

@@ -185,6 +185,20 @@ export function decideWithPolicy(policy: VerificationPolicy, input: PolicyDecisi
   };
 }
 
+/**
+ * ENG-1 P0: the decision recorded for a claimed skill when the legacy whole-activity result cannot be
+ * attributed to exactly one skill. Nothing is proposed, nothing moves; the reason says why.
+ */
+export function unattributedDecision(policy: VerificationPolicy, input: { readonly currentState: EvidenceState; readonly reason: string }): PolicyDecision {
+  assertVerificationPolicySane(policy);
+  if (!input.reason || input.reason.trim() === '') throw new MissingPrerequisite('reason', 'a verification decision with no recorded reason is not a decision');
+  return {
+    decision: 'not_applicable', resultingState: input.currentState, previousState: input.currentState, proposedState: null,
+    reason: `${input.reason} (policy ${policy.key}@${policy.version})`, legacyOutcome: null, decidedByKind: 'policy',
+    policyRef: { id: policy.id, key: policy.key, version: policy.version, status: policy.reviewStatus },
+  };
+}
+
 /** The pre-Phase-3 rule, as one function, for the equivalence test and for readers. */
 export function legacyVerificationDecision(input: Pick<PolicyDecisionInput, 'evaluationOutcome' | 'proposedState' | 'currentState' | 'reason'>): { applies: boolean; resultingState: EvidenceState } {
   if (input.proposedState && verificationApplies(input.evaluationOutcome)) {
