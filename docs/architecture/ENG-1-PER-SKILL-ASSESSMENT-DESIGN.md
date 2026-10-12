@@ -1,6 +1,11 @@
 # نَقْلة / NAQLA — ENG-1: Per-Skill Assessment Integrity (Engineering Design)
 
 **Date:** 2026-10-11 · **Status:** DESIGN FOR APPROVAL. Nothing here is implemented.
+
+> **Implementation status (2026-10-12):**
+> - P0, P1 and P2 are implemented under the Product Owner's engineering approval: `bf35ed9`, `21a856b`, `4996c90`. See `ENG-1-P0-P2-IMPLEMENTATION-REPORT.md`.
+> - Implemented P0 differs from §G: an explicit primary mapping (claimed ∩ activity-primary ∩ rubric-covered) replaces a claim-position column, and rubric pinning binds `rubric_version.activity_spec_version` at publication.
+> - P3–P6 are not implemented. The per-skill pathway is sealed inactive.
 **Basis:** code at commit `dfa460a`.
 
 **What this design does not do:**
