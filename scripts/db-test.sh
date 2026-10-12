@@ -50,19 +50,29 @@ run_proofs "$ROOT/supabase/tests/per_skill_schema.sql" 'PASS|FAIL'
 echo "==> O-2 / AP-1 evidence history and project identity proofs (0027)"
 run_proofs "$ROOT/supabase/tests/evidence_integrity.sql" 'PASS|FAIL'
 
+echo "==> ENG-1 Phase A integrity hardening proofs (0028)"
+run_proofs "$ROOT/supabase/tests/integrity_hardening.sql" 'PASS|FAIL'
+
+echo "==> ENG-1 P3 development pathway proofs (0029)"
+run_proofs "$ROOT/supabase/tests/per_skill_development.sql" 'PASS|FAIL'
+
 echo "==> ENG-1 rollback refuses while per-skill records exist"
 if psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0026_eng1_p2_per_skill_schema.down.sql" >/dev/null 2>&1; then
   echo "FAIL  the 0026 rollback ran although per-skill records exist" >&2; exit 1
 fi
 echo "PASS  0026 rollback refused (per-skill history is never deleted by a rollback)"
 
-echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0027, 0026, 0025) → up"
+echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0029, 0028, 0027, 0026, 0025) → up"
 RT="${DB}_roundtrip"; RTURL="${PGURL%/*}/$RT"
 psql "$PGURL" -v ON_ERROR_STOP=1 -q -c "drop database if exists $RT;" -c "create database $RT;" >/dev/null
 for f in "$ROOT"/supabase/migrations/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 for f in "$ROOT"/supabase/seed/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 shape() { psql "$RTURL" -At -c "select string_agg(table_name||'.'||column_name, ',' order by table_name, column_name) from information_schema.columns where table_schema = 'public'"; }
 after_up="$(shape)"
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0029_eng1_p3_development_pathway.down.sql" >/dev/null
+[[ "$(psql "$RTURL" -At -c "select count(*) from pg_constraint where conname = 'verification_policy_per_skill_sealed'")" == "1" ]] || { echo "FAIL  0029 rollback did not restore the P2 seal" >&2; exit 1; }
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0028_eng1_integrity_hardening.down.sql" >/dev/null
+[[ "$(psql "$RTURL" -At -c "select has_table_privilege('authenticated', 'submission_claimed_skill', 'INSERT')")" == "t" ]] || { echo "FAIL  0028 rollback did not restore the pre-0028 grants" >&2; exit 1; }
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0027_evidence_history_integrity.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0026_eng1_p2_per_skill_schema.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0025_eng1_p0_rubric_activity_binding.down.sql" >/dev/null
@@ -77,6 +87,10 @@ psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0025_eng1_p0_r
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0026_eng1_p2_per_skill_schema.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0027_evidence_history_integrity.sql" >/dev/null
 [[ "$(psql "$RTURL" -At -c "select has_column_privilege('authenticated', 'evidence', 'skill_id', 'UPDATE')")" == "f" ]] || { echo "FAIL  0027 re-apply did not restore column privileges" >&2; exit 1; }
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0028_eng1_integrity_hardening.sql" >/dev/null
+[[ "$(psql "$RTURL" -At -c "select has_table_privilege('authenticated', 'submission_claimed_skill', 'INSERT')::text || (select convalidated::text from pg_constraint where conname = 'verification_policy_no_submission_promotion')")" == "falsetrue" ]] || { echo "FAIL  0028 re-apply did not restore the guards" >&2; exit 1; }
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0029_eng1_p3_development_pathway.sql" >/dev/null
+[[ "$(psql "$RTURL" -At -c "select count(*) filter (where conname = 'verification_policy_per_skill_development_only') || '/' || count(*) filter (where conname = 'verification_policy_per_skill_sealed') from pg_constraint")" == "1/0" ]] || { echo "FAIL  0029 re-apply did not restore the development seal" >&2; exit 1; }
 [[ "$(shape)" == "$after_up" ]] || { echo "FAIL  re-applying 0025/0026 did not restore the same schema" >&2; exit 1; }
 legacy="$(psql "$RTURL" -At -c "select count(*) from rubric_version where activity_spec_version is null")"
 echo "PASS  re-applied: identical schema; $legacy pre-existing rubric version(s) left unbound (legacy rows are never re-bound)"

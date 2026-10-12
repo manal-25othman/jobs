@@ -74,6 +74,8 @@ export interface RubricCriterion {
    */
   readonly thresholdForSkill?: number | null;
   readonly thresholdStatus?: string | null;
+  /** ENG-1 P3: the scores of the criterion's scoring levels, when the rubric defines levels (absent ⇒ any integer score). */
+  readonly levelScores?: readonly number[] | null;
 }
 
 export interface PublishedRubric {

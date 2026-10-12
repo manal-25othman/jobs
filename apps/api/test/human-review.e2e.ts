@@ -150,9 +150,10 @@ describe('3, 6, 7, 8, 9, 13, 14, 15 — blind review, permissions, immutability,
     await http.post(`/v1/review/evidence/x/state`).set(auth(r)).expect(404);
     const art = (await pool.query('select id from submission_artifact where user_id = $1 limit 1', [user.id])).rows[0].id;
     await asAuthenticatedUser(pool, r.id, async (c) => {
-      assert.equal((await c.query(`update submission_artifact set value_text = 'edited by reviewer' where id = $1`, [art])).rowCount, 0);
+      // Since 0028 (ENG-1 Phase A) a client role holds no write privilege on submissions or their artifacts at all.
+      await expectRejected(c, `update submission_artifact set value_text = 'edited by reviewer' where id = $1`, [art], /permission denied/);
       assert.equal((await c.query(`update skill_claim set state = 'demonstrated' where user_id = $1`, [user.id])).rowCount, 0);
-      assert.equal((await c.query(`update submission set state = 'closed' where user_id = $1`, [user.id])).rowCount, 0);
+      await expectRejected(c, `update submission set state = 'closed' where user_id = $1`, [user.id], /permission denied/);
       await expectRejected(c, `insert into evidence (user_id, skill_id, source_strength, provenance_class, provenance_source) values ($1,$2,'platform_controlled','curated','reviewer')`, [user.id, skillId], /permission denied|row-level security/);
       await expectRejected(c, 'select 1 from review_queue_item', [], /permission denied/);
     });

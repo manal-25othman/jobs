@@ -163,6 +163,8 @@ export class EvidenceLedgerService {
   async recordEvaluation(c: PoolClient, p: {
     userId: string; submissionId: string; projectId: string; activitySpecId: string | null; evaluationResultId: string;
     outcome: string; totalScore: number; maxScore: number; evidenceId: string | null; skillId: string | null;
+    /** ENG-1 P3 (development pathway): one link per assessed skill, each with the evidence that skill earned (if any). */
+    perSkill?: readonly { readonly skillId: string; readonly evidenceId: string | null }[];
   }): Promise<{ checkItemId: string }> {
     const types = await this.loadRegistry(c);
     const targetRoleId = await this.currentTargetRole(c, p.userId);
@@ -177,18 +179,21 @@ export class EvidenceLedgerService {
       evaluationResultId: p.evaluationResultId, parentItemId, artifactKey: null, attemptNumber, status: 'submitted',
       draft: { typeCode: 'automated_check_result', source: 'system', title: `Automated evaluation ${p.outcome}`,
                evaluationResultId: p.evaluationResultId,
-               metadata: { outcome: p.outcome, total_score: p.totalScore, max_score: p.maxScore, produced_evidence: p.evidenceId !== null } },
+               metadata: { outcome: p.outcome, total_score: p.totalScore, max_score: p.maxScore,
+                 produced_evidence: p.evidenceId !== null || (p.perSkill ?? []).some((x) => x.evidenceId !== null) } },
     });
     if (p.skillId) await this.linkSkill(c, checkItemId, p.userId, p.skillId, 'system');
+    for (const x of p.perSkill ?? []) await this.linkSkill(c, checkItemId, p.userId, x.skillId, 'system');
 
-    if (p.evidenceId) {
+    for (const evidenceId of [p.evidenceId, ...(p.perSkill ?? []).map((x) => x.evidenceId)]) {
+      if (!evidenceId) continue;
       await c.query(
         `insert into evidence_derivation (evidence_id, evidence_item_id, user_id, derivation_kind) values ($1,$2,$3,'recorded_as') on conflict do nothing`,
-        [p.evidenceId, checkItemId, p.userId]);
+        [evidenceId, checkItemId, p.userId]);
       if (parentItemId) {
         await c.query(
           `insert into evidence_derivation (evidence_id, evidence_item_id, user_id, derivation_kind) values ($1,$2,$3,'evaluated_from') on conflict do nothing`,
-          [p.evidenceId, parentItemId, p.userId]);
+          [evidenceId, parentItemId, p.userId]);
       }
     }
     return { checkItemId };

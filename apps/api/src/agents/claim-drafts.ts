@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import {
-  resolveActiveConfig, claimEligibility, claimPolicyRef, CLAIM_KIND_CLASS,
+  resolveActiveConfig, claimEligibility, claimPolicyRef, CLAIM_KIND_CLASS, skillsWithPositiveVerificationDecision,
   type ClaimKind, type ClaimPolicy, type ClaimSubject, type ResolvedClaimPolicy, type ClaimEligibility,
   type EvidenceState, type EvidenceSourceStrength,
 } from '@naqla/domain';
@@ -42,15 +42,25 @@ export async function loadClaimSubject(c: PoolClient, userId: string, kind: Clai
   const counts = skillIds.size === 0 ? { rows: [] as Record<string, unknown>[] } : await c.query(
     `select canonical_skill_id(skill_id) as skill_id, count(*)::int as n from evidence where user_id = $1 and withdrawn_at is null and canonical_skill_id(skill_id) = any($2::uuid[]) group by 1`,
     [userId, [...skillIds]]);
+  // CLM-1: every decision for the asserted skills, with what it produced; the domain decides which ones are positive.
   const decided = skillIds.size === 0 ? { rows: [] as Record<string, unknown>[] } : await c.query(
-    `select distinct canonical_skill_id(skill_id) as skill_id from verification_decision where user_id = $1 and canonical_skill_id(skill_id) = any($2::uuid[])`, [userId, [...skillIds]]);
+    `select canonical_skill_id(vd.skill_id) as skill_id, vd.decision, vd.resulting_state, vd.evidence_id,
+            case when e.id is null then null else canonical_skill_id(e.skill_id) end as evidence_skill_id,
+            (e.id is not null and e.withdrawn_at is null) as evidence_standing,
+            exists (select 1 from verification_decision o where o.human_override_of = vd.id) as overridden
+       from verification_decision vd
+       left join evidence e on e.id = vd.evidence_id and e.user_id = vd.user_id
+      where vd.user_id = $1 and canonical_skill_id(vd.skill_id) = any($2::uuid[])`, [userId, [...skillIds]]);
   return {
     assertedSkills: [...assertedIds].map((skillId) => ({ skillId, state: facts.skillStates[skillId] ?? 'gap' })),
     // The state that decides is the claim's state for the evidence's (canonical) skill, from the same facts validation used.
     citedEvidence: ev.rows.map((r) => ({ evidenceId: String(r['id']), skillId: String(r['skill_id']), state: facts.skillStates[String(r['skill_id'])] ?? 'gap',
       sourceStrength: r['source_strength'] as EvidenceSourceStrength, standing: r['standing'] === true })),
     standingEvidenceCount: Object.fromEntries(counts.rows.map((r) => [String(r['skill_id']), Number(r['n'])])),
-    skillsWithVerificationDecision: new Set(decided.rows.map((r) => String(r['skill_id']))),
+    skillsWithVerificationDecision: skillsWithPositiveVerificationDecision(decided.rows.map((r) => ({
+      skillId: String(r['skill_id']), decision: String(r['decision']), resultingState: r['resulting_state'] as EvidenceState,
+      evidenceId: r['evidence_id'] === null ? null : String(r['evidence_id']), evidenceSkillId: r['evidence_skill_id'] === null ? null : String(r['evidence_skill_id']),
+      evidenceStanding: r['evidence_standing'] === true, overridden: r['overridden'] === true }))),
   };
 }
 

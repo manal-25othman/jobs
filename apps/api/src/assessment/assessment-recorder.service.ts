@@ -33,7 +33,7 @@ export class AssessmentRecorderService {
     const { rows } = await c.query(
       `select id, key, version, review_status, applies_outcomes::text[] as applies_outcomes, accept_rubric_proposal, max_resulting_state, min_assessment_confidence,
               min_independent_evidence, escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, approved_by,
-              promotion_basis, practiced_on_submission
+              promotion_basis, practiced_on_submission, assessment_scope
          from verification_policy where key = $1`, [key]);
     const r = resolveActiveConfig(rows.map(governedFromRow), { production: isProduction() });
     if (!r.row) throw new MissingPrerequisite('verification_policy', `no usable verification policy '${key}': ${r.reason}`);
@@ -123,17 +123,22 @@ export class AssessmentRecorderService {
     assessmentId: string; evaluationResultId: string; userId: string; skillId: string; policy: VerificationPolicy; policyResolution: ConfigResolution; trackConfigVersionId: string | null;
     decision: PolicyDecision | { decision: 'evidence_reestablished'; previousState: EvidenceState; proposedState: EvidenceState | null; resultingState: EvidenceState; reason: string };
     confidence: number | null; verificationId: string | null; evidenceId: string | null;
+    /** ENG-1 P3: the per-skill assessment this decision rests on (development pathway only). */
+    skillAssessmentId?: string | null;
   }): Promise<string> {
     const d = p.decision;
     const { rows } = await c.query(
       `insert into verification_decision (assessment_id, evaluation_result_id, user_id, skill_id, policy_id, policy_key, policy_version, policy_status, domain_ruleset_version,
-                                          decided_by_kind, decided_by_ref, decision, previous_state, proposed_state, resulting_state, confidence, reason, verification_id, evidence_id, track_config_version_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'policy',$18,$10,$11,$12,$13,$14,$15,$16,$17,$19) returning id`,
+                                          decided_by_kind, decided_by_ref, decision, previous_state, proposed_state, resulting_state, confidence, reason, verification_id, evidence_id, track_config_version_id,
+                                          skill_assessment_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'policy',$18,$10,$11,$12,$13,$14,$15,$16,$17,$19,$20) returning id`,
       [p.assessmentId, p.evaluationResultId, p.userId, p.skillId, p.policy.id, p.policy.key, p.policy.version, p.policy.reviewStatus, DOMAIN_RULESET_VERSION,
-       d.decision, d.previousState, d.proposedState, d.resultingState, p.confidence, d.reason, p.verificationId, p.evidenceId, `policy:${p.policyResolution}`, p.trackConfigVersionId]);
+       d.decision, d.previousState, d.proposedState, d.resultingState, p.confidence, d.reason, p.verificationId, p.evidenceId, `policy:${p.policyResolution}`, p.trackConfigVersionId,
+       p.skillAssessmentId ?? null]);
     await emitAuditEvent(c, {
       eventType: 'verification.decided', userId: p.userId, actorKind: 'system', subjectTable: 'verification_decision', subjectId: rows[0].id,
-      reason: d.reason, payload: { decision: d.decision, policy: `${p.policy.key}@${p.policy.version}`, policyStatus: p.policy.reviewStatus, policyResolution: p.policyResolution, trackConfigVersionId: p.trackConfigVersionId, skillId: p.skillId, from: d.previousState, to: d.resultingState },
+      reason: d.reason, payload: { decision: d.decision, policy: `${p.policy.key}@${p.policy.version}`, policyStatus: p.policy.reviewStatus, policyResolution: p.policyResolution, trackConfigVersionId: p.trackConfigVersionId, skillId: p.skillId, from: d.previousState, to: d.resultingState,
+        ...(p.skillAssessmentId ? { skillAssessmentId: p.skillAssessmentId } : {}) },
     });
     return rows[0].id as string;
   }

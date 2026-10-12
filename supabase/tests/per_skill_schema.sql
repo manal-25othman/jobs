@@ -140,9 +140,11 @@ select ps_must_fail($$update evidence set skill_assessment_id = null where skill
 select ps_expect($$select 1 from verification_policy where assessment_scope <> 'primary_claimed_skill'$$, 0, 'every existing policy keeps the legacy scope');
 insert into verification_policy (key, version, description_en, assessment_scope) values ('ps_proof', 1, 'ENG-1 P2 proof: a per_skill row may exist only inactive', 'per_skill');
 select ps_must_fail_after($$select set_config('naqla.config_actor', 'eng1 proof', true), set_config('naqla.config_reason', 'seal proof', true)$$,
-  $$update verification_policy set activation = 'development_only' where key = 'ps_proof'$$, 'SEALED: a per_skill policy cannot be activated, even development_only (audited actor set)', 'per_skill_sealed');
+  $$update verification_policy set activation = 'development_only' where key = 'ps_proof'$$, 'SEALED (0029): a per_skill policy cannot be made development_only without the explicit test opt-in (audited actor set)', 'per_skill_dev_activation');
 select ps_must_fail_after($$select set_config('naqla.config_actor', 'eng1 proof', true), set_config('naqla.config_reason', 'seal proof', true)$$,
-  $$insert into verification_policy (key, version, description_en, assessment_scope, activation) values ('ps_proof2', 1, 'x', 'per_skill', 'development_only')$$, 'SEALED: a per_skill policy cannot be born active', 'per_skill_sealed');
+  $$insert into verification_policy (key, version, description_en, assessment_scope, activation) values ('ps_proof2', 1, 'x', 'per_skill', 'development_only')$$, 'SEALED (0029): a per_skill policy cannot be born active without the opt-in', 'per_skill_dev_activation');
+select ps_must_fail_after($$select set_config('naqla.config_actor', 'eng1 proof', true), set_config('naqla.config_reason', 'seal proof', true), set_config('naqla.per_skill_dev_activation', 'on', true)$$,
+  $$insert into verification_policy (key, version, description_en, assessment_scope, activation, review_status, approved_by, approved_at) values ('ps_proof3', 1, 'x', 'per_skill', 'production_active', 'approved', gen_random_uuid(), now())$$, 'SEALED (0029): even with the opt-in, a per_skill policy is never production_active', 'per_skill_development_only');
 select ps_must_fail($$insert into verification_policy (key, version, description_en, assessment_scope, per_skill_evidence_derivation) values ('ps_proof', 2, 'x', 'per_skill', true)$$, 'per_skill and H6 are mutually exclusive', 'excludes_h6');
 delete from verification_policy where key = 'ps_proof';
 

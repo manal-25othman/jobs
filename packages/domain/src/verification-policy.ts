@@ -60,7 +60,17 @@ export interface VerificationPolicy {
   promotionBasis: PromotionBasis;
   /** D-118: whether submitting work alone records Practiced (legacy T-LINK at submission). Off in the safety baseline. */
   practicedOnSubmission: boolean;
+  /**
+   * ENG-1: which skills a decision may move. Absent ⇒ `primary_claimed_skill` (the legacy path, ENG-1 P0).
+   * `per_skill` (P3) is a development-only pathway: never approved, published or active for real users.
+   */
+  assessmentScope?: AssessmentScope;
 }
+
+export const ASSESSMENT_SCOPES = ['primary_claimed_skill', 'per_skill'] as const;
+export type AssessmentScope = (typeof ASSESSMENT_SCOPES)[number];
+
+export function assessmentScopeOf(p: Pick<VerificationPolicy, 'assessmentScope'>): AssessmentScope { return p.assessmentScope ?? 'primary_claimed_skill'; }
 
 export function assertVerificationPolicySane(p: VerificationPolicy): void {
   if (p.version < 1) throw new DomainError(`policy ${p.key}: version must be >= 1`);
@@ -76,13 +86,21 @@ export function assertVerificationPolicySane(p: VerificationPolicy): void {
   if (p.minIndependentEvidence !== null && (p.minIndependentEvidence < 1 || !Number.isInteger(p.minIndependentEvidence))) throw new DomainError(`policy ${p.key}: evidence floor must be a positive integer`);
   if (!(BLOCKING_RULES as readonly string[]).includes(p.blockingRule)) throw new DomainError(`policy ${p.key}: unknown blocking rule '${p.blockingRule}'`);
   if (!(PROMOTION_BASES as readonly string[]).includes(p.promotionBasis)) throw new DomainError(`policy ${p.key}: unknown promotion basis '${p.promotionBasis}'`);
+  const scope = assessmentScopeOf(p);
+  if (!(ASSESSMENT_SCOPES as readonly string[]).includes(scope)) throw new DomainError(`policy ${p.key}: unknown assessment scope '${scope}'`);
+  if (scope === 'per_skill') {
+    // The two per-skill mechanisms are mutually exclusive; the per-skill pathway never rests on declarations or on submitting.
+    if (p.perSkillEvidenceDerivation) throw new DomainError(`policy ${p.key}@${p.version}: the per-skill scope (ENG-1) and H6 per-skill derivation are mutually exclusive`);
+    if (p.promotionBasis !== 'independently_verified') throw new DomainError(`policy ${p.key}@${p.version}: the per-skill scope requires the independently_verified promotion basis`);
+    if (p.practicedOnSubmission) throw new DomainError(`policy ${p.key}@${p.version}: the per-skill scope never records a level on submission`);
+  }
 }
 
 export function verificationPolicyFromRow(r: {
   id: string; key: string; version: number | string; review_status: string; applies_outcomes: string[]; accept_rubric_proposal: boolean;
   max_resulting_state: string | null; min_assessment_confidence: string | number | null; min_independent_evidence: number | string | null;
   escalate_on: unknown; blocking_rule: string; per_skill_evidence_derivation: boolean; decision_actors: string[];
-  promotion_basis?: string | null; practiced_on_submission?: boolean | null;
+  promotion_basis?: string | null; practiced_on_submission?: boolean | null; assessment_scope?: string | null;
 }): VerificationPolicy {
   const p: VerificationPolicy = {
     id: r.id, key: r.key, version: Number(r.version), reviewStatus: r.review_status,
@@ -96,6 +114,7 @@ export function verificationPolicyFromRow(r: {
     // A row read without these columns is treated as the safety baseline: fail closed.
     promotionBasis: (r.promotion_basis ?? 'independently_verified') as PromotionBasis,
     practicedOnSubmission: r.practiced_on_submission === true,
+    assessmentScope: (r.assessment_scope ?? 'primary_claimed_skill') as AssessmentScope,
   };
   assertVerificationPolicySane(p);
   return p;
@@ -103,6 +122,28 @@ export function verificationPolicyFromRow(r: {
 
 export function verificationPolicyIsValidated(p: Pick<VerificationPolicy, 'reviewStatus'>): boolean {
   return p.reviewStatus === 'approved' || p.reviewStatus === 'published';
+}
+
+/**
+ * ENG-1 Phase A (D-118): submission-based promotion (`practiced_on_submission`) is a development/test compatibility
+ * switch only. It is never part of an approved or published policy, and never of a policy that is active for real
+ * users (production_active or the legacy baseline). The database enforces the same rule
+ * (verification_policy_no_submission_promotion, migration 0028); this is the validation-boundary twin.
+ */
+export function assertSubmissionPromotionNotEnabled(p: Pick<VerificationPolicy, 'key' | 'version' | 'practicedOnSubmission'>,
+  target: { readonly reviewStatus?: string; readonly activation?: string }): void {
+  if (!p.practicedOnSubmission) return;
+  if (target.reviewStatus === 'approved' || target.reviewStatus === 'published') {
+    throw new DomainError(`policy ${p.key}@${p.version} enables submission-based promotion (practiced_on_submission); such a policy can never be approved or published (D-118)`);
+  }
+  if (target.activation === 'production_active' || target.activation === 'legacy_baseline') {
+    throw new DomainError(`policy ${p.key}@${p.version} enables submission-based promotion (practiced_on_submission); such a policy can never be active for real users (D-118)`);
+  }
+}
+
+/** Whether submitting work may record Practiced under this policy, here: never in production, never under a validated policy. */
+export function submissionPromotionInEffect(p: Pick<VerificationPolicy, 'practicedOnSubmission' | 'reviewStatus'>, env: { readonly production: boolean }): boolean {
+  return p.practicedOnSubmission && !env.production && !verificationPolicyIsValidated(p);
 }
 
 export type PolicyDecisionKind = VerificationOutcome | 'not_applicable' | 'assessment_pending_validation';

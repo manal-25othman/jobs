@@ -95,8 +95,42 @@ export interface ClaimSubject {
   }[];
   /** Standing (not withdrawn) evidence rows per skill. */
   readonly standingEvidenceCount: Readonly<Record<string, number>>;
-  /** Skills with a recorded verification decision. */
+  /** Skills with a recorded POSITIVE verification decision (CLM-1: built by skillsWithPositiveVerificationDecision, never from any decision row). */
   readonly skillsWithVerificationDecision: ReadonlySet<string>;
+}
+
+/**
+ * CLM-1 (ENG-1 Phase A): what counts as a recorded verification decision FOR a claim. Only a decision that
+ * established the skill counts — an accepted promotion or a re-established earlier level — and only while the
+ * evidence it produced still stands, for the same skill, and no human has overridden it. A `not_applicable`,
+ * pending-validation, rejected, downgraded, escalated (blocked) or exception decision never qualifies: the existence
+ * of a decision row is not proof of the skill. `exception_granted` is excluded deliberately (fail closed) until its
+ * claim semantics are an approved expert decision.
+ */
+export const POSITIVE_VERIFICATION_DECISIONS = ['accepted', 'evidence_reestablished'] as const;
+
+export interface RecordedVerificationDecisionFact {
+  readonly skillId: string;
+  readonly decision: string;
+  readonly resultingState: EvidenceState;
+  readonly evidenceId: string | null;
+  /** Canonical skill of the evidence row the decision produced (null when there is none). */
+  readonly evidenceSkillId: string | null;
+  /** The evidence row exists and is not withdrawn. */
+  readonly evidenceStanding: boolean;
+  /** A later human decision overrides this one. */
+  readonly overridden: boolean;
+}
+
+export function isPositiveVerificationDecision(d: RecordedVerificationDecisionFact): boolean {
+  return (POSITIVE_VERIFICATION_DECISIONS as readonly string[]).includes(d.decision)
+    && d.evidenceId !== null && d.evidenceStanding && d.evidenceSkillId === d.skillId
+    && !d.overridden && evidenceOrdinal(d.resultingState) > evidenceOrdinal('gap');
+}
+
+/** The skills a claim may treat as having a recorded verification decision (CLM-1). */
+export function skillsWithPositiveVerificationDecision(decisions: readonly RecordedVerificationDecisionFact[]): Set<string> {
+  return new Set(decisions.filter(isPositiveVerificationDecision).map((d) => d.skillId));
 }
 
 export interface ResolvedClaimPolicy { readonly policy: ClaimPolicy; readonly resolution: ConfigResolution }

@@ -165,11 +165,15 @@ export class ActivityCatalogueService {
           order by p.created_at desc`, [activityId]);
       const resultIds = rows.map((r) => r.result_id).filter(Boolean);
       const decisions = resultIds.length ? (await c.query(
-        `select evaluation_result_id, decision, previous_state, resulting_state, evidence_id from verification_decision where evaluation_result_id = any($1::uuid[])`, [resultIds])).rows : [];
+        `select evaluation_result_id, decision, previous_state, resulting_state, evidence_id, skill_assessment_id from verification_decision where evaluation_result_id = any($1::uuid[]) order by decided_at`, [resultIds])).rows : [];
       return rows.map((r) => {
         const ds = decisions.filter((d) => d.evaluation_result_id === r.result_id);
-        const decision = (ds.find((d) => d.decision === 'assessment_pending_validation') ?? ds[0])?.decision ?? null;
-        const levelChanged = ds.some((d) => d.decision !== 'assessment_pending_validation' && d.evidence_id && d.resulting_state && d.resulting_state !== d.previous_state);
+        const moves = (d: (typeof ds)[number]) => d.decision !== 'assessment_pending_validation' && d.evidence_id && d.resulting_state && d.resulting_state !== d.previous_state;
+        const pending = ds.find((d) => d.decision === 'assessment_pending_validation');
+        // ENG-1 P3 (development pathway): a per-skill result is represented by the decision that moved a level, as in the evaluation view.
+        const perSkill = ds.some((d) => d.skill_assessment_id);
+        const decision = ((perSkill ? ds.find(moves) ?? ds.find((d) => d.decision === 'evidence_reestablished') ?? pending : pending) ?? ds[0])?.decision ?? null;
+        const levelChanged = ds.some(moves);
         return {
           id: r.id, title: r.title, kind: r.kind, status: r.status, activitySpecId: r.activity_spec_id, activitySpecVersion: r.activity_spec_version,
           activity: r.activity_spec_id ? { id: r.activity_spec_id, slug: r.activity_slug, titleAr: r.activity_title_ar, titleEn: r.activity_title_en } : null,

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { assertActivationAllowed, configIsValidated, MissingPrerequisite, CLAIM_KIND_CLASS, evidenceOrdinal, type ConfigActivation, type ClaimKind, type EvidenceState } from '@naqla/domain';
+import { assertActivationAllowed, configIsValidated, MissingPrerequisite, CLAIM_KIND_CLASS, evidenceOrdinal, assertSubmissionPromotionNotEnabled, DomainError, type ConfigActivation, type ClaimKind, type EvidenceState } from '@naqla/domain';
 import { GOVERNED_TABLES, governedFromRow, isProduction, type GovernedTable } from './configuration.service';
 import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
 import { emitAuditEvent } from '../infra/audit';
@@ -28,6 +28,7 @@ export async function approveConfigRow(c: PoolClient, p: { table: string; id: st
   const g = governedFromRow(cur.rows[0]);
   if (g.baselineOf) throw new BadRequestException('a legacy baseline is not approved in place; it is the pre-existing behaviour. Create a new version and approve that.');
   if (configIsValidated(g)) throw new BadRequestException(`${p.table} ${g.key}@${g.version} is already ${g.reviewStatus}`);
+  if (p.table === 'verification_policy') assertVerificationPolicyMayBe(cur.rows[0], { reviewStatus: 'approved' });
   return withConfigActor(c, p.approvedByLabel, p.reason, async () => {
     const r = await c.query(`update ${p.table} set review_status = 'approved', approved_by = $2, approved_at = now(), validation_note_en = $3 where id = $1 returning *`,
       [p.id, p.approvedBy, `approved by ${p.approvedByLabel}: ${p.reason}`]);
@@ -48,6 +49,7 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
   const scope = p.table === 'track_config_version' ? 'target_role_id' : p.table === 'claim_policy' ? 'key, claim_kind' : p.table === 'readiness_rule_set' ? "coalesce(target_role_id, '00000000-0000-0000-0000-000000000000'::uuid), key"
     : p.table === 'pack_constraint_set' ? "key, coalesce(track_id, '')" : 'key';
   if (p.activation !== 'inactive') assertActivationPermittedInPhase8(p.table, cur.rows[0], isProduction() || p.activation === 'production_active');
+  if (p.table === 'verification_policy' && p.activation !== 'inactive') assertVerificationPolicyMayBe(cur.rows[0], { activation: p.activation });
   if (p.activation !== 'inactive') {
     const clash = await c.query(`select id, version, activation from ${p.table} where (${scope}) = (select ${scope} from ${p.table} where id = $1) and id <> $1 and activation <> 'inactive'`, [p.id]);
     if (clash.rowCount) throw new BadRequestException(`${p.table} already has an active row (${clash.rows[0].activation} v${clash.rows[0].version}); deactivate it explicitly first — a new row never replaces an active one by accident`);
@@ -133,6 +135,27 @@ export function assertActivationPermittedInPhase8(table: string, row: Record<str
   }
   if (table === 'verification_policy' && row['per_skill_evidence_derivation'] === true && productionLike) {
     throw new BadRequestException('per-skill evidence derivation (H6) cannot be activated in production without explicit approval');
+  }
+}
+
+/**
+ * ENG-1 Phase A / P3 — validation-boundary twins of the database guards (migrations 0028/0029):
+ *   - submission-based promotion is never approved, published or active for real users;
+ *   - the per-skill assessment scope (P3) is a development-only pathway: never approved, published,
+ *     production_active or a baseline, and never active at all in production.
+ */
+export function assertVerificationPolicyMayBe(row: Record<string, unknown>, target: { reviewStatus?: string; activation?: string }): void {
+  try {
+    assertSubmissionPromotionNotEnabled({ key: String(row['key']), version: Number(row['version']), practicedOnSubmission: row['practiced_on_submission'] === true }, target);
+  } catch (e) {
+    if (e instanceof DomainError) throw new BadRequestException(e.message);
+    throw e;
+  }
+  if (row['assessment_scope'] === 'per_skill') {
+    if (target.reviewStatus === 'approved' || target.reviewStatus === 'published' || (target.activation !== undefined && target.activation !== 'development_only')) {
+      throw new BadRequestException(`policy ${String(row['key'])}@${String(row['version'])} uses the per-skill assessment scope (ENG-1 P3), which is a development-only pathway: it cannot be approved, published or activated for real users`);
+    }
+    if (isProduction()) throw new BadRequestException('the per-skill assessment scope (ENG-1 P3) can never be activated in production');
   }
 }
 

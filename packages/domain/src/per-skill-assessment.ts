@@ -111,6 +111,17 @@ export function sharedPrecondition(rubric: Pick<PublishedRubric, 'criteria'>, ru
   return { holds: true, reason: 'gates and blocking checks passed' };
 }
 
+/**
+ * ENG-1 P3 (O-3): a threshold fraction t is usable only when t × max is a score the criterion can actually be given —
+ * an integer (scores are integers) and, when the rubric defines scoring levels, the score of one of them.
+ */
+export function thresholdRepresentable(threshold: number, maxScore: number, levelScores?: readonly number[] | null): boolean {
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 1 || !(maxScore > 0)) return false;
+  const required = threshold * maxScore;
+  if (Math.abs(required - Math.round(required)) > EPS) return false;
+  return !levelScores || levelScores.length === 0 || levelScores.some((l) => Math.abs(l - required) <= EPS);
+}
+
 function criterionResult(c: PublishedRubric['criteria'][number], run: EvaluationRun): SkillCriterionResult {
   const scored = run.criteria.find((x) => x.criterionId === c.key);
   const pending = run.pendingHumanCriteria.includes(c.key) || scored === undefined;
@@ -118,7 +129,7 @@ function criterionResult(c: PublishedRubric['criteria'][number], run: Evaluation
   const thresholdStatus = c.thresholdStatus ?? null;
   const base = { key: c.key, evaluatorKind: (c.evaluatorType ?? 'rule'), score: pending ? null : scored!.score, maxScore: c.maxScore, threshold, thresholdStatus };
   if (pending) return { ...base, status: 'pending' };
-  const usable = thresholdStatus === 'approved' && threshold !== null && Number.isFinite(threshold) && threshold > 0 && threshold <= 1;
+  const usable = thresholdStatus === 'approved' && threshold !== null && thresholdRepresentable(threshold, c.maxScore, c.levelScores);
   if (!usable) return { ...base, status: 'threshold_unapproved' };
   return { ...base, status: scored!.score + EPS >= threshold! * c.maxScore ? 'met' : 'not_met' };
 }
@@ -148,7 +159,7 @@ export function assessSkill(input: SkillAssessmentInput, skillId: string): Skill
   const by = (s: SkillCriterionStatus) => criteria.filter((c) => c.status === s).map((c) => c.key);
   if (by('not_met').length) return done('not_met', `criteria of this skill not met: ${by('not_met').join(', ')}`);
   if (by('pending').length) return done('incomplete', `criteria of this skill still undecided: ${by('pending').join(', ')}`);
-  if (by('threshold_unapproved').length) return done('incomplete', `no approved per-skill threshold for: ${by('threshold_unapproved').join(', ')}`);
+  if (by('threshold_unapproved').length) return done('incomplete', `no approved, representable per-skill threshold for: ${by('threshold_unapproved').join(', ')}`);
   return done('met', `every criterion of this skill met its approved threshold: ${by('met').join(', ')}`);
 }
 
@@ -188,6 +199,10 @@ export function decideSkillAssessment(policy: VerificationPolicy, a: SkillAssess
 }): PolicyDecision {
   if (policy.perSkillEvidenceDerivation) {
     throw new DomainError(`ENG-1: policy ${policy.key}@${policy.version} enables H6 per-skill derivation; per-skill assessment refuses to run beside it`);
+  }
+  // ENG-1 P3: the per-skill pathway is development-only. In production it never decides a level, whatever the policy says.
+  if (ctx.production) {
+    throw new DomainError(`ENG-1 P3: the per-skill assessment pathway is not available in production (policy ${policy.key}@${policy.version})`);
   }
   const policyRef = { id: policy.id, key: policy.key, version: policy.version, status: policy.reviewStatus };
   const hold = (reason: string): PolicyDecision => ({ decision: 'not_applicable', resultingState: a.currentState, previousState: a.currentState, proposedState: a.proposedState,

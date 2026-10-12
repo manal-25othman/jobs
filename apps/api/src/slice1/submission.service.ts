@@ -1,13 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
-import { assertModeRespected, assertExternalUrlValid, assertClientArtifactAllowed, resolveDeliverableFileMapping, explicitFileMappingRequired, DeliverableMappingRefused, type AiUsageMode } from '@naqla/domain';
+import { assertModeRespected, assertExternalUrlValid, assertClientArtifactAllowed, resolveDeliverableFileMapping, explicitFileMappingRequired, DeliverableMappingRefused, submissionPromotionInEffect, type AiUsageMode } from '@naqla/domain';
 import { AssessmentRecorderService } from '../assessment/assessment-recorder.service';
 import { UploadService } from './upload.service';
 import { EvidenceLedgerService } from '../evidence/evidence-ledger.service';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
 import { DisclosureService, type AiDisclosureInput } from '../integrity/disclosure.service';
 import { IntegritySignalService } from '../integrity/integrity-signal.service';
+import { isProduction } from '../configuration/configuration.service';
 
 export interface SubmissionArtifactInput {
   key: string;
@@ -191,7 +192,8 @@ export class SubmissionService {
       for (const skillId of input.skillIds) {
         // D-118: submitting work records a level only when the verification policy in effect says so (legacy compatibility);
         // the safety baseline records none — the submission, its files and the journey are recorded either way.
-        if ((await this.assessments.loadPolicy(c)).policy.practicedOnSubmission) await this.ensurePracticedClaim(c, userId, skillId, projectId, submissionId);
+        // ENG-1 Phase A: never in production and never under an approved/published policy, whatever the row says (the database refuses such a row too).
+        if (submissionPromotionInEffect((await this.assessments.loadPolicy(c)).policy, { production: isProduction() })) await this.ensurePracticedClaim(c, userId, skillId, projectId, submissionId);
       }
 
       // Phase 1: the submission is also recorded in the evidence ledger (typed
