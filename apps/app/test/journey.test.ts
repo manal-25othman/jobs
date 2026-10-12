@@ -6,7 +6,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assessmentCopy, workStatusCopy, nextActionFor, evaluationPageState, levelChangeToShow, buildFileMapping, buildTextArtifacts,
-  attemptsOf, criterionResult, isAssessedWork, WORK_STATUS_COPY, SUBMISSION_IS_NOT_A_LEVEL_AR, friendlyErrorAr,
+  attemptsOf, criterionResult, isAssessedWork, WORK_STATUS_COPY, SUBMISSION_IS_NOT_A_LEVEL_AR, friendlyErrorAr, attributionNoticeAr,
 } from '../src/lib/journey.ts';
 
 describe('assessment copy never promises more than the API reports', () => {
@@ -132,5 +132,28 @@ describe('refusals in words', () => {
     assert.equal(friendlyErrorAr('[skill_not_mapped_to_activity] x', 'f').textAr, 'إحدى المهارات المختارة ليست من مهارات هذا النشاط.');
     assert.equal(friendlyErrorAr('upload u not confirmed', 'تعذّر التسليم').textAr, 'تعذّر التسليم');
     assert.equal(friendlyErrorAr('[something_else] x', 'fallback').textAr, 'fallback');
+  });
+});
+
+describe('O-1 — honest feedback when no level could be attributed (ENG-1 P0)', () => {
+  test('ambiguous / no_candidate on a completed evaluation: says it was assessed, no level changed, why — and never that a skill failed', () => {
+    for (const a of ['ambiguous', 'no_candidate'] as const) {
+      const n = attributionNoticeAr(a, 'completed_feedback')!;
+      assert.ok(n, a);
+      assert.match(n.bodyAr, /اكتمل النشاط وقُيِّم عملك/);
+      assert.match(n.titleAr, /لم يُسجَّل مستوى/);
+      assert.match(n.noteAr, /ليس إخفاقًا/);
+      assert.doesNotMatch(`${n.titleAr} ${n.bodyAr} ${n.noteAr}`, /أخفقتِ|رسبتِ|فشلتِ|لم تنجحي/);
+    }
+    assert.match(attributionNoticeAr('ambiguous', 'completed_feedback')!.noteAr, /أكثر من مهارة رئيسية/);
+    assert.match(attributionNoticeAr('no_candidate', 'completed_feedback')!.noteAr, /ليست من المهارات الرئيسية/);
+  });
+  test('during human review: a note that no level will follow; nothing for attributed or older results', () => {
+    assert.match(attributionNoticeAr('ambiguous', 'human_review_pending')!.noteAr, /لن يُسجَّل مستوى/);
+    assert.equal(attributionNoticeAr('attributed', 'completed_feedback'), null);
+    assert.equal(attributionNoticeAr(null, 'completed_feedback'), null);
+    assert.equal(attributionNoticeAr(undefined, 'completed_feedback'), null);
+    assert.equal(attributionNoticeAr('ambiguous', 'completed_level'), null, 'never beside a recorded level');
+    assert.equal(attributionNoticeAr('ambiguous', 'not_evaluated'), null);
   });
 });

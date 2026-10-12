@@ -127,6 +127,28 @@ export function evaluationPageState(v: { state: string; workStatus: string; outc
 }
 
 /**
+ * O-1 (ENG-1 P0): why a completed evaluation recorded no level, when the reason is attribution, in plain Arabic.
+ * Never says a skill was failed: the work WAS assessed (criterion by criterion); no level moved because a
+ * whole-activity result cannot yet be attributed to one skill. Null when there is nothing to explain.
+ */
+export type LevelAttribution = 'attributed' | 'ambiguous' | 'no_candidate' | null | undefined;
+export function attributionNoticeAr(a: LevelAttribution, page: EvaluationPageState): { titleAr: string; bodyAr: string; noteAr: string } | null {
+  if (a !== 'ambiguous' && a !== 'no_candidate') return null;
+  if (page === 'human_review_pending') {
+    return { titleAr: '', bodyAr: '', noteAr: a === 'ambiguous'
+      ? 'لأنك اخترتِ أكثر من مهارة رئيسية لهذا العمل، لن يُسجَّل مستوى لأي مهارة من هذا التقييم حتى بعد اكتمال المراجعة. ستصلك الملاحظات على كل معيار.'
+      : 'المهارات التي اخترتِها ليست من المهارات الرئيسية التي يقيسها هذا النشاط، فلن يُسجَّل لها مستوى من هذا التقييم حتى بعد اكتمال المراجعة. ستصلك الملاحظات على كل معيار.' };
+  }
+  if (page !== 'completed_feedback' && page !== 'needs_more_evidence') return null;
+  const assessed = 'اكتمل النشاط وقُيِّم عملك على كل معيار — الملاحظات أدناه.';
+  return a === 'ambiguous'
+    ? { titleAr: 'اكتمل التقييم — ولم يُسجَّل مستوى لأي مهارة', bodyAr: assessed,
+        noteAr: 'اخترتِ أكثر من مهارة رئيسية لهذا العمل، والمنصّة لا تسجّل بعدُ نتيجة مستقلة لكل مهارة من تقييم واحد، لذلك لم يتغيّر مستوى أي منها. هذا ليس إخفاقًا في أي مهارة، ومستوياتك تبقى كما هي.' }
+    : { titleAr: 'اكتمل التقييم — ولم يُسجَّل مستوى لأي مهارة', bodyAr: assessed,
+        noteAr: 'المهارات التي اخترتِها ليست من المهارات الرئيسية التي يقيسها هذا النشاط، لذلك لا يُنسب إليها مستوى من هذا التقييم. هذا ليس إخفاقًا فيها، ومستوياتك تبقى كما هي.' };
+}
+
+/**
  * A level change to show, or null. Shown ONLY when the API reports a recorded level change AND carries the
  * transition read from the decision that made it. Verified is never shown as a level change (production ceiling).
  */

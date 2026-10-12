@@ -233,3 +233,28 @@ describe('ENG-1 P0 — a legacy (pre-0025) unbound rubric', () => {
     assert.equal((await pool.query('select activity_spec_version from rubric_version where id = $1', [legacy.rubricId])).rows[0].activity_spec_version, null);
   });
 });
+
+describe('O-1 — the read view tells the graduate how the result was attributed (no level is inferred)', () => {
+  const view = async (u: TestUser, sid: string) => (await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(u)).expect(200)).body.data as { levelAttribution: string | null; workStatus: string; transition: unknown };
+  test('attributed / ambiguous / no_candidate are reported exactly; only the attributed one records a level', async () => {
+    const act = await cloneActivity({ bothPrimary: true, secondaryCovered: true });
+    const cases: [string, string, string[], string][] = [
+      ['attributed', SEED_ACT, [SKILL], 'level_recorded'],
+      ['ambiguous', act.activityId, [SKILL, SECONDARY], 'feedback_ready'],
+      ['no_candidate', SEED_ACT, [SECONDARY], 'feedback_ready'],
+    ];
+    for (const [expected, activity, skills, status] of cases) {
+      const u = await bootstrapped();
+      const sid = await submit(u, await project(u, activity), skills);
+      await evaluate(u, sid);
+      const v = await view(u, sid);
+      assert.equal(v.levelAttribution, expected); assert.equal(v.workStatus, status, expected);
+      assert.equal(v.transition === null, expected !== 'attributed');
+    }
+  });
+  test('a submission not yet evaluated reports no attribution', async () => {
+    const u = await bootstrapped();
+    const sid = await submit(u, await project(u, SEED_ACT), [SKILL]);
+    assert.equal((await view(u, sid)).levelAttribution, null);
+  });
+});

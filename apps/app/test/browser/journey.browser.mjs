@@ -319,14 +319,16 @@ async function run(browser) {
     await page.context().close();
   }
 
-  // B7 · human-reviewed activity: pending review reads as pending; after a named reviewer decides on SME-approved,
-  // non-demo content, and only then, a level change is shown.
-  {
-    const u = await newUser();
+  // B7 / B11 / B12 · human-reviewed activity, SME-approved non-demo content. ENG-1 P0 (D-121): the legacy evaluator moves
+  // ONE skill per evaluation and only when exactly one claimed skill is primary for the activity AND measured by the
+  // rubric; otherwise no level is recorded and the graduate is told why (O-1). Each journey states one fact.
+  const HTML_AR = 'بنية HTML الدلالية'; const CSS_AR = 'تنسيق CSS والتصميم المتجاوب';
+  const reSkill = (label) => new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  async function reviewedSubmission(u, keepOnly /* null = the work page's default selection */) {
     await apiCall(u, 'PUT', '/me/career-goal', { targetRoleId: reviewed.roleId, confirmed: true });
     const page = await pageFor(browser, u);
     await page.goto(`${APP}/activities/${reviewed.activityId}`); await page.getByText('يُراجَع بشريًا').first().waitFor();
-    check('B7a', 'a human-reviewed activity explains that a reviewed pass may raise the level, never to Verified automatically', /قد يرتفع مستوى المهارة/.test(await bodyText(page)) && /لا يُمنح مستوى «موثّقة» تلقائيًا/.test(await bodyText(page)));
+    const activityText = await bodyText(page);
     await page.getByRole('button', { name: 'ابدئي النشاط' }).click();
     await page.waitForURL(/\/work\//); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
     const projectId = page.url().split('/').pop();
@@ -335,27 +337,79 @@ async function run(browser) {
     await uploadInto(page, 'file.styles_css', 'styles.css', 'form { display: grid; }');
     await page.locator(fileInput('note.data_flow')).fill('تُحفظ الحالة في كائن واحد، وتُعرض القائمة منه؛ التحميل والخطأ والفراغ حالات صريحة.');
     await page.locator(fileInput('answer.clarification')).fill('الوصف يذكر أربعة حقول والمواصفة خمسة؛ نفّذتُ الأربعة وطرحتُ الخامس سؤالًا.');
+    const group = page.locator('[aria-labelledby="skills-title"]');
+    const defaultChecked = await group.locator('input[type=checkbox]:checked').count();
+    if (keepOnly) {
+      for (const box of await group.getByRole('checkbox').all()) await box.setChecked(false);
+      await group.getByRole('checkbox', { name: reSkill(keepOnly) }).setChecked(true);
+    }
     await answerQuestionnaire(page);
     await page.getByRole('button', { name: 'تسليم للتقييم' }).click();
     await page.waitForURL(/\/evaluation\?submission=/); await page.getByText('عملك قيد المراجعة البشرية').waitFor();
     const sid = new URL(page.url()).searchParams.get('submission');
+    return { page, sid, projectId, activityText, defaultChecked };
+  }
+  async function finishReview(page, sid) {
+    await reviewEverything((await one('select id from evaluation where submission_id = $1', [sid])).id);
+    await page.reload(); await page.locator('#crit').waitFor();
+    return bodyText(page);
+  }
+
+  // B7 · the work page's DEFAULT selection (every primary skill of the activity): pending review reads as pending and
+  // says no level will follow; after every criterion is decided, the work is reported as assessed, no level is
+  // recorded for ANY skill (no arbitrary pick — F-2), and nothing says a skill was failed.
+  {
+    const u = await newUser();
+    const { page, sid, projectId, activityText, defaultChecked } = await reviewedSubmission(u, null);
+    check('B7a', 'a human-reviewed activity explains that a reviewed pass may raise the level, never to Verified automatically', /قد يرتفع مستوى المهارة/.test(activityText) && /لا يُمنح مستوى «موثّقة» تلقائيًا/.test(activityText));
     const pending = await bodyText(page);
     check('B7b', 'a pending human review reads as pending, naming what awaits review, without an error', /ما ينتظر المراجعة/.test(pending) && !/request failed|already|خطأ/.test(pending));
+    check('B7h', 'with several primary skills selected (the default: ' + defaultChecked + '), the pending page already says no level will follow', defaultChecked > 1 && /لن يُسجَّل مستوى لأي مهارة من هذا التقييم/.test(pending));
     await page.reload(); await page.getByText('عملك قيد المراجعة البشرية').waitFor();
     check('B7c', 'refreshing a pending review starts nothing', await count('select count(*)::int n from evaluation where submission_id = $1', [sid]) === 1);
     check('B7d', 'no level while review is pending', !/تغيّر مستوى المهارة/.test(await bodyText(page)) && await count('select count(*)::int n from skill_claim where user_id = $1', [u.id]) === 0);
     await shot(page, 'U4-evaluation-human-review-pending-desktop');
-    const evaluationId = (await one('select id from evaluation where submission_id = $1', [sid])).id;
-    await reviewEverything(evaluationId);
-    await page.reload(); await page.getByText('تغيّر مستوى المهارة').first().waitFor();
-    const claim = await one('select state from skill_claim where user_id = $1', [u.id]);
-    const after = await bodyText(page);
-    check('B7e', 'after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown', claim?.state === 'demonstrated' && /مُثبتة بدليل/.test(after), claim?.state);
+    const after = await finishReview(page, sid);
+    const claims = await count('select count(*)::int n from skill_claim where user_id = $1', [u.id]);
+    const evidence = await count('select count(*)::int n from evidence where user_id = $1', [u.id]);
+    check('B7e', 'after every criterion is decided: the work is reported as completed and assessed, NO level is recorded for any skill (no arbitrary pick), and the reason is given',
+      claims === 0 && evidence === 0 && /اكتمل النشاط وقُيِّم عملك/.test(after) && /أكثر من مهارة رئيسية/.test(after) && !/مُثبتة بدليل/.test(after), `claims=${claims} evidence=${evidence}`);
+    check('B7i', 'nothing tells the graduate a skill was failed; criteria are shown as assessed', /ليس إخفاقًا/.test(after) && !/أخفقتِ|رسبتِ|فشلتِ/.test(after) && /الملاحظات على كل معيار/.test(after));
     check('B7f', 'Verified is never shown as granted', !/← موثّقة/.test(after) && await count(`select count(*)::int n from skill_claim where user_id = $1 and state = 'verified'`, [u.id]) === 0);
+    await shot(page, 'U4-evaluation-assessed-no-attribution-desktop');
+    await page.goto(`${APP}/work`); await page.locator('article').first().waitFor();
+    const myWork = await bodyText(page);
+    check('B7g', 'My Work reports that work as assessed, and does NOT report a level change', /قُيِّم — الملاحظات جاهزة/.test(myWork) && !/تغيّر مستوى المهارة/.test(myWork));
+    await page.goto(`${APP}/work/${projectId}`); await page.getByRole('heading', { name: 'محاولاتك' }).waitFor();
+    await page.context().close();
+  }
+
+  // B11 · the legitimate path is intact: ONE primary skill selected ⇒ after the named review, the level the backend
+  // recorded (Demonstrated, never Verified) is shown, and My Work reports it for that work only.
+  {
+    const u = await newUser();
+    const { page, sid } = await reviewedSubmission(u, HTML_AR);
+    const after = await finishReview(page, sid);
+    const claim = await one('select state from skill_claim where user_id = $1', [u.id]);
+    const nClaims = await count('select count(*)::int n from skill_claim where user_id = $1', [u.id]);
+    check('B11a', 'one primary skill selected: after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown', claim?.state === 'demonstrated' && nClaims === 1 && /مُثبتة بدليل/.test(after), `${claim?.state}/${nClaims}`);
+    check('B11b', 'no attribution notice beside a recorded level', !/لم يُسجَّل مستوى لأي مهارة/.test(after));
+    check('B11c', 'Verified is never shown as granted', !/← موثّقة/.test(after));
     await shot(page, 'U4-evaluation-level-recorded-desktop');
     await page.goto(`${APP}/work`); await page.locator('article').first().waitFor();
-    check('B7g', 'My Work reports the recorded level change for that work only', /قُيِّم — تغيّر مستوى المهارة/.test(await bodyText(page)));
-    await page.goto(`${APP}/work/${projectId}`); await page.getByRole('heading', { name: 'محاولاتك' }).waitFor();
+    check('B11d', 'My Work reports the recorded level change for that work only', /قُيِّم — تغيّر مستوى المهارة/.test(await bodyText(page)));
+    await page.context().close();
+  }
+
+  // B12 · a skill the activity measures only as SECONDARY is never promoted by the whole-activity result; the
+  // graduate is told the work was assessed and why no level was recorded.
+  {
+    const u = await newUser();
+    const { page, sid } = await reviewedSubmission(u, CSS_AR);
+    const after = await finishReview(page, sid);
+    check('B12a', 'only a secondary skill selected: no level is recorded', await count('select count(*)::int n from skill_claim where user_id = $1', [u.id]) === 0 && await count('select count(*)::int n from evidence where user_id = $1', [u.id]) === 0);
+    check('B12b', 'the graduate is told the work was assessed and why no level was recorded, without a claim of failure', /اكتمل النشاط وقُيِّم عملك/.test(after) && /ليست من المهارات الرئيسية/.test(after) && /ليس إخفاقًا/.test(after));
+    await shot(page, 'U4-evaluation-secondary-only-desktop');
     await page.context().close();
   }
 

@@ -1,6 +1,6 @@
 {
-  "at": "2026-10-09T22:28:19.894Z",
-  "total": 57,
+  "at": "2026-10-12T10:30:50.116Z",
+  "total": 65,
   "failed": 0,
   "results": [
     {
@@ -172,6 +172,12 @@
       "detail": ""
     },
     {
+      "id": "B7h",
+      "name": "with several primary skills selected (the default: 3), the pending page already says no level will follow",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "id": "B7c",
       "name": "refreshing a pending review starts nothing",
       "pass": true,
@@ -185,9 +191,15 @@
     },
     {
       "id": "B7e",
-      "name": "after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown",
+      "name": "after every criterion is decided: the work is reported as completed and assessed, NO level is recorded for any skill (no arbitrary pick), and the reason is given",
       "pass": true,
-      "detail": "demonstrated"
+      "detail": "claims=0 evidence=0"
+    },
+    {
+      "id": "B7i",
+      "name": "nothing tells the graduate a skill was failed; criteria are shown as assessed",
+      "pass": true,
+      "detail": ""
     },
     {
       "id": "B7f",
@@ -197,7 +209,43 @@
     },
     {
       "id": "B7g",
+      "name": "My Work reports that work as assessed, and does NOT report a level change",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11a",
+      "name": "one primary skill selected: after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown",
+      "pass": true,
+      "detail": "demonstrated/1"
+    },
+    {
+      "id": "B11b",
+      "name": "no attribution notice beside a recorded level",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11c",
+      "name": "Verified is never shown as granted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11d",
       "name": "My Work reports the recorded level change for that work only",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B12a",
+      "name": "only a secondary skill selected: no level is recorded",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B12b",
+      "name": "the graduate is told the work was assessed and why no level was recorded, without a claim of failure",
       "pass": true,
       "detail": ""
     },

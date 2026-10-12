@@ -149,6 +149,8 @@ export interface EvaluationView {
   integrityChecks: { key: string; passed: boolean; message: string | null }[];
   transition: { from: string; to: string; evidenceId: string } | null;
   verificationDecision: { decision: string; reason: string } | null;
+  /** O-1: how the legacy evaluator attributed the result (ENG-1 P0). Null before evaluation and for older results. */
+  levelAttribution?: 'attributed' | 'ambiguous' | 'no_candidate' | null;
   humanReview: { pending: number; completed: number; awaiting: { criterionKey: string; nameAr: string }[]; pendingCriteria: string[]; completedCriteria: string[] } | null;
   evaluatedAt: string | null;
   actions: { evaluate: boolean };

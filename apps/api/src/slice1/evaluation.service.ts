@@ -753,7 +753,7 @@ export class EvaluationService {
     if (!view) {
       return { submissionId, evaluationId: null, state: 'not_evaluated' as const, workStatus: 'submitted' as WorkStatus, resultId: null, outcome: null,
         totalScore: null, maxScore: null, reason: null, criteria: [], integrityChecks: [], transition: null, verification: null, verificationDecision: null,
-        humanReview: null, evaluatedAt: null, activitySpecVersion: null, rubricVersion: null, actions: { evaluate: true } };
+        humanReview: null, evaluatedAt: null, activitySpecVersion: null, rubricVersion: null, levelAttribution: null, actions: { evaluate: true } };
     }
     const { r, criteria, legacy, decisions } = view;
 
@@ -768,11 +768,16 @@ export class EvaluationService {
         `select check_key, passed from integrity_check where evaluation_result_id = $1 and classification = 'user_facing' order by check_key`, [r.result_id])).rows : [];
       const messages = r.project_activity_id ? (await sc.query(
         `select key, user_facing_message from integrity_check_spec where activity_spec_id = $1 and classification = 'user_facing'`, [r.project_activity_id])).rows : [];
-      const reason = r.result_id ? (await sc.query(
-        `select reason from audit_event where subject_table = 'evaluation_result' and subject_id = $1 order by occurred_at desc limit 1`, [r.result_id])).rows[0]?.reason ?? null : null;
+      const event = r.result_id ? (await sc.query(
+        `select reason, payload->'attribution' as attribution from audit_event where subject_table = 'evaluation_result' and subject_id = $1 order by occurred_at desc limit 1`, [r.result_id])).rows[0] ?? null : null;
+      const reason = event?.reason ?? null;
       const rubric = r.rubric_version_id ? (await sc.query(
         `select rv.version, (select sum(max_score) from rubric_criterion c where c.rubric_version_id = rv.id) as max_total from rubric_version rv where rv.id = $1`, [r.rubric_version_id])).rows[0] ?? null : null;
-      return { queue, integrity, messages, reason, rubric };
+      // ENG-1 P0 / O-1: how the legacy path attributed this result (recorded on the result's audit event). Null for history before P0.
+      const a = event?.attribution as { skillId?: string; unattributed?: string } | null | undefined;
+      const levelAttribution: 'attributed' | 'ambiguous' | 'no_candidate' | null =
+        !a ? null : a.skillId ? 'attributed' : a.unattributed === 'ambiguous' ? 'ambiguous' : a.unattributed === 'no_candidate' ? 'no_candidate' : null;
+      return { queue, integrity, messages, reason, rubric, levelAttribution };
     });
 
     const humanReview = r.state === 'queued_for_human' ? {
@@ -807,6 +812,8 @@ export class EvaluationService {
       // The legacy verification row (unchanged fields) plus the D-118 decision; a pending decision has no legacy row.
       verification: legacy ? { ...legacy, decision: decision?.decision ?? null } : verificationDecision,
       verificationDecision,
+      // O-1: whether a whole-activity result could be attributed to one claimed skill (ENG-1 P0). Additive, read-only.
+      levelAttribution: svc.levelAttribution,
       actions: { evaluate: false },
     };
   }

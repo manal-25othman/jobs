@@ -7,7 +7,7 @@ import { useSession, Loading, ErrorBanner, EvidenceState } from '../../component
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { CompanionNudge } from '../../components/CompanionNudge';
-import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr } from '../../lib/journey';
+import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr } from '../../lib/journey';
 
 /**
  * U4 — the evaluation of one submission.
@@ -80,6 +80,7 @@ function EvaluationInner() {
 
   const page = evaluationPageState(view);
   const level = levelChangeToShow(view);
+  const attribution = attributionNoticeAr(view.levelAttribution, page);
   const workHref = projectId ? `/work/${encodeURIComponent(projectId)}` : '/work';
   const unmetChecks = view.integrityChecks.filter((i) => !i.passed);
 
@@ -142,6 +143,7 @@ function EvaluationInner() {
               {view.humanReview?.awaiting.map((a) => <li key={a.criterionKey}>{a.nameAr}</li>)}
             </ul>
             <p className="body-sm muted" style={{ margin: 0 }}>ستظهر النتيجة هنا حين يكتمل قرار المراجعة على كل معيار. لا يوجد وقت متوقَّع معلَن بعد، ولن يتغيّر مستوى مهارتك قبل ذلك.</p>
+            {attribution ? <p className="body-sm" style={{ margin: 0 }} data-testid="attribution-note">{attribution.noteAr}</p> : null}
           </section>
         </>
       ) : null}
@@ -155,6 +157,7 @@ function EvaluationInner() {
             </ul>
           ) : <p className="body-sm" style={{ margin: 0 }}>لم يستوفِ العمل كل المعايير بعد. اقرئي الملاحظات أدناه.</p>}
           <p className="body-sm muted" style={{ margin: 0 }}>«لا دليل بعد» نتيجة مشروعة. مهارتك تبقى حيث هي — لا تنزل.</p>
+          {attribution ? <p className="body-sm" style={{ margin: 0 }} data-testid="attribution-note">{attribution.noteAr}</p> : null}
           <a className="link" href={workHref}>ابدئي محاولة جديدة ←</a>
         </section>
       ) : null}
@@ -182,7 +185,13 @@ function EvaluationInner() {
         </div>
       ) : null}
 
-      {page === 'completed_feedback' ? (
+      {page === 'completed_feedback' && attribution ? (
+        <section className="card" aria-labelledby="done">
+          <h2 id="done">{attribution.titleAr}</h2>
+          <p className="body-sm" style={{ margin: 0 }}>{attribution.bodyAr}</p>
+          <p className="body-sm" style={{ margin: 0 }} data-testid="attribution-note">{attribution.noteAr}</p>
+        </section>
+      ) : page === 'completed_feedback' ? (
         <section className="card" aria-labelledby="done">
           <h2 id="done">اكتمل التقييم</h2>
           <p className="body-sm" style={{ margin: 0 }}>الملاحظات أدناه. لم يتغيّر مستوى المهارة بهذا التقييم.</p>
