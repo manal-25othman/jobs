@@ -167,15 +167,36 @@ async function reviewedActivity() {
 }
 
 const LEVELS = { semantic_structure: 'solid', form_validation: 'solid', data_states: 'solid', state_transitions: 'solid', responsive_layout: 'solid', explanation_clarity: 'solid', judgment_assumption_check: 'met' };
-async function reviewEverything(evaluationId) {
+async function reviewEverything(evaluationId, levels = LEVELS) {
   const reviewer = await newUser();
   await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'UI acceptance operator')`, [reviewer.id]);
   const items = (await pool.query(`select id, criterion_key from review_queue_item where evaluation_id = $1 order by criterion_key`, [evaluationId])).rows;
   for (const it of items) {
     await apiCall(reviewer, 'POST', `/review/queue/${it.id}/assign`, {});
     await apiCall(reviewer, 'GET', `/review/items/${it.id}`);
-    await apiCall(reviewer, 'POST', `/review/items/${it.id}/decision`, { levelKey: LEVELS[it.criterion_key], rationale: `لاحظتُ في الملفات المسلّمة أن ${it.criterion_key} يستوفي الوصف.` });
+    await apiCall(reviewer, 'POST', `/review/items/${it.id}/decision`, { levelKey: levels[it.criterion_key] ?? LEVELS[it.criterion_key], rationale: `لاحظتُ في الملفات المسلّمة أن ${it.criterion_key} يستوفي الوصف.` });
   }
+}
+
+/**
+ * ENG-1 P5 — TEST ONLY: makes a per_skill draft policy development_only with the explicit opt-in that migration 0029
+ * requires (refused in production by the database). `useSafetyBaseline` restores the real default afterwards.
+ */
+const P5_POLICY = 'ENG-1 P5 UI ACCEPTANCE ONLY: per-skill development pathway; unapproved draft; never production.';
+async function usePerSkillDevelopmentPolicy() {
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    await c.query("select set_config('naqla.config_actor', 'UI acceptance harness', true), set_config('naqla.config_reason', 'P5 development-only per-skill UI acceptance', true), set_config('naqla.per_skill_dev_activation', 'on', true)");
+    let id = (await c.query(`select id from verification_policy where key = 'default' and description_en = $1`, [P5_POLICY])).rows[0]?.id;
+    if (!id) {
+      const v = Math.max(970, Number((await c.query(`select max(version) + 1 as v from verification_policy where key = 'default'`)).rows[0].v));
+      id = (await c.query(`insert into verification_policy (key, version, description_en, promotion_basis, practiced_on_submission, assessment_scope) values ('default', $1, $2, 'independently_verified', false, 'per_skill') returning id`, [v, P5_POLICY])).rows[0].id;
+    }
+    await c.query(`update verification_policy set activation = 'inactive' where key = 'default' and activation <> 'inactive' and id <> $1`, [id]);
+    await c.query(`update verification_policy set activation = 'development_only' where id = $1 and activation <> 'development_only'`, [id]);
+    await c.query('commit');
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
 }
 
 /* ───────────────────────────── page helpers ───────────────────────────── */
@@ -324,10 +345,10 @@ async function run(browser) {
   // rubric; otherwise no level is recorded and the graduate is told why (O-1). Each journey states one fact.
   const HTML_AR = 'بنية HTML الدلالية'; const CSS_AR = 'تنسيق CSS والتصميم المتجاوب';
   const reSkill = (label) => new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  async function reviewedSubmission(u, keepOnly /* null = the work page's default selection */) {
+  async function reviewedSubmission(u, keepOnly /* null = the work page's default selection; a label or a list of labels */, activityId = reviewed.activityId, chip = 'يُراجَع بشريًا') {
     await apiCall(u, 'PUT', '/me/career-goal', { targetRoleId: reviewed.roleId, confirmed: true });
     const page = await pageFor(browser, u);
-    await page.goto(`${APP}/activities/${reviewed.activityId}`); await page.getByText('يُراجَع بشريًا').first().waitFor();
+    await page.goto(`${APP}/activities/${activityId}`); await page.getByText(chip).first().waitFor();
     const activityText = await bodyText(page);
     await page.getByRole('button', { name: 'ابدئي النشاط' }).click();
     await page.waitForURL(/\/work\//); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
@@ -341,7 +362,7 @@ async function run(browser) {
     const defaultChecked = await group.locator('input[type=checkbox]:checked').count();
     if (keepOnly) {
       for (const box of await group.getByRole('checkbox').all()) await box.setChecked(false);
-      await group.getByRole('checkbox', { name: reSkill(keepOnly) }).setChecked(true);
+      for (const label of [keepOnly].flat()) await group.getByRole('checkbox', { name: reSkill(label) }).setChecked(true);
     }
     await answerQuestionnaire(page);
     await page.getByRole('button', { name: 'تسليم للتقييم' }).click();
@@ -349,8 +370,8 @@ async function run(browser) {
     const sid = new URL(page.url()).searchParams.get('submission');
     return { page, sid, projectId, activityText, defaultChecked };
   }
-  async function finishReview(page, sid) {
-    await reviewEverything((await one('select id from evaluation where submission_id = $1', [sid])).id);
+  async function finishReview(page, sid, levels) {
+    await reviewEverything((await one('select id from evaluation where submission_id = $1', [sid])).id, levels);
     await page.reload(); await page.locator('#crit').waitFor();
     return bodyText(page);
   }
@@ -395,6 +416,7 @@ async function run(browser) {
     check('B11a', 'one primary skill selected: after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown', claim?.state === 'demonstrated' && nClaims === 1 && /مُثبتة بدليل/.test(after), `${claim?.state}/${nClaims}`);
     check('B11b', 'no attribution notice beside a recorded level', !/لم يُسجَّل مستوى لأي مهارة/.test(after));
     check('B11c', 'Verified is never shown as granted', !/← موثّقة/.test(after));
+    check('B11e', 'P5: a legacy (single-skill) evaluation renders exactly as before — no per-skill section', await page.locator('[data-testid="per-skill-results"]').count() === 0 && !/نتيجة كل مهارة/.test(after));
     await shot(page, 'U4-evaluation-level-recorded-desktop');
     await page.goto(`${APP}/work`); await page.locator('article').first().waitFor();
     check('B11d', 'My Work reports the recorded level change for that work only', /قُيِّم — تغيّر مستوى المهارة/.test(await bodyText(page)));
@@ -412,6 +434,87 @@ async function run(browser) {
     await shot(page, 'U4-evaluation-secondary-only-desktop');
     await page.context().close();
   }
+
+  // B13 · ENG-1 P5 — per-skill results (DEVELOPMENT PATHWAY ONLY). The harness switches to a test-only per_skill policy with the
+  // explicit opt-in (migration 0029) for these scenarios and restores the D-118 safety baseline right after.
+  await usePerSkillDevelopmentPolicy();
+  try {
+    // Skills are identified through the activity's own rubric (canonical ids), never by slug: other suites may leave same-slug rows.
+    const crit = async (key) => (await one(`select canonical_skill_id(rc.linked_skill_id) as id from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id
+      where rv.activity_spec_id = $1 and not rv.is_demo_fixture and rc.key = $2 order by rv.created_at desc limit 1`, [reviewed.activityId, key])).id;
+    const HTML_ID = await crit('semantic_structure'); const FORMS_ID = await crit('form_validation');
+    const FORMS_AR = (await one(`select label_ar from skill where id = $1`, [FORMS_ID])).label_ar;
+    const NO_FAILURE = (t) => !/أخفقتِ|رسبتِ|فشلتِ|راسب/.test(t);
+    const NO_INTERNALS = (t) => !/threshold|0\.5|per_skill@|basis|descriptor/i.test(t);
+    // B13a–f · mixed: HTML met, form validation not met, within one activity; pending review first.
+    {
+      const u = await newUser();
+      const { page, sid } = await reviewedSubmission(u, [HTML_AR, FORMS_AR]);
+      await page.locator('[data-testid="per-skill-results"]').waitFor();
+      const pending = await bodyText(page);
+      const pendingSkills = await page.locator('[data-testid="skill-result"]').count();
+      check('B13a', 'pending human review: each selected skill is listed as awaiting the reviewer, and no level is decided yet',
+        pendingSkills === 2 && (pending.match(/بانتظار المراجِع/g) ?? []).length >= 2 && /لا يُحسم المستوى قبل اكتمال المراجعة/.test(pending) && /عملك قيد المراجعة البشرية/.test(pending));
+      await shot(page, 'P5-evaluation-pending-review-desktop');
+      const after = await finishReview(page, sid, { form_validation: 'missing' });
+      const html = page.locator('[data-testid="skill-result"]', { hasText: HTML_AR });
+      const forms = page.locator('[data-testid="skill-result"]', { hasText: FORMS_AR });
+      const htmlText = await html.innerText(); const formsText = await forms.innerText();
+      check('B13b', 'mixed result in ONE activity: HTML met with a recorded level change; form validation not met with no level change',
+        /استوفت معاييرها/.test(htmlText) && /تغيّر المستوى: فجوة ← مُثبتة بدليل/.test(htmlText) && /لم تُستوفَ معاييرها بعد/.test(formsText) && /لم يتغيّر المستوى/.test(formsText), `${htmlText} || ${formsText}`);
+      check('B13c', 'assessment outcome and level change are shown as two separate lines per skill, under a summary that counts recorded changes only',
+        (await html.locator('[data-testid="skill-outcome"]').count()) === 1 && (await html.locator('[data-testid="skill-level"]').count()) === 1 && /تغيّر مستوى 1 من 2/.test(after) && /اكتمال النشاط لا يعني استيفاء كل مهارة/.test(after));
+      check('B13d', 'no failure wording, no reviewer-only rubric values or internals, never Verified', NO_FAILURE(after) && NO_INTERNALS(after) && !/← موثّقة/.test(after));
+      check('B13e', 'each skill lists only ITS OWN criteria by name', (await html.locator('li').count()) === 1 && (await forms.locator('li').count()) === 1 && !/التحقق|النموذج/.test(await html.locator('li').innerText()));
+      check('B13f', 'the database agrees: HTML demonstrated, form validation not', (await one('select state from skill_claim where user_id = $1 and skill_id = $2', [u.id, HTML_ID]))?.state === 'demonstrated'
+        && !(await one('select state from skill_claim where user_id = $1 and skill_id = $2', [u.id, FORMS_ID])));
+      await shot(page, 'P5-evaluation-mixed-desktop');
+      for (const viewport of [{ width: 375, height: 812 }, { width: 1280, height: 900 }]) {
+        const p2 = await pageFor(browser, u, viewport);
+        await p2.goto(`${APP}/evaluation?submission=${sid}`); await p2.locator('[data-testid="per-skill-results"]').waitFor(); await p2.waitForLoadState('networkidle');
+        const issues = await a11yBasics(p2);
+        check(`B13-a11y-${viewport.width}`, `per-skill evaluation at ${viewport.width}px: RTL, Arabic, labelled controls, named links, no horizontal scroll`, issues.length === 0, issues.join('; '));
+        if (viewport.width === 375) await shot(p2, 'P5-evaluation-mixed-mobile');
+        await p2.context().close();
+      }
+      // My Work: one chip per skill; the level change is attributed to HTML only.
+      await page.goto(`${APP}/work`); await page.locator('[data-testid="work-skill-results"]').first().waitFor();
+      const chips = await page.locator('[data-testid="work-skill-results"]').first().innerText();
+      check('B13g', 'My Work shows the latest attempt skill by skill: HTML level changed, form validation not', new RegExp(`${HTML_AR}: تغيّر المستوى`).test(chips) && new RegExp(`${FORMS_AR}: لم تُستوفَ`).test(chips) && /تغيّر مستوى 1 من 2/.test(await bodyText(page)), chips);
+      await shot(page, 'P5-my-work-per-skill-desktop');
+      // Withdrawn evidence: the history stays; the level line says the evidence was withdrawn; no CV proposal from it.
+      const ev = await one(`select e.id from evidence e where e.user_id = $1 and canonical_skill_id(e.skill_id) = $2`, [u.id, HTML_ID]);
+      await apiCall(u, 'POST', `/evidence/${ev.id}/withdraw`, { reason: 'لم يكن العمل عملي بالكامل' });
+      await page.goto(`${APP}/evaluation?submission=${sid}`); await page.locator('[data-testid="per-skill-results"]').waitFor();
+      const w = await page.locator('[data-testid="skill-result"]', { hasText: HTML_AR }).innerText();
+      check('B13h', 'withdrawn evidence: HTML still shows it was assessed and met, the recorded level is marked as withdrawn, and no CV proposal is offered from it',
+        /استوفت معاييرها/.test(w) && /ثم سُحب دليله/.test(w) && !/اقتراح بند السيرة/.test(w), w);
+      await shot(page, 'P5-evaluation-withdrawn-desktop');
+      await page.context().close();
+    }
+    // B13i · thresholds not approved (DEMO content, values proposed): outcomes recorded as not decided; no level; nothing reads as failure.
+    {
+      const demo = await one(`select id from activity_spec where slug = 'act_fe_build_interface' and is_demo_fixture`);
+      const demoRubric = await one(`select id, status from rubric_version where activity_spec_id = $1`, [demo.id]);
+      if (demoRubric.status !== 'published') { // DEMO shortcut outside production, as the API e2e suites do
+        await pool.query(`update rubric_version set status = 'curated' where id = $1 and status = 'draft'`, [demoRubric.id]); await pool.query(`update rubric_version set status = 'published' where id = $1`, [demoRubric.id]);
+        await pool.query(`update activity_spec set status = 'curated' where id = $1 and status = 'draft'`, [demo.id]); await pool.query(`update activity_spec set status = 'published' where id = $1`, [demo.id]);
+      }
+      const u = await newUser();
+      const { page, sid } = await reviewedSubmission(u, HTML_AR, demo.id, 'تجريبي — غير مراجَع');
+      const after = await finishReview(page, sid);
+      const t = await page.locator('[data-testid="skill-result"]').first().innerText();
+      check('B13i', 'unapproved thresholds: the skill is shown as not decided (awaiting expert approval), no level, not a failure',
+        /بانتظار اعتماد الخبراء/.test(t) && /لم يتغيّر المستوى/.test(t) && NO_FAILURE(after) && NO_INTERNALS(after)
+        && await count('select count(*)::int n from evidence where user_id = $1', [u.id]) === 0, t);
+      await shot(page, 'P5-evaluation-unapproved-thresholds-desktop');
+      await page.context().close();
+    }
+  } finally {
+    await useSafetyBaseline();
+  }
+  // B13j · after the development scenarios, a legacy evaluation again carries no per-skill section (the pathway is off at rest).
+  check('B13j', 'the per-skill policy is inactive again after the scenarios', await count(`select count(*)::int n from verification_policy where assessment_scope = 'per_skill' and activation <> 'inactive'`) === 0);
 
   // B8 · unauthorized navigation: other users' work, unpublished activities, unknown ids; the old URL redirects.
   {

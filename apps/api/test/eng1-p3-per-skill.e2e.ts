@@ -347,4 +347,45 @@ describe('ENG-1 P3 — per-skill assessment through the API (development pathway
     assert.equal(Number((await one('select count(*)::int n from evidence where user_id = $1', [u.id])).n), 0);
     assert.equal(await claimState(u.id, demoHtml), 'gap');
   });
+
+  test('11 · P5 API/UI contract: the per-skill projection is learner-safe (no threshold, rubric level, basis detail or internal reason), names each criterion, and My Work carries it', async () => {
+    const SKILL_KEYS = ['basisIndependentlyVerified', 'claimed', 'criteria', 'currentState', 'decision', 'evidence', 'outcome', 'proposedState', 'rubricResolution', 'rubricVersion',
+      'skillAssessmentId', 'skillId', 'skillLabelAr', 'skillSlug'];
+    const FORBIDDEN = /threshold|basisReasons|per_skill@|policy default|descriptor|observ|levelKey/i;
+    const u = await graduate();
+    const sid = await submit(u, [S.html, S.forms]);
+    const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
+    assert.equal(ev.outcome, 'needs_human_review');
+    assert.doesNotMatch(JSON.stringify(ev.skills), FORBIDDEN, 'the evaluate response is learner-safe');
+    // Pending human review: each skill is incomplete with its criteria awaiting the reviewer; no level is decided.
+    const pending = (await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(u)).expect(200)).body.data;
+    assert.equal(pending.workStatus, 'under_human_review');
+    for (const x of pending.skills) { assert.equal(x.outcome, 'incomplete'); assert.ok(x.criteria.every((c: { status: string }) => c.status === 'pending')); }
+    // Finish the review (form validation missing) and read the final view.
+    const r = await theReviewer();
+    for (const it of (await pool.query(`select id, criterion_key from review_queue_item where evaluation_id = $1 order by criterion_key`, [ev.evaluationId])).rows) {
+      await http.post(`/v1/review/queue/${it.id}/assign`).set(auth(r)).send({}).expect(201);
+      await http.get(`/v1/review/items/${it.id}`).set(auth(r)).expect(200);
+      await http.post(`/v1/review/items/${it.id}/decision`).set(auth(r)).send({ levelKey: it.criterion_key === 'form_validation' ? 'missing' : SOLID[it.criterion_key], rationale: `Observed in the submitted files: ${it.criterion_key}.` }).expect(201);
+    }
+    const view = (await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(u)).expect(200)).body.data;
+    assert.equal(view.skills.length, 2);
+    for (const x of view.skills) {
+      assert.deepEqual(Object.keys(x).sort(), SKILL_KEYS);
+      assert.deepEqual(Object.keys(x.decision).sort(), ['decision', 'previousState', 'resultingState']);
+      for (const c of x.criteria) { assert.deepEqual(Object.keys(c).sort(), ['evaluatorKind', 'key', 'maxScore', 'nameAr', 'score', 'status']); assert.ok(c.nameAr, 'each criterion is named'); }
+      assert.ok(x.skillLabelAr);
+    }
+    assert.doesNotMatch(JSON.stringify(view.skills), FORBIDDEN);
+    const byId = Object.fromEntries(view.skills.map((x: { skillId: string }) => [x.skillId, x]));
+    assert.equal(byId[S.html].outcome, 'met'); assert.equal(byId[S.forms].outcome, 'not_met');
+    // My Work carries one entry per skill; a project not yet evaluated carries none.
+    const pid = (await one('select project_id from submission where id = $1', [sid])).project_id;
+    await http.post('/v1/projects').set(auth(u)).send({ title: 'لم يُسلَّم', kind: 'platform_activity', activitySpecId: activityId }).expect(201);
+    const items = (await http.get('/v1/projects').set(auth(u)).expect(200)).body.data.items as { id: string; latestSubmission: { skills: { skillId: string; outcome: string; levelChanged: boolean; labelAr: string | null }[] } | null }[];
+    const mine = items.find((i) => i.id === pid)!;
+    assert.deepEqual(mine.latestSubmission!.skills.map((x) => [x.skillId, x.outcome, x.levelChanged]).sort(), [[S.html, 'met', true], [S.forms, 'not_met', false]].sort());
+    assert.ok(mine.latestSubmission!.skills.every((x) => x.labelAr));
+    assert.ok(items.filter((i) => i.id !== pid).every((i) => i.latestSubmission === null || (i.latestSubmission.skills ?? []).length === 0));
+  });
 });

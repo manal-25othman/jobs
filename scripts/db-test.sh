@@ -56,6 +56,13 @@ run_proofs "$ROOT/supabase/tests/integrity_hardening.sql" 'PASS|FAIL'
 echo "==> ENG-1 P3 development pathway proofs (0029)"
 run_proofs "$ROOT/supabase/tests/per_skill_development.sql" 'PASS|FAIL'
 
+echo "==> historical claimed-skill audit runs read-only and changes nothing"
+before="$(psql "$TARGET" -At -c "select (select count(*) from submission_claimed_skill) || '/' || (select count(*) from evidence) || '/' || (select count(*) from skill_claim)")"
+psql "$TARGET" -X -q -v ON_ERROR_STOP=1 -f "$ROOT/scripts/audit-claimed-skills.sql" >/dev/null
+[[ "$(psql "$TARGET" -At -c "select (select count(*) from submission_claimed_skill) || '/' || (select count(*) from evidence) || '/' || (select count(*) from skill_claim)")" == "$before" ]] || { echo "FAIL  the audit changed data" >&2; exit 1; }
+grep -q "transaction isolation level repeatable read read only" "$ROOT/scripts/audit-claimed-skills.sql" || { echo "FAIL  the audit is not read-only" >&2; exit 1; }
+echo "PASS  audit-claimed-skills.sql ran in a read-only transaction and changed nothing ($before)"
+
 echo "==> ENG-1 rollback refuses while per-skill records exist"
 if psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0026_eng1_p2_per_skill_schema.down.sql" >/dev/null 2>&1; then
   echo "FAIL  the 0026 rollback ran although per-skill records exist" >&2; exit 1

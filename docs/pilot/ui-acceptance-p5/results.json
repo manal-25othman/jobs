@@ -1,0 +1,475 @@
+{
+  "at": "2026-10-12T14:24:09.619Z",
+  "total": 78,
+  "failed": 0,
+  "results": [
+    {
+      "id": "B1a",
+      "name": "catalogue without a goal explains and links to goal selection",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B1b",
+      "name": "My Work empty state links to the catalogue",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2a",
+      "name": "goal confirmation leads to the activity catalogue",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2b",
+      "name": "the demo activity is listed and labelled DEMO",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2c",
+      "name": "no private rubric or assessment detail is shown in the catalogue",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2d",
+      "name": "the catalogue shows exactly the authorized activities",
+      "pass": true,
+      "detail": "9 cards, API 9"
+    },
+    {
+      "id": "B2e",
+      "name": "detail shows deliverables, skills, assessment and the submission-is-not-a-level sentence",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2f",
+      "name": "detail carries no private assessment wording",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2g",
+      "name": "starting the activity creates a project authorized by the API and opens its workspace",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2h",
+      "name": "the workspace has no tick-boxes claiming technical facts",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2i",
+      "name": "the workspace states that nothing is saved before submission",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B2j",
+      "name": "submit is disabled until the mandatory deliverables are present",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B3a",
+      "name": "submit becomes available once every mandatory deliverable is present",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B3b",
+      "name": "files sent in reverse order are bound to the deliverables of their slots",
+      "pass": true,
+      "detail": "[{\"key\":\"file.component\",\"declared_name\":\"HabitList.jsx\"},{\"key\":\"file.test\",\"declared_name\":\"HabitList.test.jsx\"}]"
+    },
+    {
+      "id": "B3c",
+      "name": "a double click created exactly one submission",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B3d",
+      "name": "no declared tick, signal or file marker was sent — only files and declared text deliverables",
+      "pass": true,
+      "detail": "file.component,file.test,note.coverage"
+    },
+    {
+      "id": "B4a",
+      "name": "submitting started exactly one evaluation",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B4b",
+      "name": "three refreshes started no further evaluation",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B4c",
+      "name": "the demo result shows no level change (D-118)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B4d",
+      "name": "no evaluate button is offered once evaluated",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B4e",
+      "name": "no skill level was granted in the database",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B5a",
+      "name": "opening and refreshing a not-yet-evaluated submission starts nothing",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B5b",
+      "name": "the explicit button (double-clicked) started exactly one evaluation",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B6a",
+      "name": "the workspace lists every attempt with a link to its feedback",
+      "pass": true,
+      "detail": "2"
+    },
+    {
+      "id": "B6b",
+      "name": "My Work shows the attempts count and a next action",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B6c",
+      "name": "My Work separates completed work from a skill level",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7a",
+      "name": "a human-reviewed activity explains that a reviewed pass may raise the level, never to Verified automatically",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7b",
+      "name": "a pending human review reads as pending, naming what awaits review, without an error",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7h",
+      "name": "with several primary skills selected (the default: 3), the pending page already says no level will follow",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7c",
+      "name": "refreshing a pending review starts nothing",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7d",
+      "name": "no level while review is pending",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7e",
+      "name": "after every criterion is decided: the work is reported as completed and assessed, NO level is recorded for any skill (no arbitrary pick), and the reason is given",
+      "pass": true,
+      "detail": "claims=0 evidence=0"
+    },
+    {
+      "id": "B7i",
+      "name": "nothing tells the graduate a skill was failed; criteria are shown as assessed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7f",
+      "name": "Verified is never shown as granted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B7g",
+      "name": "My Work reports that work as assessed, and does NOT report a level change",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11a",
+      "name": "one primary skill selected: after a named reviewer decided on SME-approved, non-demo content, the level change the backend recorded is shown",
+      "pass": true,
+      "detail": "demonstrated/1"
+    },
+    {
+      "id": "B11b",
+      "name": "no attribution notice beside a recorded level",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11c",
+      "name": "Verified is never shown as granted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11e",
+      "name": "P5: a legacy (single-skill) evaluation renders exactly as before — no per-skill section",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B11d",
+      "name": "My Work reports the recorded level change for that work only",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B12a",
+      "name": "only a secondary skill selected: no level is recorded",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B12b",
+      "name": "the graduate is told the work was assessed and why no level was recorded, without a claim of failure",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13a",
+      "name": "pending human review: each selected skill is listed as awaiting the reviewer, and no level is decided yet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13b",
+      "name": "mixed result in ONE activity: HTML met with a recorded level change; form validation not met with no level change",
+      "pass": true,
+      "detail": "بنية HTML الدلالية\nنتيجة التقييم:\nاستوفت معاييرها\n\nاستوفى عملك كل معايير هذه المهارة كما قرّرها التقييم.\n\nمستوى المهارة:\nتغيّر المستوى: فجوة ← مُثبتة بدليل\nاقتراح بند السيرة ←\nبنية دلالية — مستوفى || النماذج والتحقق من المدخلات\nنتيجة التقييم:\nلم تُستوفَ معاييرها بعد\n\nمعيار واحد على الأقل من معايير هذه المهارة لم يُستوفَ في هذا العمل. هذه نتيجة هذا العمل وحده، ومستواك فيها لا ينزل.\n\nمستوى المهارة:\nلم يتغيّر المستوى بهذا التقييم (فجوة)\nالتحقق من النموذج — غير مستوفى بعد"
+    },
+    {
+      "id": "B13c",
+      "name": "assessment outcome and level change are shown as two separate lines per skill, under a summary that counts recorded changes only",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13d",
+      "name": "no failure wording, no reviewer-only rubric values or internals, never Verified",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13e",
+      "name": "each skill lists only ITS OWN criteria by name",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13f",
+      "name": "the database agrees: HTML demonstrated, form validation not",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13-a11y-375",
+      "name": "per-skill evaluation at 375px: RTL, Arabic, labelled controls, named links, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13-a11y-1280",
+      "name": "per-skill evaluation at 1280px: RTL, Arabic, labelled controls, named links, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B13g",
+      "name": "My Work shows the latest attempt skill by skill: HTML level changed, form validation not",
+      "pass": true,
+      "detail": "النماذج والتحقق من المدخلات: لم تُستوفَ معاييرها بعد\nبنية HTML الدلالية: تغيّر المستوى"
+    },
+    {
+      "id": "B13h",
+      "name": "withdrawn evidence: HTML still shows it was assessed and met, the recorded level is marked as withdrawn, and no CV proposal is offered from it",
+      "pass": true,
+      "detail": "بنية HTML الدلالية\nنتيجة التقييم:\nاستوفت معاييرها\n\nاستوفى عملك كل معايير هذه المهارة كما قرّرها التقييم.\n\nمستوى المهارة:\nسُجِّل مستوى «مُثبتة بدليل» ثم سُحب دليله\nبنية دلالية — مستوفى"
+    },
+    {
+      "id": "B13i",
+      "name": "unapproved thresholds: the skill is shown as not decided (awaiting expert approval), no level, not a failure",
+      "pass": true,
+      "detail": "بنية HTML الدلالية\nنتيجة التقييم:\nلم تُحسم — بانتظار اعتماد الخبراء\n\nقُيِّمت معايير هذه المهارة، لكن حدّ الاستيفاء الخاص بها لم يعتمده الخبراء بعد، فلا تُحسم نتيجتها ولا يُسجَّل لها مستوى. هذا ليس إخفاقًا.\n\nمستوى المهارة:\nلم يتغيّر المستوى بهذا التقييم (فجوة)\nبنية دلالية — الحدّ بانتظار الاعتماد"
+    },
+    {
+      "id": "B13j",
+      "name": "the per-skill policy is inactive again after the scenarios",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-draft",
+      "name": "a draft activity id shows \"not available\" and offers no start",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-another role's",
+      "name": "a another role's activity id shows \"not available\" and offers no start",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-unknown",
+      "name": "a unknown activity id shows \"not available\" and offers no start",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-work",
+      "name": "another graduate's workspace is not available",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-eval",
+      "name": "another graduate's evaluation is not available, and opening it started nothing",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B8-project",
+      "name": "the former /project URL redirects to the catalogue",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B9a",
+      "name": "an oversize upload is refused with an Arabic message in its slot",
+      "pass": true,
+      "detail": "تعذّر رفع الملف. تأكّدي من نوعه وحجمه ثم حاولي مجددًا."
+    },
+    {
+      "id": "B9b",
+      "name": "submission stays blocked while a mandatory file is missing",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B9c",
+      "name": "nothing was submitted",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-U1-activities",
+      "name": "U1-activities at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-U2-activity-detail",
+      "name": "U2-activity-detail at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-U3-workspace",
+      "name": "U3-workspace at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-U4-evaluation",
+      "name": "U4-evaluation at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-U6-my-work",
+      "name": "U6-my-work at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-goal",
+      "name": "goal at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-375-skills",
+      "name": "skills at 375px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-U1-activities",
+      "name": "U1-activities at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-U2-activity-detail",
+      "name": "U2-activity-detail at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-U3-workspace",
+      "name": "U3-workspace at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-U4-evaluation",
+      "name": "U4-evaluation at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-U6-my-work",
+      "name": "U6-my-work at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-goal",
+      "name": "goal at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-1280-skills",
+      "name": "skills at 1280px: RTL, Arabic, labelled controls, named links/buttons, no horizontal scroll",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "B10-keyboard",
+      "name": "every workspace deliverable control is reachable by keyboard",
+      "pass": true,
+      "detail": "A,deliverable-file-component,deliverable-file-test,deliverable-note-coverage,INPUT,BODY"
+    }
+  ]
+}

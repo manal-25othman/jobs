@@ -7,7 +7,8 @@ import { useSession, Loading, ErrorBanner, EvidenceState } from '../../component
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { CompanionNudge } from '../../components/CompanionNudge';
-import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr } from '../../lib/journey';
+import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
+  hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr } from '../../lib/journey';
 
 /**
  * U4 — the evaluation of one submission.
@@ -83,6 +84,49 @@ function EvaluationInner() {
   const attribution = attributionNoticeAr(view.levelAttribution, page);
   const workHref = projectId ? `/work/${encodeURIComponent(projectId)}` : '/work';
   const unmetChecks = view.integrityChecks.filter((i) => !i.passed);
+  // ENG-1 P5: an evaluation recorded skill by skill (development pathway) is shown skill by skill; a legacy one exactly as before.
+  const perSkill = hasPerSkillResults(view) && page !== 'not_evaluated' && page !== 'evaluation_pending' ? view.skills! : null;
+  const perSkillSummary = perSkill ? perSkillSummaryAr(perSkill) : null;
+
+  const perSkillCard = perSkill ? (
+    <section className="card" aria-labelledby="per-skill" data-testid="per-skill-results">
+      <h2 id="per-skill">نتيجة كل مهارة</h2>
+      <p className="body-sm muted" style={{ margin: 0 }}>لكل مهارة سطران منفصلان: ما وجده التقييم في معاييرها، وما سجّله قرار التحقق لمستواها.</p>
+      <div className="rows">
+        {perSkill.map((sk) => {
+          const o = skillOutcomeCopy(sk);
+          const lv = skillLevelLine(sk);
+          const name = sk.skillLabelAr ?? 'مهارة';
+          return (
+            <article key={sk.skillId} className="stack" style={{ gap: 6 }} aria-labelledby={`sk-${sk.skillId}`} data-testid="skill-result">
+              <h3 id={`sk-${sk.skillId}`} className="body-sm" style={{ fontWeight: 500, margin: 0 }}>{name}</h3>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <span className="micro muted">نتيجة التقييم:</span>
+                <span className={chipClass(o.tone)} data-testid="skill-outcome">{o.labelAr}</span>
+              </div>
+              <p className="body-sm" style={{ margin: 0 }}>{o.explanationAr}</p>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <span className="micro muted">مستوى المهارة:</span>
+                <span className={chipClass(lv.tone)} data-testid="skill-level">{lv.labelAr}</span>
+                {lv.kind === 'raised' && lv.evidenceId ? (
+                  <a className="link" href={`/proposals?focus=${encodeURIComponent(lv.evidenceId)}`}>اقتراح بند السيرة ←</a>
+                ) : null}
+              </div>
+              {sk.criteria.length ? (
+                <ul className="body-sm" style={{ margin: 0, paddingInlineStart: 20 }} aria-label={`معايير ${name}`}>
+                  {sk.criteria.map((c) => {
+                    const cc = skillCriterionCopy(c.status);
+                    return <li key={c.key}>{c.nameAr ?? 'معيار من معايير هذه المهارة'} — <span className={chipClass(cc.tone)}>{cc.labelAr}</span></li>;
+                  })}
+                </ul>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+      <p className="disclaimer">إكمال النشاط لا يُثبت كل مهارة فيه، ونتيجة «لم تُقيَّم» ليست إخفاقًا. لا يُمنح مستوى «موثّقة» تلقائيًا.</p>
+    </section>
+  ) : null;
 
   const criteriaCard = view.criteria.length ? (
     <section className="card" aria-labelledby="crit">
@@ -162,7 +206,14 @@ function EvaluationInner() {
         </section>
       ) : null}
 
-      {page === 'pending_validation' ? (
+      {perSkill && perSkillSummary && (page === 'pending_validation' || page === 'completed_level' || page === 'completed_feedback') ? (
+        <section className="card" aria-labelledby="per-skill-summary">
+          <h2 id="per-skill-summary">{perSkillSummary.titleAr}</h2>
+          <p className="body-sm" style={{ margin: 0 }}>{perSkillSummary.bodyAr}</p>
+        </section>
+      ) : null}
+
+      {page === 'pending_validation' && !perSkill ? (
         <section className="card" aria-labelledby="pending">
           <h2 id="pending">قُيِّم عملك — والمستوى بانتظار تحقق مستقل</h2>
           <p className="body-sm" style={{ margin: 0 }}>
@@ -173,7 +224,7 @@ function EvaluationInner() {
         </section>
       ) : null}
 
-      {page === 'completed_level' && level ? (
+      {page === 'completed_level' && level && !perSkill ? (
         <div className="next-action">
           <span className="kicker">تغيّر مستوى المهارة</span>
           <h2>{level.fromAr} ← {level.toAr}</h2>
@@ -185,7 +236,7 @@ function EvaluationInner() {
         </div>
       ) : null}
 
-      {page === 'completed_feedback' && attribution ? (
+      {perSkill ? null : page === 'completed_feedback' && attribution ? (
         <section className="card" aria-labelledby="done">
           <h2 id="done">{attribution.titleAr}</h2>
           <p className="body-sm" style={{ margin: 0 }}>{attribution.bodyAr}</p>
@@ -197,6 +248,8 @@ function EvaluationInner() {
           <p className="body-sm" style={{ margin: 0 }}>الملاحظات أدناه. لم يتغيّر مستوى المهارة بهذا التقييم.</p>
         </section>
       ) : null}
+
+      {perSkillCard}
 
       {page !== 'not_evaluated' && page !== 'evaluation_pending' ? criteriaCard : null}
 

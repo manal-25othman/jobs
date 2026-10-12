@@ -131,7 +131,7 @@ export function evaluationPageState(v: { state: string; workStatus: string; outc
  * Never says a skill was failed: the work WAS assessed (criterion by criterion); no level moved because a
  * whole-activity result cannot yet be attributed to one skill. Null when there is nothing to explain.
  */
-export type LevelAttribution = 'attributed' | 'ambiguous' | 'no_candidate' | null | undefined;
+export type LevelAttribution = 'attributed' | 'ambiguous' | 'no_candidate' | 'per_skill' | null | undefined;
 export function attributionNoticeAr(a: LevelAttribution, page: EvaluationPageState): { titleAr: string; bodyAr: string; noteAr: string } | null {
   if (a !== 'ambiguous' && a !== 'no_candidate') return null;
   if (page === 'human_review_pending') {
@@ -164,6 +164,123 @@ export function criterionResult(score: number, max: number): { labelAr: string; 
   if (max > 0 && score >= max) return { labelAr: 'مستوفى', tone: 'success' };
   if (score > 0) return { labelAr: 'مستوفى جزئيًا', tone: 'info' };
   return { labelAr: 'غير مستوفى بعد', tone: 'attention' };
+}
+
+/* ───────────────────────── per-skill results (ENG-1 P5, development pathway) ───────────────────────── */
+
+/**
+ * One assessed skill, as the API's additive `skills[]` reports it. Only what the graduate may see: the skill's own
+ * criteria by NAME and status — never thresholds, rubric levels, descriptors, checks or reviewer notes.
+ */
+export interface SkillResultView {
+  skillId: string; skillLabelAr: string | null; outcome: string; currentState: string;
+  criteria: { key: string; nameAr: string | null; status: string; evaluatorKind?: string }[];
+  decision: { decision: string; previousState: string; resultingState: string } | null;
+  evidence: { id: string; withdrawn: boolean } | null;
+}
+
+/** Whether this evaluation carries per-skill results. A legacy evaluation (every real user today) carries none. */
+export function hasPerSkillResults(v: { skills?: readonly unknown[] | null }): boolean {
+  return Array.isArray(v.skills) && v.skills.length > 0;
+}
+
+/**
+ * What the ASSESSMENT found for one skill, in words a learner can act on. This is never a level: whether the level
+ * changed is `skillLevelLine`, read from the verification decision. `not_assessed`, `blocked` and `incomplete` are
+ * never described as a failure.
+ */
+export function skillOutcomeCopy(s: Pick<SkillResultView, 'outcome' | 'criteria'>): { labelAr: string; tone: Tone; explanationAr: string } {
+  switch (s.outcome) {
+    case 'met':
+      return { labelAr: 'استوفت معاييرها', tone: 'success', explanationAr: 'استوفى عملك كل معايير هذه المهارة كما قرّرها التقييم.' };
+    case 'not_met':
+      return { labelAr: 'لم تُستوفَ معاييرها بعد', tone: 'attention',
+        explanationAr: 'معيار واحد على الأقل من معايير هذه المهارة لم يُستوفَ في هذا العمل. هذه نتيجة هذا العمل وحده، ومستواك فيها لا ينزل.' };
+    case 'incomplete':
+      return s.criteria.some((c) => c.status === 'pending')
+        ? { labelAr: 'بانتظار المراجِع', tone: 'info', explanationAr: 'يقرّر مراجِع مختص معايير هذه المهارة؛ تظهر نتيجتها حين يكتمل قراره.' }
+        : { labelAr: 'لم تُحسم — بانتظار اعتماد الخبراء', tone: 'info',
+            explanationAr: 'قُيِّمت معايير هذه المهارة، لكن حدّ الاستيفاء الخاص بها لم يعتمده الخبراء بعد، فلا تُحسم نتيجتها ولا يُسجَّل لها مستوى. هذا ليس إخفاقًا.' };
+    case 'not_assessed':
+      return { labelAr: 'لم تُقيَّم في هذا النشاط', tone: 'neutral',
+        explanationAr: 'لا يقيس هذا النشاط هذه المهارة بمعيار خاص بها، لذلك لم تُقيَّم هنا. هذا ليس إخفاقًا، ومستواك فيها كما هو.' };
+    case 'blocked':
+      return { labelAr: 'لم تُقيَّم — ينقص العمل ما يلزم', tone: 'attention',
+        explanationAr: 'لم يكتمل فحص عام للعمل كله، فلم تُقيَّم أي مهارة منه. أكملي ما ينقص ثم أعيدي التسليم. هذا ليس حكمًا على المهارة.' };
+    default:
+      return { labelAr: 'نتيجة غير معروفة', tone: 'neutral', explanationAr: 'لم نتمكّن من عرض نتيجة هذه المهارة.' };
+  }
+}
+
+/** A criterion of ONE skill, in words. */
+export function skillCriterionCopy(status: string): { labelAr: string; tone: Tone } {
+  switch (status) {
+    case 'met': return { labelAr: 'مستوفى', tone: 'success' };
+    case 'not_met': return { labelAr: 'غير مستوفى بعد', tone: 'attention' };
+    case 'pending': return { labelAr: 'بانتظار المراجِع', tone: 'info' };
+    case 'threshold_unapproved': return { labelAr: 'الحدّ بانتظار الاعتماد', tone: 'info' };
+    default: return { labelAr: 'غير محسوم', tone: 'neutral' };
+  }
+}
+
+export type SkillLevelKind = 'raised' | 'raised_withdrawn' | 'reestablished' | 'pending_validation' | 'unchanged' | 'not_decided';
+
+/**
+ * What the VERIFICATION DECISION did to this skill's level — separate from the assessment outcome. A level change is
+ * shown only when the decision recorded one with evidence; Verified is never shown as granted (production ceiling).
+ */
+export function skillLevelLine(s: Pick<SkillResultView, 'decision' | 'evidence' | 'currentState'> & Partial<Pick<SkillResultView, 'outcome' | 'criteria'>>):
+  { kind: SkillLevelKind; labelAr: string; tone: Tone; evidenceId: string | null; to: string | null } {
+  const d = s.decision;
+  if (s.outcome === 'incomplete' && (s.criteria ?? []).some((c) => c.status === 'pending')) {
+    return { kind: 'not_decided', labelAr: 'لا يُحسم المستوى قبل اكتمال المراجعة', tone: 'neutral', evidenceId: null, to: null };
+  }
+  if (!d) return { kind: 'not_decided', labelAr: 'لم يُتَّخذ قرار بشأن المستوى بعد', tone: 'neutral', evidenceId: null, to: null };
+  const moved = d.decision !== 'assessment_pending_validation' && d.resultingState !== d.previousState && !!s.evidence
+    && (d.resultingState === 'practiced' || d.resultingState === 'demonstrated');
+  if (moved && s.evidence!.withdrawn) {
+    return { kind: 'raised_withdrawn', labelAr: `سُجِّل مستوى «${LEVEL_AR[d.resultingState] ?? d.resultingState}» ثم سُحب دليله`, tone: 'attention', evidenceId: null, to: d.resultingState };
+  }
+  if (moved) {
+    return { kind: 'raised', labelAr: `تغيّر المستوى: ${LEVEL_AR[d.previousState] ?? d.previousState} ← ${LEVEL_AR[d.resultingState] ?? d.resultingState}`, tone: 'success', evidenceId: s.evidence!.id, to: d.resultingState };
+  }
+  if (d.decision === 'evidence_reestablished' && s.evidence && !s.evidence.withdrawn) {
+    return { kind: 'reestablished', labelAr: `أُعيد تثبيت دليل مستواك «${LEVEL_AR[d.resultingState] ?? d.resultingState}»`, tone: 'info', evidenceId: s.evidence.id, to: d.resultingState };
+  }
+  if (d.decision === 'assessment_pending_validation') {
+    return { kind: 'pending_validation', labelAr: 'المستوى بانتظار تحقق مستقل', tone: 'info', evidenceId: null, to: null };
+  }
+  return { kind: 'unchanged', labelAr: `لم يتغيّر المستوى بهذا التقييم (${LEVEL_AR[d.resultingState] ?? d.resultingState})`, tone: 'neutral', evidenceId: null, to: null };
+}
+
+/** The headline over the per-skill list. Counts only what the decisions recorded; never infers from the activity's result. */
+export function perSkillSummaryAr(skills: readonly Pick<SkillResultView, 'decision' | 'evidence' | 'currentState' | 'outcome' | 'criteria'>[]):
+  { titleAr: string; bodyAr: string; raised: number; total: number } {
+  const raised = skills.filter((s) => skillLevelLine(s).kind === 'raised').length;
+  const awaiting = skills.some((s) => s.outcome === 'incomplete' && s.criteria.some((c) => c.status === 'pending'));
+  const titleAr = awaiting ? 'نتيجة كل مهارة — بعضها بانتظار المراجعة'
+    : raised > 0 ? `تغيّر مستوى ${raised} من ${skills.length} ${skills.length === 1 ? 'مهارة' : 'مهارات'}`
+    : 'قُيِّمت كل مهارة على حدة — ولم يتغيّر مستوى أي منها';
+  return { titleAr, raised, total: skills.length,
+    bodyAr: 'قُيِّمت كل مهارة اخترتِها من معاييرها هي وحدها. اكتمال النشاط لا يعني استيفاء كل مهارة، ونتيجة التقييم شيء وتغيّر المستوى شيء آخر: لا يتغيّر المستوى إلا حين يسجّله قرار التحقق.' };
+}
+
+/** My Work: the per-skill line for the latest attempt, or null for a legacy result. */
+export function perSkillWorkLineAr(skills: readonly { outcome: string; levelChanged: boolean }[] | null | undefined): string | null {
+  if (!skills || skills.length === 0) return null;
+  const raised = skills.filter((s) => s.levelChanged).length;
+  return raised > 0
+    ? `قُيِّمت آخر محاولة مهارةً مهارة: تغيّر مستوى ${raised} من ${skills.length}.`
+    : `قُيِّمت آخر محاولة مهارةً مهارة: لم يتغيّر مستوى أي منها بعد.`;
+}
+
+/** My Work chip for one skill of the latest attempt. */
+export function workSkillChip(s: { labelAr: string | null; outcome: string; levelChanged: boolean }): { textAr: string; tone: Tone } {
+  const o = skillOutcomeCopy({ outcome: s.outcome, criteria: [] });
+  const name = s.labelAr ?? 'مهارة';
+  if (s.levelChanged) return { textAr: `${name}: تغيّر المستوى`, tone: 'success' };
+  if (s.outcome === 'incomplete') return { textAr: `${name}: لم تُحسم بعد`, tone: 'info' };
+  return { textAr: `${name}: ${o.labelAr}`, tone: o.tone === 'success' ? 'info' : o.tone };
 }
 
 /* ───────────────────────── workspace: deliverables → request ───────────────────────── */

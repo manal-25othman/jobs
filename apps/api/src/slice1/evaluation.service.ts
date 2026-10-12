@@ -45,6 +45,17 @@ export interface PerSkillResult {
   evidenceId: string | null; transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null;
 }
 
+/** P5: what an evaluate/finalise response carries per skill — the same learner-safe fields as the evaluation view. */
+function learnerSafeSkill(x: PerSkillResult) {
+  return {
+    skillId: x.skillId, skillAssessmentId: x.skillAssessmentId, claimed: x.claimed, outcome: x.outcome, currentState: x.currentState, proposedState: x.proposedState,
+    basisIndependentlyVerified: x.basisIndependentlyVerified,
+    criteria: x.criteria.map((c) => ({ key: c.key, status: c.status, score: c.score, maxScore: c.maxScore, evaluatorKind: c.evaluatorKind })),
+    decision: { decision: x.decision.decision, previousState: x.decision.previousState, resultingState: x.decision.resultingState },
+    evidenceId: x.evidenceId, transition: x.transition,
+  };
+}
+
 /**
  * Evaluation.
  *
@@ -282,7 +293,7 @@ export class EvaluationService {
         evaluatedAt: resultRow.rows[0].evaluated_at,
         humanReview: awaitingHuman ? { pendingCriteria: run.pendingHumanCriteria, completedCriteria: [] as string[] } : null,
         // ENG-1 P3 (additive): one entry per assessed skill on the development pathway; empty on the legacy path.
-        skills: perSkill,
+        skills: perSkill.map(learnerSafeSkill),
       };
     });
   }
@@ -401,7 +412,7 @@ export class EvaluationService {
       }
       return { evaluationId, resultId, userId: e.user_id as string, outcome: run.outcome, totalScore: run.totalScore, maxScore: run.maxScore, reason: run.reason, criteria: run.criteria,
         integrityChecks: run.integrityChecks.filter((i) => i.classification === 'user_facing').map((i) => ({ key: i.key, passed: i.passed, message: i.message })), transition, reestablishedEvidenceId,
-        verification: { decision: outcome.decision, reason: outcome.decisionReason }, evaluatedAt: resultRow.rows[0].evaluated_at, skills: perSkill };
+        verification: { decision: outcome.decision, reason: outcome.decisionReason }, evaluatedAt: resultRow.rows[0].evaluated_at, skills: perSkill.map(learnerSafeSkill) };
     });
   }
 
@@ -914,7 +925,7 @@ export class EvaluationService {
         `select decision, previous_state, resulting_state, reason, evidence_id, skill_id, skill_assessment_id from verification_decision where evaluation_result_id = $1 order by decided_at`, [r.result_id])).rows : [];
       // ENG-1 P3 read model (owner-only under RLS): the per-skill assessments of this result, with the criteria each rests on.
       const assessed = r.result_id ? (await c.query(
-        `select id, skill_id, claimed, outcome, current_state, proposed_state, reason, basis_independently_verified, basis_reasons, rubric_version, rubric_resolution
+        `select id, skill_id, claimed, outcome, current_state, proposed_state, basis_independently_verified, rubric_version_id, rubric_version, rubric_resolution
            from skill_assessment where evaluation_result_id = $1 order by skill_id`, [r.result_id])).rows : [];
       const assessedCriteria = assessed.length ? (await c.query(
         `select sc.skill_assessment_id, sc.criterion_key, sc.status, sc.score, sc.max_score, sc.threshold, sc.threshold_status, acr.evaluator_kind
@@ -954,7 +965,10 @@ export class EvaluationService {
         !a ? null : a.perSkill ? 'per_skill' : a.skillId ? 'attributed' : a.unattributed === 'ambiguous' ? 'ambiguous' : a.unattributed === 'no_candidate' ? 'no_candidate' : null;
       // Skill names for the per-skill read model (labels are catalogue data; ids come from this user's own rows).
       const labels = assessed.length ? (await sc.query('select id, slug, label_ar, label_en from skill where id = any($1::uuid[])', [assessed.map((x) => x.skill_id)])).rows : [];
-      return { queue, integrity, messages, reason, rubric, levelAttribution, labels };
+      // P5: the learner-facing NAME of each criterion (already shown in the human-review awaiting list) — never its levels,
+      // descriptors, observations, threshold or checks, which stay reviewer-only.
+      const criterionNames = assessed.length ? (await sc.query('select key, name_ar from rubric_criterion where rubric_version_id = $1', [assessed[0]!.rubric_version_id])).rows : [];
+      return { queue, integrity, messages, reason, rubric, levelAttribution, labels, criterionNames };
     });
 
     const humanReview = r.state === 'queued_for_human' ? {
@@ -971,16 +985,18 @@ export class EvaluationService {
       const d = decisions.find((y) => y.skill_assessment_id === x.id) ?? null;
       const ev = d?.evidence_id ? evidence.find((e) => e.id === d.evidence_id) ?? null : null;
       const label = svc.labels.find((l) => l.id === x.skill_id);
+      // P5 learner-safe projection: outcomes, own criteria (name, status, score) and the decision — no threshold values,
+      // no rubric levels or descriptors, no internal reason strings or verification-basis details.
       return {
         skillId: x.skill_id as string, skillSlug: (label?.slug as string | undefined) ?? null, skillLabelAr: (label?.label_ar as string | undefined) ?? null,
         skillAssessmentId: x.id as string, claimed: x.claimed as boolean, outcome: x.outcome as string,
-        currentState: x.current_state as EvidenceState, proposedState: (x.proposed_state as EvidenceState | null) ?? null, reason: x.reason as string,
-        basisIndependentlyVerified: x.basis_independently_verified as boolean, basisReasons: x.basis_reasons as string[],
+        currentState: x.current_state as EvidenceState, proposedState: (x.proposed_state as EvidenceState | null) ?? null,
+        basisIndependentlyVerified: x.basis_independently_verified as boolean,
         rubricVersion: x.rubric_version as string, rubricResolution: x.rubric_resolution as string,
-        criteria: assessedCriteria.filter((c) => c.skill_assessment_id === x.id).map((c) => ({ key: c.criterion_key as string, status: c.status as string,
-          score: c.score === null ? null : Number(c.score), maxScore: Number(c.max_score), threshold: c.threshold === null ? null : Number(c.threshold),
-          thresholdStatus: (c.threshold_status as string | null) ?? null, evaluatorKind: c.evaluator_kind as string })),
-        decision: d ? { decision: d.decision as string, previousState: d.previous_state as EvidenceState, resultingState: d.resulting_state as EvidenceState, reason: d.reason as string } : null,
+        criteria: assessedCriteria.filter((c) => c.skill_assessment_id === x.id).map((c) => ({ key: c.criterion_key as string,
+          nameAr: (svc.criterionNames.find((n) => n.key === c.criterion_key)?.name_ar as string | undefined) ?? null, status: c.status as string,
+          score: c.score === null ? null : Number(c.score), maxScore: Number(c.max_score), evaluatorKind: c.evaluator_kind as string })),
+        decision: d ? { decision: d.decision as string, previousState: d.previous_state as EvidenceState, resultingState: d.resulting_state as EvidenceState } : null,
         evidence: ev ? { id: ev.id as string, withdrawn: ev.withdrawn_at !== null } : null,
       };
     });

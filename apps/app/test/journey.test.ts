@@ -157,3 +157,68 @@ describe('O-1 — honest feedback when no level could be attributed (ENG-1 P0)',
     assert.equal(attributionNoticeAr('ambiguous', 'not_evaluated'), null);
   });
 });
+
+/* ───────────── ENG-1 P5: per-skill results (development pathway) ───────────── */
+import {
+  hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr, perSkillWorkLineAr, workSkillChip, type SkillResultView,
+} from '../src/lib/journey.ts';
+
+const sk = (o: Partial<SkillResultView>): SkillResultView => ({
+  skillId: 's', skillLabelAr: 'مهارة', outcome: 'met', currentState: 'gap', criteria: [{ key: 'k', nameAr: 'معيار', status: 'met' }],
+  decision: { decision: 'not_applicable', previousState: 'gap', resultingState: 'gap' }, evidence: null, ...o,
+});
+const FAIL_WORDS = /أخفقتِ|رسبتِ|فشلتِ|راسب/;
+
+describe('P5 — per-skill results are shown skill by skill, assessment apart from level', () => {
+  test('a legacy evaluation (no skills[] or empty) is not a per-skill one', () => {
+    assert.equal(hasPerSkillResults({}), false); assert.equal(hasPerSkillResults({ skills: [] }), false); assert.equal(hasPerSkillResults({ skills: null }), false);
+    assert.equal(hasPerSkillResults({ skills: [sk({})] }), true);
+  });
+  test('every outcome has learner-facing words; not_assessed / blocked / incomplete never read as a failure', () => {
+    for (const outcome of ['met', 'not_met', 'incomplete', 'not_assessed', 'blocked']) {
+      const c = skillOutcomeCopy(sk({ outcome }));
+      assert.ok(c.labelAr && c.explanationAr, outcome); assert.doesNotMatch(c.labelAr + c.explanationAr, FAIL_WORDS, outcome);
+    }
+    assert.match(skillOutcomeCopy(sk({ outcome: 'not_assessed', criteria: [] })).explanationAr, /ليس إخفاقًا/);
+    assert.match(skillOutcomeCopy(sk({ outcome: 'blocked' })).explanationAr, /ليس حكمًا على المهارة/);
+    assert.match(skillOutcomeCopy(sk({ outcome: 'incomplete', criteria: [{ key: 'k', nameAr: null, status: 'threshold_unapproved' }] })).labelAr, /اعتماد الخبراء/);
+    assert.match(skillOutcomeCopy(sk({ outcome: 'incomplete', criteria: [{ key: 'k', nameAr: null, status: 'pending' }] })).labelAr, /المراجِع/);
+    assert.match(skillOutcomeCopy(sk({ outcome: 'not_met' })).explanationAr, /لا ينزل/);
+  });
+  test('the outcome copy never claims a level; a met skill is not a level change', () => {
+    assert.doesNotMatch(skillOutcomeCopy(sk({ outcome: 'met' })).labelAr, /مستوى|مُثبتة|موثّقة/);
+    assert.equal(skillLevelLine(sk({ outcome: 'met' })).kind, 'unchanged', 'met without a recorded decision moves nothing');
+  });
+  test('a level change is shown only from a decision that recorded one with standing evidence — never Verified', () => {
+    const raised = skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: { id: 'e1', withdrawn: false } }));
+    assert.equal(raised.kind, 'raised'); assert.equal(raised.evidenceId, 'e1'); assert.match(raised.labelAr, /فجوة ← مُثبتة بدليل/);
+    assert.equal(skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: null })).kind, 'unchanged', 'no evidence, no change shown');
+    assert.equal(skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'demonstrated', resultingState: 'verified' }, evidence: { id: 'e', withdrawn: false } })).kind, 'unchanged');
+    const w = skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: { id: 'e1', withdrawn: true } }));
+    assert.equal(w.kind, 'raised_withdrawn'); assert.equal(w.evidenceId, null, 'no CV proposal from withdrawn evidence');
+    assert.equal(skillLevelLine(sk({ decision: { decision: 'evidence_reestablished', previousState: 'demonstrated', resultingState: 'demonstrated' }, evidence: { id: 'e2', withdrawn: false } })).kind, 'reestablished');
+    assert.equal(skillLevelLine(sk({ decision: { decision: 'assessment_pending_validation', previousState: 'gap', resultingState: 'gap' } })).kind, 'pending_validation');
+    assert.equal(skillLevelLine(sk({ outcome: 'incomplete', criteria: [{ key: 'k', nameAr: null, status: 'pending' }] })).kind, 'not_decided', 'pending review decides nothing yet');
+    assert.equal(skillLevelLine(sk({ decision: null })).kind, 'not_decided');
+  });
+  test('mixed results: the summary counts recorded changes only, and says completing the activity is not proving every skill', () => {
+    const html = sk({ skillId: 'h', decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: { id: 'e', withdrawn: false } });
+    const js = sk({ skillId: 'j', outcome: 'not_met', criteria: [{ key: 'f', nameAr: 'التحقق من النموذج', status: 'not_met' }] });
+    const sum = perSkillSummaryAr([html, js]);
+    assert.equal(sum.raised, 1); assert.equal(sum.total, 2); assert.match(sum.titleAr, /1 من 2/); assert.match(sum.bodyAr, /اكتمال النشاط لا يعني استيفاء كل مهارة/);
+    assert.match(perSkillSummaryAr([js]).titleAr, /لم يتغيّر مستوى أي منها/);
+    assert.match(perSkillSummaryAr([sk({ outcome: 'incomplete', criteria: [{ key: 'k', nameAr: null, status: 'pending' }] })]).titleAr, /بانتظار المراجعة/);
+  });
+  test('criterion statuses have words; nothing exposes a threshold value', () => {
+    for (const st of ['met', 'not_met', 'pending', 'threshold_unapproved', 'other']) assert.ok(skillCriterionCopy(st).labelAr);
+    assert.doesNotMatch(JSON.stringify([skillCriterionCopy('threshold_unapproved'), skillOutcomeCopy(sk({ outcome: 'incomplete', criteria: [{ key: 'k', nameAr: null, status: 'threshold_unapproved' }] }))]), /0\.\d|%/);
+  });
+  test('My Work: a per-skill line and one chip per skill; legacy results keep the existing line', () => {
+    assert.equal(perSkillWorkLineAr([]), null); assert.equal(perSkillWorkLineAr(undefined), null);
+    assert.match(perSkillWorkLineAr([{ outcome: 'met', levelChanged: true }, { outcome: 'not_met', levelChanged: false }])!, /1 من 2/);
+    assert.match(perSkillWorkLineAr([{ outcome: 'not_assessed', levelChanged: false }])!, /لم يتغيّر/);
+    assert.equal(workSkillChip({ labelAr: 'HTML', outcome: 'met', levelChanged: true }).tone, 'success');
+    assert.equal(workSkillChip({ labelAr: 'HTML', outcome: 'met', levelChanged: false }).tone, 'info', 'met without a level is not shown as success');
+    assert.doesNotMatch(workSkillChip({ labelAr: 'JS', outcome: 'not_assessed', levelChanged: false }).textAr, FAIL_WORDS);
+  });
+});

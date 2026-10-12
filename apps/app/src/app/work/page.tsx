@@ -5,7 +5,7 @@ import { api, type ProjectStatus, type ActivityCatalogue, type ActivityDetail, t
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
-import { workStatusCopy, chipClass, nextActionFor, isAssessedWork } from '../../lib/journey';
+import { workStatusCopy, chipClass, nextActionFor, isAssessedWork, perSkillWorkLineAr, workSkillChip } from '../../lib/journey';
 
 const LATEST_AR: Record<string, string> = {
   submitted: 'سُلِّمت آخر محاولة ولم تُقيَّم بعد.',
@@ -94,8 +94,13 @@ export default function MyWorkPage() {
             ) : null}
             <p className="body-sm" style={{ margin: 0 }}>
               المحاولات: <span className="num">{p.attempts}</span>
-              {p.latestSubmission ? <> · {LATEST_AR[p.workStatus] ?? ''}</> : <> · لم يُسلَّم بعد.</>}
+              {p.latestSubmission ? <> · {perSkillWorkLineAr(p.latestSubmission.skills) ?? LATEST_AR[p.workStatus] ?? ''}</> : <> · لم يُسلَّم بعد.</>}
             </p>
+            {p.latestSubmission?.skills?.length ? (
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} aria-label="نتيجة كل مهارة في آخر محاولة" data-testid="work-skill-results">
+                {p.latestSubmission.skills.map((sk) => { const c = workSkillChip(sk); return <span key={sk.skillId} className={chipClass(c.tone)}>{c.textAr}</span>; })}
+              </div>
+            ) : null}
             <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
               {p.kind === 'platform_activity' ? <a className="link" href={`/work/${encodeURIComponent(p.id)}`}>مكان العمل ←</a> : null}
               <a className="link push" href={next.href}>{next.labelAr} ←</a>

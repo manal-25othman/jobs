@@ -6,6 +6,8 @@
  * refuses — and it never re-derives a domain rule.
  */
 
+import type { SkillResultView } from './journey';
+
 export interface ApiOk<T> { ok: true; data: T }
 export interface ApiErr { ok: false; error: { code: string; message: string } }
 export type ApiResult<T> = ApiOk<T> | ApiErr;
@@ -136,7 +138,9 @@ export interface ProjectStatus {
   activitySpecId: string | null; activitySpecVersion: string | null;
   activity: { id: string; slug: string; titleAr: string; titleEn: string } | null;
   attempts: number; createdAt: string; updatedAt: string;
-  latestSubmission: null | { id: string; submittedAt: string; evaluationId: string | null; evaluationState: string | null; resultId: string | null; outcome: string | null; decision: string | null; levelChanged: boolean };
+  latestSubmission: null | { id: string; submittedAt: string; evaluationId: string | null; evaluationState: string | null; resultId: string | null; outcome: string | null; decision: string | null; levelChanged: boolean;
+    /** ENG-1 P5 (additive): per-skill outcomes of this attempt; empty for legacy results. */
+    skills?: { skillId: string; labelAr: string | null; outcome: string; decision: string | null; levelChanged: boolean }[] };
   workStatus: WorkStatus;
 }
 /** GET /submissions/:id/evaluation — a pure read, valid in every state; never starts a run. */
@@ -150,7 +154,9 @@ export interface EvaluationView {
   transition: { from: string; to: string; evidenceId: string } | null;
   verificationDecision: { decision: string; reason: string } | null;
   /** O-1: how the legacy evaluator attributed the result (ENG-1 P0). Null before evaluation and for older results. */
-  levelAttribution?: 'attributed' | 'ambiguous' | 'no_candidate' | null;
+  levelAttribution?: 'attributed' | 'ambiguous' | 'no_candidate' | 'per_skill' | null;
+  /** ENG-1 P3/P5 (additive, development pathway): one entry per assessed skill; absent or empty for every legacy evaluation. */
+  skills?: SkillResultView[];
   humanReview: { pending: number; completed: number; awaiting: { criterionKey: string; nameAr: string }[]; pendingCriteria: string[]; completedCriteria: string[] } | null;
   evaluatedAt: string | null;
   actions: { evaluate: boolean };

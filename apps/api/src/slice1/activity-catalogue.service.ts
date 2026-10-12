@@ -166,8 +166,18 @@ export class ActivityCatalogueService {
       const resultIds = rows.map((r) => r.result_id).filter(Boolean);
       const decisions = resultIds.length ? (await c.query(
         `select evaluation_result_id, decision, previous_state, resulting_state, evidence_id, skill_assessment_id from verification_decision where evaluation_result_id = any($1::uuid[]) order by decided_at`, [resultIds])).rows : [];
+      // ENG-1 P5 (development pathway): the per-skill outcomes of each latest result, owner-only under RLS. Empty for legacy results.
+      const assessed = resultIds.length ? (await c.query(
+        `select sa.evaluation_result_id, sa.id, sa.skill_id, sa.outcome, k.label_ar
+           from skill_assessment sa left join skill k on k.id = sa.skill_id
+          where sa.evaluation_result_id = any($1::uuid[]) order by sa.skill_id`, [resultIds])).rows : [];
       return rows.map((r) => {
         const ds = decisions.filter((d) => d.evaluation_result_id === r.result_id);
+        const skills = assessed.filter((a) => a.evaluation_result_id === r.result_id).map((a) => {
+          const d = ds.find((x) => x.skill_assessment_id === a.id);
+          return { skillId: a.skill_id as string, labelAr: (a.label_ar as string | null) ?? null, outcome: a.outcome as string, decision: (d?.decision as string | undefined) ?? null,
+            levelChanged: !!d && d.decision !== 'assessment_pending_validation' && !!d.evidence_id && d.resulting_state !== d.previous_state };
+        });
         const moves = (d: (typeof ds)[number]) => d.decision !== 'assessment_pending_validation' && d.evidence_id && d.resulting_state && d.resulting_state !== d.previous_state;
         const pending = ds.find((d) => d.decision === 'assessment_pending_validation');
         // ENG-1 P3 (development pathway): a per-skill result is represented by the decision that moved a level, as in the evaluation view.
@@ -179,7 +189,7 @@ export class ActivityCatalogueService {
           activity: r.activity_spec_id ? { id: r.activity_spec_id, slug: r.activity_slug, titleAr: r.activity_title_ar, titleEn: r.activity_title_en } : null,
           attempts: Number(r.attempts), createdAt: r.created_at, updatedAt: r.updated_at,
           latestSubmission: r.submission_id ? { id: r.submission_id, submittedAt: r.submitted_at, evaluationId: r.evaluation_id, evaluationState: r.evaluation_state,
-            resultId: r.result_id, outcome: r.outcome, decision, levelChanged } : null,
+            resultId: r.result_id, outcome: r.outcome, decision, levelChanged, skills } : null,
           workStatus: workStatus({ hasSubmission: !!r.submission_id, evaluationState: r.evaluation_state, outcome: r.outcome, decision, levelChanged }),
         };
       });
