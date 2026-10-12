@@ -1,0 +1,21 @@
+BEGIN
+== summary: one row per check (claims, submissions, users, evidence earned through the anomalous claim, still standing, skill claims resting on it)
+                                         check_name                                          | claims | submissions | users | evidence_earned | evidence_standing | skill_claims_resting 
+---------------------------------------------------------------------------------------------+--------+-------------+-------+-----------------+-------------------+----------------------
+ C1 claim owner differs from submission owner                                                |      0 |           0 |     0 |               0 |                 0 |                    0
+ C2 claimed skill not active/canonical today                                                 |      0 |           0 |     0 |               0 |                 0 |                    0
+ C3 platform claim outside the activity mapping                                              |      0 |           0 |     0 |               0 |                 0 |                    0
+ C4 more than one primary skill claimed (ambiguous under P0)                                 |      6 |           3 |     3 |               0 |                 0 |                    0
+ C5 no decision for this claim although its result decides every claim (possible late claim) |      0 |           0 |     0 |               0 |                 0 |                    0
+ C6 evidence for this claim without a verification decision                                  |      1 |           1 |     1 |               1 |                 1 |                    0
+
+== totals (context)
+ claimed_skills | submissions | on_evaluated_submissions 
+----------------+-------------+--------------------------
+            170 |         156 |                      144
+
+== up to 20 sample (submission_id, skill_id) per check with evidence still standing (opaque ids only, for operator follow-up)
+ check_id | submission_id | skill_id | evidence_id 
+----------+---------------+----------+-------------
+
+ROLLBACK

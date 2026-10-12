@@ -6,7 +6,8 @@
 > - P0, P1 and P2 are implemented under the Product Owner's engineering approval: `bf35ed9`, `21a856b`, `4996c90`. See `ENG-1-P0-P2-IMPLEMENTATION-REPORT.md`.
 > - Implemented P0 differs from §G: an explicit primary mapping (claimed ∩ activity-primary ∩ rubric-covered) replaces a claim-position column, and rubric pinning binds `rubric_version.activity_spec_version` at publication.
 > - P3 is implemented as an INACTIVE development pathway (development_only only, by explicit test opt-in, refused in production): see `ENG-1-P3-DEVELOPMENT-GATE-REPORT.md` (D-123). It is never active at rest.
-> - P4–P6 are not implemented.
+> - P5 (graduate per-skill results) is implemented for the development pathway only (D-124, `ENG-1-P5-GRADUATE-PER-SKILL-RESULTS-REPORT.md`). P4 is specified in `ENG-1-P4-READINESS-EXT-2-DESIGN.md` (design only).
+> - P4 and P6 are not implemented.
 **Basis:** code at commit `dfa460a`.
 
 **What this design does not do:**
