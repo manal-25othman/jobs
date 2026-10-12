@@ -124,12 +124,11 @@ describe('D-077 — withdrawn evidence: the asset survives, stops being evidence
     await asAuthenticatedUser(pool, b.id, async (c) => {
       const r = await c.query(`update evidence set withdrawn_at = now(), withdrawn_reason = 'not mine' where id = $1`, [evidenceId]);
       assert.equal(r.rowCount, 0, 'another user: zero rows');
-      const d = await c.query('delete from evidence where id = $1', [evidenceId]);
-      assert.equal(d.rowCount, 0);
+      // 0027 (O-2): clients hold no DELETE privilege on evidence at all — refused, not merely filtered to 0 rows.
+      await expectRejected(c, 'delete from evidence where id = $1', [evidenceId], /permission denied/);
     });
     await asAuthenticatedUser(pool, a.id, async (c) => {
-      const d = await c.query('delete from evidence where id = $1', [evidenceId]);
-      assert.equal(d.rowCount, 0, 'the owner cannot delete evidence');
+      await expectRejected(c, 'delete from evidence where id = $1', [evidenceId], /permission denied/); // the owner cannot delete evidence (0027)
       await expectRejected(c, `update evidence set confidence = 0.1 where id = $1`, [evidenceId], /row-level security|permission denied/);
       const ok = await c.query(`update evidence set withdrawn_at = now(), withdrawn_reason = 'my choice' where id = $1`, [evidenceId]);
       assert.equal(ok.rowCount, 1, 'the owner may withdraw with a reason');

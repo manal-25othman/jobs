@@ -204,9 +204,11 @@ update evidence set withdrawn_at = now(), withdrawn_reason = 'rls proof' where i
 set role anon;
 select expect_rows($$select 1 from case_study$$, 0, 'an asset citing withdrawn evidence closes its live link (Phase 9)');
 reset role;
-update evidence set withdrawn_at = null, withdrawn_reason = null where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+-- 0027 (O-2): a withdrawal is final for every role, so the live check is proven by removing the withdrawn citation,
+-- not by un-withdrawing the evidence (which no product path ever did).
+delete from asset_evidence where asset_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' and evidence_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 set role anon;
-select expect_rows($$select 1 from case_study$$, 1, 'restoring the evidence reopens it (the check is live, not a stored flag)');
+select expect_rows($$select 1 from case_study$$, 1, 'without the withdrawn citation it reopens (the check is live, not a stored flag)');
 reset role;
 
 update grounding_public_state set version = 'rls-test@2', set_by = 'rls proof', reason = 'new engine' where singleton;
