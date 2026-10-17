@@ -241,7 +241,7 @@ describe('EXT-2 in readiness — inactive, separate, fail closed', () => {
 });
 
 /* ───────────── ENG-1 P4: corroborating evidence (development pathway, policy flag) ───────────── */
-import { assessSkill, decideCorroboration, isPositiveVerificationDecision, assertVerificationPolicySane, type VerificationPolicy, type SkillAssessmentInput, type PublishedRubric, type EvaluationRun } from './index.js';
+import { assessSkill, decideCorroboration, isPositiveVerificationDecision, POSITIVE_VERIFICATION_DECISIONS, skillsWithPositiveVerificationDecision, assertVerificationPolicySane, type VerificationPolicy, type SkillAssessmentInput, type PublishedRubric, type EvaluationRun } from './index.js';
 
 describe('P4 — corroborating evidence: an independent task on an already-demonstrated skill leaves evidence, never a level change', () => {
   const rubric: PublishedRubric = { rubricVersionId: 'rv', version: 'rub@1', activitySpecId: 'a', activitySpecVersion: '1.0.0', status: 'published', passThreshold: 0.75, proposesState: 'demonstrated',
@@ -253,7 +253,7 @@ describe('P4 — corroborating evidence: an independent task on an already-demon
   const policy = (o: Partial<VerificationPolicy> = {}): VerificationPolicy => ({ id: 'p', key: 'default', version: 980, reviewStatus: 'draft', appliesOutcomes: ['passed'], acceptRubricProposal: true,
     maxResultingState: null, minAssessmentConfidence: null, minIndependentEvidence: null, escalateOn: {}, blockingRule: 'mandatory_criteria_unmet_blocks', perSkillEvidenceDerivation: false,
     decisionActors: ['policy', 'human'], promotionBasis: 'independently_verified', practicedOnSubmission: false, assessmentScope: 'per_skill', recordCorroboratingEvidence: true, ...o });
-  const ctx = { rubricProposesState: 'demonstrated' as const, production: false, evaluatorKind: 'human' as const };
+  const ctx = { rubricProposesState: 'demonstrated' as const, production: false, evaluatorKind: 'human' as const, primaryEvidenceStanding: true };
   test('met, verified, claimed, already Demonstrated ⇒ evidence_corroborated with previous = resulting (no level change)', () => {
     const d = decideCorroboration(policy(), assessSkill(input(), HTML), ctx)!;
     assert.equal(d.decision, 'evidence_corroborated'); assert.equal(d.previousState, 'demonstrated'); assert.equal(d.resultingState, 'demonstrated');
@@ -266,12 +266,18 @@ describe('P4 — corroborating evidence: an independent task on an already-demon
     assert.equal(decideCorroboration(policy(), assessSkill(input({ claimedSkillIds: [] }), HTML), ctx), null, 'unclaimed observation (PO-1)');
     assert.equal(decideCorroboration(policy({ minAssessmentConfidence: 0.99 }), assessSkill(input({ run: { ...run(2), criteria: [{ ...run(2).criteria[0]!, confidence: 0.5 }] } }), HTML), ctx), null, 'confidence floor');
     assert.equal(decideCorroboration(policy(), assessSkill(input({ currentStates: {} }), HTML), ctx), null, 'from gap it is a promotion, not a corroboration');
+    assert.equal(decideCorroboration(policy(), assessSkill(input(), HTML), { ...ctx, primaryEvidenceStanding: false }), null, 'withdrawn primary evidence: re-establishment, not corroboration');
+    assert.equal(decideCorroboration(policy(), assessSkill(input({ humanDecidedCriteria: [] }), HTML), ctx), null, 'a human-only criterion without a human decision is not a verified basis');
+    assert.equal(decideCorroboration(policy({ promotionBasis: 'legacy_any_pass' }), assessSkill(input(), HTML), ctx), null, 'a whole-activity pass basis never corroborates');
+    assert.equal(decideCorroboration(policy({ perSkillEvidenceDerivation: true }), assessSkill(input(), HTML), ctx), null, 'H6 stays excluded');
+    assert.equal(decideCorroboration(policy(), assessSkill(input(), HTML), { ...ctx, evaluatorKind: 'llm' }), null, 'an LLM evaluator never corroborates');
     assert.throws(() => decideCorroboration(policy(), assessSkill(input(), HTML), { ...ctx, production: true }), DomainError);
   });
-  test('a corroborated decision is positive for claims (CLM-1) and EXT-2 only with standing evidence of the same skill', () => {
+  test('a corroborated decision NEVER qualifies a career claim (CLM-1 unchanged, condition 7); EXT-2 may count it', () => {
     const fact = { skillId: HTML, decision: 'evidence_corroborated', resultingState: 'demonstrated' as const, evidenceId: 'e', evidenceSkillId: HTML, evidenceStanding: true, overridden: false };
-    assert.equal(isPositiveVerificationDecision(fact), true);
-    assert.equal(isPositiveVerificationDecision({ ...fact, evidenceStanding: false }), false);
+    assert.equal(isPositiveVerificationDecision(fact), false);
+    assert.deepEqual([...POSITIVE_VERIFICATION_DECISIONS], ['accepted', 'evidence_reestablished']);
+    assert.equal(skillsWithPositiveVerificationDecision([fact]).size, 0, 'a skill with only a corroborated decision has no positive decision for claims');
     assert.equal(taskExclusion(task({ decision: { id: 'd', decision: 'evidence_corroborated', overridden: false, policyValidated: false } }), P_HTML, { production: false }), null);
   });
   test('the policy flag exists only in the per-skill scope', () => {

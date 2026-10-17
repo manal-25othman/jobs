@@ -43,6 +43,15 @@ describe('CLM-1 — only a positive verification decision supports a claim', () 
     assert.ok(r.status === 'not_eligible' && r.reasons.some((x) => x.code === 'verification_decision_missing'));
     assert.equal(claimEligibility('cv_bullet', { policy, resolution: 'production_active' }, subject(skillsWithPositiveVerificationDecision([fact()]))).status, 'eligible');
   });
+  test('ENG-1 P4 (condition 7): a corroborated decision alone never grants a claim, even with standing corroborating evidence', () => {
+    const policy = { id: 'p', key: 'k', version: 1, reviewStatus: 'approved', activation: 'production_active', baselineOf: null, approvedBy: 'x',
+      claimKind: 'cv_bullet', minEvidenceLevel: 'demonstrated', minEvidenceCount: null, minSourceStrength: null, requiresVerificationDecision: true, requiresUserApproval: true, lockUntilGrounded: true } as ClaimPolicy;
+    const corroboratedOnly = skillsWithPositiveVerificationDecision([fact({ decision: 'evidence_corroborated', evidenceId: 'c1' })]);
+    assert.equal(corroboratedOnly.size, 0);
+    const r = claimEligibility('cv_bullet', { policy, resolution: 'production_active' }, { assertedSkills: [{ skillId: 's1', state: 'demonstrated' }],
+      citedEvidence: [{ evidenceId: 'c1', skillId: 's1', state: 'demonstrated', sourceStrength: 'platform_controlled', standing: true }], standingEvidenceCount: { s1: 1 }, skillsWithVerificationDecision: corroboratedOnly });
+    assert.ok(r.status === 'not_eligible' && r.reasons.some((x) => x.code === 'verification_decision_missing'));
+  });
 });
 
 describe('Phase A — submission-based promotion is never validated or active', () => {

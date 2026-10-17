@@ -17,6 +17,13 @@
  *   8  demo / unpublished content and unapproved values never count; legacy results excluded unless the rule says adapter
  *   9  cross-tenant isolation; readiness stays pending (never `evaluated`) and is unconfigured in production; the sealed set
  *      can never be approved or production-activated
+ *
+ * Integrity safeguards (PO decision on corroborating evidence, migration 0031):
+ *   S1 the corroborating row is role 'corroborating', never the claim's primary evidence, and the database refuses every
+ *      attempt to make it carry a level, a claim, an asset or an agent proposal
+ *   S2 repeating the same task / re-evaluating / same family / a reused artifact records NO additional evidence (with why)
+ *   S3 corroborating evidence alone never grants a career claim (CLM-1 unchanged); EXT-2 alone may count it
+ *   S4 the test policy itself can never be approved or production-activated
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +35,9 @@ import { reviewTransition, approveRubricValues } from '../src/career-data/review
 import { promoteDemo } from '../src/career-data/promotion';
 import { createReadinessRuleSet, approveConfigRow, setConfigActivation } from '../src/configuration/config-admin.service';
 import { loadEvidenceTaskFacts } from '../src/readiness/evidence-facts';
+import { loadClaimSubject } from '../src/agents/claim-drafts';
+import { loadDomainFacts } from '../src/agents/domain-facts';
+import { claimEligibility, type ClaimPolicy } from '@naqla/domain';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const auth = (u: TestUser) => ({ Authorization: `Bearer ${u.token}` });
@@ -174,6 +184,18 @@ async function readiness(u: TestUser): Promise<{ status: string; overall: string
 const rule = (r: { rules: Rule[] }, label: string) => r.rules.find((x) => x.labelEn === label)!;
 const decisionOf = async (resultId: string, skill: string) => (await one(`select d.decision, d.previous_state::text as prev, d.resulting_state::text as res, d.evidence_id from verification_decision d
   join skill_assessment sa on sa.id = d.skill_assessment_id where sa.evaluation_result_id = $1 and sa.skill_id = $2`, [resultId, skill]));
+const reasonOf = async (resultId: string, skill: string) => (await one(`select d.reason from verification_decision d join skill_assessment sa on sa.id = d.skill_assessment_id
+  where sa.evaluation_result_id = $1 and sa.skill_id = $2`, [resultId, skill])).reason as string;
+const evidenceCount = async (u: TestUser, skill: string) => Number((await one('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2', [u.id, skill])).n);
+/** Runs a statement as postgres inside a rolled-back transaction and expects the database to refuse it (guards hold for every role). */
+async function refused(sql: string, params: unknown[], pattern: RegExp, gucs: Record<string, string> = {}) {
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    for (const [k, v] of Object.entries(gucs)) await c.query('select set_config($1, $2, true)', [k, v]);
+    await assert.rejects(() => c.query(sql, params), pattern, sql);
+  } finally { await c.query('rollback'); c.release(); }
+}
 
 describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pathway', () => {
   let shared: { u: TestUser; intResult: string; aResult: string } | null = null;
@@ -186,6 +208,10 @@ describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pa
     const corr = await decisionOf(a.resultId, S.html);
     assert.deepEqual([corr.decision, corr.prev, corr.res], ['evidence_corroborated', 'demonstrated', 'demonstrated']); assert.ok(corr.evidence_id);
     assert.equal(Number((await one(`select count(*)::int n from evidence_transition where user_id = $1`, [u.id])).n), 1, 'exactly one level change (the project)');
+    const primary = (await decisionOf(int.resultId, S.html)).evidence_id;
+    assert.deepEqual(await one('select e.evidence_role, sc.primary_evidence_id from evidence e join skill_claim sc on sc.user_id = e.user_id and sc.skill_id = e.skill_id where e.id = $1', [corr.evidence_id]),
+      { evidence_role: 'corroborating', primary_evidence_id: primary }, 'the claim still rests on the project; the corroborating row is labelled as such');
+    assert.equal((await one('select evidence_role from evidence where id = $1', [primary])).evidence_role, 'primary');
     assert.equal((await one('select state::text from skill_claim where user_id = $1 and skill_id = $2', [u.id, S.html])).state, 'demonstrated');
     const r = await readiness(u);
     const html = rule(r, 'P-HTML (test)');
@@ -204,25 +230,55 @@ describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pa
     assert.equal(rule(r, 'one-project path (as P-GIT, test)').outcome, 'satisfied'); assert.equal(rule(r, 'one-project path (as P-GIT, test)').audit!.independentTasks, 1);
   });
 
-  test('4 · same variant family ⇒ one task; unknown family ⇒ indeterminate; repeated submissions of one activity collapse', async () => {
+  test('4 · S2 same variant family ⇒ one task and NO corroborating evidence; unknown family ⇒ indeterminate; repeating one activity adds no evidence', async () => {
     const same = await graduate();
-    await reviewedTask(same, ACT.INT.id, [S.html], 'int-4a'); await reviewedTask(same, ACT.SAMEFAM.id, [S.html], 'same-4a');
+    await reviewedTask(same, ACT.INT.id, [S.html], 'int-4a'); const sf = await reviewedTask(same, ACT.SAMEFAM.id, [S.html], 'same-4a');
+    assert.equal((await decisionOf(sf.resultId, S.html)).evidence_id, null, 'same family: no corroborating evidence is written');
+    assert.match(await reasonOf(sf.resultId, S.html), /not independent of earlier evidence of this skill \(same_variant_family\)/);
+    assert.equal(await evidenceCount(same, S.html), 1);
     const r1 = rule(await readiness(same), 'P-HTML (test)');
-    assert.equal(r1.audit!.independentTasks, 1); assert.equal(r1.outcome, 'not_satisfied'); assert.equal(r1.audit!.collapsed.length, 1, 'different activity id, same family: collapsed');
+    assert.equal(r1.audit!.independentTasks, 1); assert.equal(r1.outcome, 'not_satisfied');
+    assert.ok(r1.audit!.excluded.some((x) => x.evaluationResultId === sf.resultId && x.reason === 'decision_not_positive'));
     const nofam = await graduate();
     await reviewedTask(nofam, ACT.INT.id, [S.html], 'int-4b'); await reviewedTask(nofam, ACT.NOFAM.id, [S.html], 'nofam-4b');
     assert.equal(rule(await readiness(nofam), 'P-HTML (test)').outcome, 'indeterminate', 'different activity ids alone never establish independence');
     const again = await graduate();
-    await reviewedTask(again, ACT.INT.id, [S.html], 'int-4c'); await reviewedTask(again, ACT.INT.id, [S.html], 'int-4c-retry');
+    await reviewedTask(again, ACT.INT.id, [S.html], 'int-4c'); const retry = await reviewedTask(again, ACT.INT.id, [S.html], 'int-4c-retry');
+    assert.equal((await decisionOf(retry.resultId, S.html)).evidence_id, null, 'repeating the same assessment creates no additional evidence');
+    assert.match(await reasonOf(retry.resultId, S.html), /\(same_activity\)/);
+    assert.equal(await evidenceCount(again, S.html), 1);
     const r3 = rule(await readiness(again), 'P-HTML (test)');
     assert.equal(r3.audit!.independentTasks, 1); assert.equal(r3.outcome, 'not_satisfied');
   });
 
-  test('5 · a learner artifact reused across the two tasks ⇒ one task', async () => {
+  test('5 · S2 a learner artifact reused across two otherwise independent tasks ⇒ no corroborating evidence, one task', async () => {
     const u = await graduate();
-    await reviewedTask(u, ACT.INT.id, [S.html], 'same-seed'); await reviewedTask(u, ACT.A.id, [S.html], 'same-seed');
+    await reviewedTask(u, ACT.INT.id, [S.html], 'same-seed'); const a = await reviewedTask(u, ACT.A.id, [S.html], 'same-seed');
+    assert.equal((await decisionOf(a.resultId, S.html)).evidence_id, null);
+    assert.match(await reasonOf(a.resultId, S.html), /\(reused_upload\)/);
+    assert.equal(await evidenceCount(u, S.html), 1);
     const r = rule(await readiness(u), 'P-HTML (test)');
-    assert.equal(r.audit!.independentTasks, 1); assert.ok(r.audit!.reuseConflicts.length >= 1); assert.equal(r.outcome, 'not_satisfied');
+    assert.equal(r.audit!.independentTasks, 1); assert.equal(r.outcome, 'not_satisfied');
+  });
+
+  test('S1 · the database refuses to let corroborating evidence carry a level, a claim, an asset or a proposal — or be duplicated', async () => {
+    const { u, intResult, aResult } = shared!;
+    const corr = (await decisionOf(aResult, S.html)).evidence_id as string;
+    await refused(`update evidence set evidence_role = 'primary' where id = $1`, [corr], /role is set at insert and immutable/);
+    await refused(`update skill_claim set primary_evidence_id = $1 where user_id = $2 and skill_id = $3`, [corr, u.id, S.html], /never be a claim's primary evidence/);
+    await refused(`insert into asset_evidence (asset_id, evidence_id) values (gen_random_uuid(), $1)`, [corr], /never backs a professional asset/);
+    await refused(`insert into verification_decision select (jsonb_populate_record(null::verification_decision, to_jsonb(d) || jsonb_build_object('id', gen_random_uuid(), 'decision', 'accepted'))).*
+      from verification_decision d where d.evidence_id = $1`, [corr], /cited only by an evidence_corroborated decision|per-skill|skill assessment/);
+    await refused(`insert into evidence (user_id, skill_id, source_strength, evaluation_result_id, project_id, provenance_class, provenance_source, confidence, skill_assessment_id, evidence_role)
+      select user_id, skill_id, source_strength, evaluation_result_id, project_id, provenance_class, provenance_source, confidence, skill_assessment_id, 'corroborating' from evidence where id = $1`,
+      [corr], /duplicate earlier evidence|one_per_skill_assessment|one_platform_row/);
+    assert.equal((await one('select evidence_corroboration_conflict($1, $2, $3) as k', [u.id, S.html, aResult])).k, 'same_assessment_event');
+    assert.equal((await one('select evidence_corroboration_conflict($1, $2, $3) as k', [u.id, S.html, intResult])).k, 'same_assessment_event');
+    const proposal = await one(`select * from agent_proposal limit 1`);
+    if (proposal) {
+      await refused(`insert into agent_proposal select (jsonb_populate_record(null::agent_proposal, to_jsonb(p) || jsonb_build_object('id', gen_random_uuid(), 'evidence_refs', jsonb_build_array($1::text)))).*
+        from agent_proposal p where p.id = $2`, [corr, proposal.id], /never cited by an agent proposal/);
+    }
   });
 
   test('6 · withdrawn evidence no longer counts; the decision and assessment history are unchanged', async () => {
@@ -233,6 +289,46 @@ describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pa
     assert.equal(r.outcome, 'not_satisfied'); assert.ok(r.audit!.excluded.some((x) => x.evaluationResultId === aResult && x.reason === 'withdrawn'));
     assert.deepEqual(await decisionOf(aResult, S.html), before, 'the decision is history');
     assert.equal((await one('select state::text from skill_claim where user_id = $1 and skill_id = $2', [u.id, S.html])).state, 'demonstrated', 'withdrawing corroborating evidence moves no level');
+  });
+
+  test('6b · S3 corroborating evidence alone never grants a career claim; EXT-2 still counts it; a resubmission after withdrawal is not independent', async () => {
+    const u = await graduate();
+    const int = await reviewedTask(u, ACT.INT.id, [S.html], 'int-6b'); const a = await reviewedTask(u, ACT.A.id, [S.html], 'a-6b');
+    const corr = (await decisionOf(a.resultId, S.html)).evidence_id as string; const primary = (await decisionOf(int.resultId, S.html)).evidence_id as string;
+    // Claim request form and draft request: corroborating evidence is not offered and cannot be cited.
+    const form = (await http.get('/v1/me/claim-drafts/options').set(auth(u)).expect(200)).body.data;
+    assert.ok(form.evidence.some((e: { id: string }) => e.id === primary), 'fixture: primary evidence is offered');
+    assert.ok(!form.evidence.some((e: { id: string }) => e.id === corr), 'corroborating evidence is never offered as a claim source');
+    const refusedDraft = await http.post('/v1/me/claim-drafts').set(auth(u)).send({ claimKind: 'cv_bullet', evidenceId: corr });
+    assert.equal(refusedDraft.status, 400, JSON.stringify(refusedDraft.body)); assert.match(JSON.stringify(refusedDraft.body), /does not exist, is not yours, or was withdrawn/);
+    // The primary evidence is withdrawn: only corroborating evidence of the skill stands.
+    await http.post(`/v1/evidence/${primary}/withdraw`).set(auth(u)).send({ reason: 'المشروع الأول لم يكن عملي بالكامل' }).expect(201);
+    const policy = { id: 'p', key: 'e2e', version: 1, reviewStatus: 'approved', activation: 'production_active', baselineOf: null, approvedBy: 'x', claimKind: 'cv_bullet', minEvidenceLevel: 'demonstrated',
+      minEvidenceCount: 1, minSourceStrength: null, requiresVerificationDecision: true, requiresUserApproval: true, lockUntilGrounded: true } as unknown as ClaimPolicy;
+    const c = await pool.connect();
+    try {
+      const facts = await loadDomainFacts(c, u.id);
+      assert.equal(facts.existingEvidence.has(corr), false, 'not citable evidence for any proposal');
+      const subject = await loadClaimSubject(c, u.id, 'cv_bullet', { namedSkillIds: [S.html], suggestedValueAr: '', suggestedValueEn: null }, [corr], facts);
+      assert.equal(subject.citedEvidence[0]!.standing, false, 'corroborating evidence does not stand for a claim');
+      assert.equal(subject.standingEvidenceCount[S.html] ?? 0, 0, 'and is not counted toward a claim');
+      assert.equal(subject.skillsWithVerificationDecision.has(S.html), false, 'evidence_corroborated is not a positive decision (CLM-1 unchanged)');
+      const v = claimEligibility('cv_bullet', { policy, resolution: 'production_active' }, subject);
+      assert.equal(v.status, 'not_eligible');
+    } finally { c.release(); }
+    const r = rule(await readiness(u), 'P-HTML (test)');
+    assert.ok(r.audit!.counted.some((x) => x.evaluationResultId === a.resultId), 'EXT-2 counts the standing corroborating evidence');
+    assert.ok(r.audit!.excluded.some((x) => x.evaluationResultId === int.resultId && x.reason === 'withdrawn'));
+    assert.equal((await one('select state::text from skill_claim where user_id = $1 and skill_id = $2', [u.id, S.html])).state, 'demonstrated', 'no level moved');
+    // Withdraw the corroborating evidence too, then resubmit the same validation task: a withdrawal never makes a repeat independent.
+    await http.post(`/v1/evidence/${corr}/withdraw`).set(auth(u)).send({ reason: 'سحب الدليل الداعم' }).expect(201);
+    const before = await evidenceCount(u, S.html);
+    const again = await reviewedTask(u, ACT.A.id, [S.html], 'a-6b-retry');
+    const d = await decisionOf(again.resultId, S.html);
+    assert.notEqual(d.decision, 'evidence_corroborated');
+    assert.notEqual(d.decision, 'accepted', 'no promotion either: the level is unchanged');
+    if (d.decision !== 'evidence_reestablished') assert.equal(await evidenceCount(u, S.html), before, 'no additional evidence from repeating a withdrawn task');
+    assert.equal((await one('select count(*)::int as n from evidence where id in ($1, $2) and withdrawn_at is not null', [primary, corr])).n, 2, 'withdrawn rows are kept, not rewritten');
   });
 
   test('7 · mixed per-skill results from one activity: HTML counts, UI state (not met in the same evaluation) does not', async () => {
@@ -322,5 +418,25 @@ describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pa
     const rec = (await http.post('/v1/me/readiness/evaluations').set(auth(u)).send({}).expect(201)).body.data;
     assert.equal(rec.report.status, 'pending_validation');
     assert.deepEqual((await pool.query('select skill_id, state::text from skill_claim where user_id = $1 order by skill_id', [u.id])).rows, levels, 'readiness never changes a level');
+  });
+
+  test('S4 · the corroborating test policy can never be approved or production-activated; the writer never runs in production', async () => {
+    for (const attempt of [
+      (c: PoolClient) => approveConfigRow(c, { table: 'verification_policy', id: policyId, approvedBy: SME, approvedByLabel: 'Named SME', reason: 'try' }),
+      (c: PoolClient) => setConfigActivation(c, { table: 'verification_policy', id: policyId, activation: 'production_active', actor: 'e2e', reason: 'try' }),
+    ]) {
+      const c = await pool.connect();
+      try { await c.query('begin'); await assert.rejects(() => attempt(c)); } finally { await c.query('rollback'); c.release(); }
+    }
+    const audited = { 'naqla.config_actor': 'ENG-1 P4 e2e', 'naqla.config_reason': 'prove the policy seal', 'naqla.per_skill_dev_activation': 'on' };
+    await refused(`update verification_policy set review_status = 'approved', approved_by = gen_random_uuid(), approved_at = now() where id = $1`, [policyId], /per_skill_development_only/, audited);
+    await refused(`update verification_policy set activation = 'production_active' where id = $1`, [policyId], /per_skill|development|approved/, audited);
+    const c = await pool.connect();
+    try {
+      await c.query('begin'); await c.query(`select set_config('naqla.production', 'on', true)`);
+      await assert.rejects(() => c.query(`insert into evidence (user_id, skill_id, source_strength, provenance_class, provenance_source, evidence_role, skill_assessment_id)
+        select user_id, skill_id, 'platform_controlled', 'system_derived', 'x', 'corroborating', id from skill_assessment limit 1`), /never written in production/);
+    } finally { await c.query('rollback'); c.release(); }
+    assert.equal(Number((await one(`select count(*)::int as n from verification_policy where record_corroborating_evidence and (review_status in ('approved','published') or activation in ('production_active','legacy_baseline'))`)).n), 0);
   });
 });

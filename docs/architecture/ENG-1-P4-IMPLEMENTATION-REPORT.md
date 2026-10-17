@@ -4,6 +4,8 @@
 
 **Status:** implemented as an INACTIVE, development-only pathway. **Waiting for Product Owner approval.** P6 has not begun.
 
+**Update (D-126):** the PO approved corroborating evidence *subject to integrity safeguards*. CLM-1 is restored unchanged: corroborating evidence never supports a CV or LinkedIn claim. Migration 0031 adds an explicit `evidence_role` and duplicate prevention. See `ENG-1-P4-CORROBORATION-SAFEGUARDS-REPORT.md`. Where §2.5 and §9 differ, that report supersedes them.
+
 **Restrictions held:**
 - Every new rule is inactive. A readiness rule set containing `skill_evidence_path` is **sealed**: it can never be approved, published or production-activated.
 - No verification policy was activated in production. D-118 and the verification ladder are preserved. H6 stays disabled.
@@ -116,7 +118,7 @@ Steps, in order:
 | When | The skill is claimed, `met`, on an independently verified basis, with no proposal (already at the level this rubric proposes); the policy accepts rubric proposals; any confidence floor is met. **Never easier than a promotion** |
 | Records | Decision `evidence_corroborated` (previous = resulting state). An evidence row with `skill_assessment_id`. Audit event `evidence.corroborated` with `levelChange: false` |
 | Never | Changes a level, the claim or its primary evidence. Never runs on the legacy path (DB trigger: a skill assessment is required). Never runs in production (domain throws) |
-| Claims (CLM-1) | Positive, with standing evidence of the same skill (the same definition as EXT-2) |
+| Claims (CLM-1) | ~~Positive~~ **Superseded by D-126:** never positive for claims; corroborating evidence is not citable, not counted, and refused by DB guards on assets and proposals. Only EXT-2 counts it |
 | UI (P5) | «لم يتغيّر المستوى «…» — سُجِّل دليل داعم إضافي». Not counted as a level change; no CV proposal from it |
 
 ### 2.6 Migration 0030 (additive; rollback refuses while any EXT-2 rule, corroborated decision, starter checksum or content fact exists)

@@ -13,7 +13,8 @@ import { canonicalEvidenceStates, type EvidenceState } from '@naqla/domain';
 export async function loadDomainFacts(c: PoolClient, userId: string): Promise<DomainFacts> {
   // OPEN-039: alias claims count for the canonical skill.
   const claims = await c.query('select canonical_skill_id(skill_id) as skill_id, state from skill_claim where user_id = $1', [userId]);
-  const ev = await c.query('select id from evidence where user_id = $1 and withdrawn_at is null', [userId]);
+  // ENG-1 P4 (condition 7): corroborating evidence is never citable by a claim; no approved claim policy covers it.
+  const ev = await c.query(`select id from evidence where user_id = $1 and withdrawn_at is null and evidence_role = 'primary'`, [userId]);
   const approved = await c.query(
     `select distinct t from (
         select unnest(declared_technologies) as t from project where user_id = $1
@@ -30,7 +31,7 @@ export async function loadDomainFacts(c: PoolClient, userId: string): Promise<Do
          union all
          select unnest(s.declared_technologies) from submission s where s.project_id = e.project_id and s.user_id = e.user_id
        ) x on true
-      where e.user_id = $1 and e.withdrawn_at is null group by e.id`, [userId]);
+      where e.user_id = $1 and e.withdrawn_at is null and e.evidence_role = 'primary' group by e.id`, [userId]);
   // OPEN-039: an alias skill's labels count for its canonical skill (states are keyed by the canonical id).
   const skills = await c.query('select canonical_skill_id(id) as id, array_agg(label_en) || array_agg(label_ar) as labels from skill group by canonical_skill_id(id)');
   // Recorded numbers only: per evaluation result, the total, the maximum and

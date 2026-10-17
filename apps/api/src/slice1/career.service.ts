@@ -104,7 +104,7 @@ export class CareerService {
                 sk.label_ar, sk.label_en,
                 (select count(*) from evidence e
                   where e.user_id = sc.user_id and e.skill_id = sc.skill_id
-                    and e.withdrawn_at is null) as evidence_count,
+                    and e.withdrawn_at is null and e.evidence_role = 'primary') as evidence_count,
                 sc.primary_evidence_id,
                 sp.state_code as progress_state, st.label_ar as progress_label_ar, st.label_en as progress_label_en, sp.last_event_at as progress_at
            from skill_claim sc

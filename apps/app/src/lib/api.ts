@@ -293,7 +293,7 @@ export interface TrackSkillsPage { role: { id: string; labelAr: string; labelEn:
 export interface TrackSkillDetail {
   role: TrackSkillsPage['role']; skill: TrackSkillView; readinessStatus: ReadinessStatus; readinessHeadlineAr: string; ruleSetValidated: boolean;
   materials: { id: string; typeCode: string; typeLabelAr: string; title: string; status: string; attemptNumber: number; submittedAt: string | null; source: string }[];
-  evaluatedEvidence: { id: string; sourceStrength: string; evaluationResultId: string | null; projectId: string | null; createdAt: string; withdrawnAt: string | null }[];
+  evaluatedEvidence: { id: string; sourceStrength: string; evaluationResultId: string | null; projectId: string | null; createdAt: string; withdrawnAt: string | null; role?: 'primary' | 'corroborating' }[];
   decisions: { id: string; decision: string; previousState: string; proposedState: string | null; resultingState: string; policy: string; policyStatus: string; policyResolution: string | null; trackConfigVersionId: string | null; decidedAt: string }[];
   journeyEvents: { trigger: string; from: string; to: string | null; applied: boolean; outcome: string; reason: string; at: string }[];
   activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];

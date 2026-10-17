@@ -233,6 +233,8 @@ export interface CorroborationDecision {
 }
 export function decideCorroboration(policy: VerificationPolicy, a: SkillAssessment, ctx: {
   readonly rubricProposesState: EvidenceState; readonly production: boolean; readonly evaluatorKind: AssessmentEvaluatorKind;
+  /** The level rests on the claim's primary evidence, still standing. Otherwise the path is D-077 re-establishment, never corroboration. */
+  readonly primaryEvidenceStanding: boolean;
 }): CorroborationDecision | null {
   if (ctx.production) throw new DomainError(`ENG-1 P4: corroborating evidence is a development-only behaviour (policy ${policy.key}@${policy.version})`);
   if (!policy.recordCorroboratingEvidence || (policy.assessmentScope ?? 'primary_claimed_skill') !== 'per_skill') return null;
@@ -245,6 +247,7 @@ export function decideCorroboration(policy: VerificationPolicy, a: SkillAssessme
   // Only the level this rubric proposes is corroborated: a skill above it (or below, which would be a promotion) is not.
   if (a.currentState !== ctx.rubricProposesState) return null;
   if (evidenceOrdinal(a.currentState) < evidenceOrdinal('practiced')) return null;
+  if (!ctx.primaryEvidenceStanding) return null;
   return { decision: 'evidence_corroborated', previousState: a.currentState, resultingState: a.currentState, proposedState: null,
     reason: `skill ${a.skillId}: ${a.reason}; already at '${a.currentState}' — corroborating evidence recorded, level unchanged (policy ${policy.key}@${policy.version})` };
 }

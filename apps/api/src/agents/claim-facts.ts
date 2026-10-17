@@ -24,7 +24,7 @@ export async function loadClaimFacts(c: PoolClient, userId: string, kind: ClaimK
   const ev = evidenceRefs.length === 0 ? [] : (await c.query(
     `select e.id, canonical_skill_id(e.skill_id) as skill_id, e.project_id, e.evaluation_result_id, p.title, er.rubric_version_id, er.submission_id, p.activity_spec_id
        from evidence e left join project p on p.id = e.project_id left join evaluation_result er on er.id = e.evaluation_result_id
-      where e.user_id = $1 and e.id = any($2::uuid[]) and e.withdrawn_at is null`, [userId, evidenceRefs])).rows;
+      where e.user_id = $1 and e.id = any($2::uuid[]) and e.withdrawn_at is null and e.evidence_role = 'primary'`, [userId, evidenceRefs])).rows;
   for (const e of ev) {
     const eid = String(e.id);
     if (e.project_id && e.title) facts.push({ id: `project:${e.project_id}`, kind: 'project', evidenceId: eid, surfacesAr: [String(e.title)], surfacesEn: [String(e.title)] });

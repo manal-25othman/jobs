@@ -44,7 +44,8 @@ export class ReadinessService {
     const { rows } = await c.query(
       `select rr.id as rr_id, rr.skill_id, s.slug, s.label_ar, s.label_en, rr.is_core, rr.importance, rr.category, rr.display_order, rr.expected_level, rr.readiness_contribution, rr.enabled, rr.classification_status,
               rr.minimum_evidence_count, rr.review_status, rr.version, sc.state as claim_state, sp.state_code as progress_state,
-              (select count(*)::int from evidence e where e.user_id = $1 and e.skill_id = rr.skill_id and e.withdrawn_at is null) as standing_evidence
+              -- ENG-1 P4: only EXT-2 (skill_evidence_path) may count corroborating evidence.
+              (select count(*)::int from evidence e where e.user_id = $1 and e.skill_id = rr.skill_id and e.withdrawn_at is null and e.evidence_role = 'primary') as standing_evidence
          from role_requirement rr join skill s on s.id = rr.skill_id
          left join skill_claim sc on sc.user_id = $1 and sc.skill_id = rr.skill_id
          left join skill_progress sp on sp.user_id = $1 and sp.skill_id = rr.skill_id
@@ -167,7 +168,7 @@ export class ReadinessService {
         `select i.id, i.item_type_code, t.label_ar as type_label_ar, i.title, i.status, i.attempt_number, i.submitted_at, i.source
            from evidence_item i join evidence_item_type t on t.code = i.item_type_code join evidence_item_skill l on l.evidence_item_id = i.id
           where l.user_id = $1 and l.skill_id = $2 order by i.created_at desc limit 50`, [userId, skillId]);
-      const evidence = await c.query(`select id, source_strength, evaluation_result_id, project_id, created_at, withdrawn_at from evidence where user_id = $1 and skill_id = $2 order by created_at desc`, [userId, skillId]);
+      const evidence = await c.query(`select id, source_strength, evaluation_result_id, project_id, created_at, withdrawn_at, evidence_role from evidence where user_id = $1 and skill_id = $2 order by created_at desc`, [userId, skillId]);
       const decisions = await c.query(`select id, decision, previous_state, proposed_state, resulting_state, policy_key, policy_version, policy_status, decided_by_ref, track_config_version_id, decided_at from verification_decision where user_id = $1 and skill_id = $2 order by decided_at desc limit 20`, [userId, skillId]);
       const events = await c.query(`select trigger_code, from_state, to_state, applied, outcome, reason, created_at from skill_progress_event where user_id = $1 and skill_id = $2 order by created_at desc limit 20`, [userId, skillId]);
       // A1: the related activities are those of the current role's catalogue (one rule, in the database).
@@ -175,7 +176,7 @@ export class ReadinessService {
          where k.skill_id = $1 and graduate_activity_in_catalogue(a.id, $2) order by a.title_ar`, [skillId, list.role?.id ?? null]);
       return {
         materials: items.rows.map((r) => ({ id: r.id, typeCode: r.item_type_code, typeLabelAr: r.type_label_ar, title: r.title, status: r.status, attemptNumber: Number(r.attempt_number), submittedAt: r.submitted_at, source: r.source })),
-        evaluatedEvidence: evidence.rows.map((r) => ({ id: r.id, sourceStrength: r.source_strength, evaluationResultId: r.evaluation_result_id, projectId: r.project_id, createdAt: r.created_at, withdrawnAt: r.withdrawn_at })),
+        evaluatedEvidence: evidence.rows.map((r) => ({ id: r.id, sourceStrength: r.source_strength, evaluationResultId: r.evaluation_result_id, projectId: r.project_id, createdAt: r.created_at, withdrawnAt: r.withdrawn_at, role: r.evidence_role })),
         decisions: decisions.rows.map((r) => ({ id: r.id, decision: r.decision, previousState: r.previous_state, proposedState: r.proposed_state, resultingState: r.resulting_state, policy: `${r.policy_key}@${r.policy_version}`, policyStatus: r.policy_status, policyResolution: r.decided_by_ref?.startsWith('policy:') ? r.decided_by_ref.slice(7) : null, trackConfigVersionId: r.track_config_version_id, decidedAt: r.decided_at })),
         journeyEvents: events.rows.map((r) => ({ trigger: r.trigger_code, from: r.from_state, to: r.to_state, applied: r.applied, outcome: r.outcome, reason: r.reason, at: r.created_at })),
         activities: activities.rows.map((r) => ({ id: r.id, slug: r.slug, titleAr: r.title_ar, version: r.version, depth: r.depth })),

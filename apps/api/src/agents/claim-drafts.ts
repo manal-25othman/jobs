@@ -36,11 +36,11 @@ export async function loadClaimSubject(c: PoolClient, userId: string, kind: Clai
     ? new Set([...payload.namedSkillIds, ...[payload.suggestedValueAr, payload.suggestedValueEn ?? ''].flatMap((t) => skillsMentioned(t, facts.knownSkills, facts.knownTechnologies))])
     : new Set<string>();
   const ev = evidenceRefs.length === 0 ? { rows: [] as Record<string, unknown>[] } : await c.query(
-    `select e.id, canonical_skill_id(e.skill_id) as skill_id, e.source_strength, e.withdrawn_at is null as standing
+    `select e.id, canonical_skill_id(e.skill_id) as skill_id, e.source_strength, (e.withdrawn_at is null and e.evidence_role = 'primary') as standing
        from evidence e where e.user_id = $1 and e.id = any($2::uuid[])`, [userId, evidenceRefs]);
   const skillIds = new Set([...assertedIds, ...ev.rows.map((r) => String(r['skill_id']))]);
   const counts = skillIds.size === 0 ? { rows: [] as Record<string, unknown>[] } : await c.query(
-    `select canonical_skill_id(skill_id) as skill_id, count(*)::int as n from evidence where user_id = $1 and withdrawn_at is null and canonical_skill_id(skill_id) = any($2::uuid[]) group by 1`,
+    `select canonical_skill_id(skill_id) as skill_id, count(*)::int as n from evidence where user_id = $1 and withdrawn_at is null and evidence_role = 'primary' and canonical_skill_id(skill_id) = any($2::uuid[]) group by 1`,
     [userId, [...skillIds]]);
   // CLM-1: every decision for the asserted skills, with what it produced; the domain decides which ones are positive.
   const decided = skillIds.size === 0 ? { rows: [] as Record<string, unknown>[] } : await c.query(

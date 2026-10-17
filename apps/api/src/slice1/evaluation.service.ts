@@ -429,7 +429,8 @@ export class EvaluationService {
     run: EvaluationRun; rubric: PublishedRubric; projectId: string; acceptedReason: string;
   }): Promise<{ transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null; reestablishedEvidenceId: string | null; policy: VerificationPolicy; decision: string; decisionReason: string }> {
     const { policy, resolution } = await this.assessments.loadPolicy(c, p.policyKey);
-    const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, p.skillId]);
+    // ENG-1 P4: corroborating evidence never counts toward a level decision.
+    const standing = await c.query(`select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null and evidence_role = 'primary'`, [p.userId, p.skillId]);
     const pd = this.assessments.decide(policy, {
       evaluationOutcome: p.run.outcome, proposedState: p.run.proposedState, currentState: p.currentState, assessmentEvaluatorKind: p.evaluatorKind,
       assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n), reason: p.acceptedReason,
@@ -488,7 +489,7 @@ export class EvaluationService {
       if (skillId === p.skillId || !evidenced.includes(skillId)) continue;
       const current = await this.currentClaimState(c, p.userId, skillId);
       if (evidenceOrdinal(p.proposedState) <= evidenceOrdinal(current)) continue;
-      const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [p.userId, skillId]);
+      const standing = await c.query(`select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null and evidence_role = 'primary'`, [p.userId, skillId]);
       const pd: PolicyDecision = this.assessments.decide(p.policy, {
         evaluationOutcome: p.run.outcome, proposedState: p.proposedState, currentState: current, assessmentEvaluatorKind: p.evaluatorKind,
         assessmentConfidence: p.assessmentConfidence, independentEvidenceCount: Number(standing.rows[0].n), basis: p.basis, production: isProduction(),
@@ -667,8 +668,8 @@ export class EvaluationService {
            values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [sa, acr.rows[0].id, p.userId, cr.key, cr.status, cr.score, cr.maxScore, cr.threshold, cr.thresholdStatus]);
       }
-      // The skill's OWN standing evidence (distinct results, withdrawn never counts) — never another skill's.
-      const own = (await c.query(`select canonical_skill_id(skill_id)::text as skill_id, evaluation_result_id::text, withdrawn_at::text from evidence where user_id = $1 and canonical_skill_id(skill_id) = $2`,
+      // The skill's OWN standing evidence (distinct results, withdrawn never counts) — never another skill's, never corroborating evidence (P4).
+      const own = (await c.query(`select canonical_skill_id(skill_id)::text as skill_id, evaluation_result_id::text, withdrawn_at::text from evidence where user_id = $1 and canonical_skill_id(skill_id) = $2 and evidence_role = 'primary'`,
         [p.userId, a.skillId])).rows.map((r) => ({ skillId: r.skill_id as string, evaluationResultId: r.evaluation_result_id as string | null, withdrawnAt: r.withdrawn_at as string | null }));
       const pd = decideSkillAssessment(policy, a, { independentEvidenceCount: standingEvidenceForSkill(own, a.skillId), production: isProduction(), evaluatorKind: p.evaluatorKind });
       let transition: { from: EvidenceState; to: EvidenceState; evidenceId: string } | null = null;
@@ -685,10 +686,18 @@ export class EvaluationService {
       } else {
         // ENG-1 P4 (policy flag, development only): an independent task on a skill already at this rubric's level leaves
         // corroborating evidence — the only way a second task can count for EXT-2. No level change, no claim change.
-        const corr = decideCorroboration(policy, a, { rubricProposesState: p.rubric.proposesState, production: isProduction(), evaluatorKind: p.evaluatorKind });
+        const corr = decideCorroboration(policy, a, { rubricProposesState: p.rubric.proposesState, production: isProduction(), evaluatorKind: p.evaluatorKind,
+          primaryEvidenceStanding: await this.primaryEvidenceStanding(c, p.userId, a.skillId) });
         if (corr) {
-          reestablished = await this.corroborate(c, { userId: p.userId, skillId: a.skillId, state: a.currentState, evaluationResultId: p.resultId, projectId: p.projectId, reason: corr.reason, skillAssessmentId: sa });
-          record = corr;
+          // Condition 5: a repeat, resubmission, re-evaluation, same family or reused artifact is not independent. The database
+          // refuses the row for the same reasons (evidence_role_guard); asking first records WHY no evidence was written.
+          const conflict = (await c.query('select evidence_corroboration_conflict($1, $2, $3) as k', [p.userId, a.skillId, p.resultId])).rows[0].k as string | null;
+          if (conflict) {
+            record = { ...pd, reason: `${pd.reason}; no corroborating evidence: not independent of earlier evidence of this skill (${conflict})` };
+          } else {
+            reestablished = await this.corroborate(c, { userId: p.userId, skillId: a.skillId, state: a.currentState, evaluationResultId: p.resultId, projectId: p.projectId, reason: corr.reason, skillAssessmentId: sa });
+            record = corr;
+          }
         }
       }
       await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId: a.skillId, policy, policyResolution: resolution,
@@ -713,15 +722,15 @@ export class EvaluationService {
     };
   }
 
-  /** ENG-1 P4 corroborating evidence: a new standing evidence row citing its skill assessment. The claim, its level and its primary evidence are untouched. */
+  /** ENG-1 P4 corroborating evidence: a new standing evidence row (role 'corroborating') citing its skill assessment. The claim, its level and its primary evidence are untouched. */
   private async corroborate(c: PoolClient, p: {
     userId: string; skillId: string; state: EvidenceState; evaluationResultId: string; projectId: string; reason: string; skillAssessmentId: string;
   }): Promise<string> {
     const evidence = await c.query(
       `insert into evidence
          (user_id, skill_id, source_strength, evaluation_result_id, project_id,
-          provenance_class, provenance_source, confidence, skill_assessment_id)
-       values ($1,$2,'platform_controlled',$3,$4,'system_derived',$5,1.0,$6)
+          provenance_class, provenance_source, confidence, skill_assessment_id, evidence_role)
+       values ($1,$2,'platform_controlled',$3,$4,'system_derived',$5,1.0,$6,'corroborating')
        returning id`,
       [p.userId, p.skillId, p.evaluationResultId, p.projectId, `evaluation_result:${p.evaluationResultId}`, p.skillAssessmentId]);
     const evidenceId: string = evidence.rows[0].id;

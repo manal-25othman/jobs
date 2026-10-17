@@ -79,7 +79,8 @@ export class WithdrawalService {
         reason: reason.trim(), payload: { affectedAssets: affected.map((a) => a.id), flaggedClaimDrafts: flaggedDrafts } });
 
       // Phase 2: the journey learns how much evidence still stands. The claim state is not touched here (D-077).
-      const standing = await c.query('select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null', [userId, ev.rows[0].skill_id]);
+      // ENG-1 P4: the journey follows the evidence a level rests on; corroborating evidence never holds a level up.
+      const standing = await c.query(`select count(*)::int as n from evidence where user_id = $1 and skill_id = $2 and withdrawn_at is null and evidence_role = 'primary'`, [userId, ev.rows[0].skill_id]);
       await this.progress.apply(c, { userId, skillId: ev.rows[0].skill_id, trigger: 'evidence.withdrawn', facts: { standing_evidence_count: standing.rows[0].n },
         eventRef: { table: 'evidence', id: evidenceId }, reason: `evidence withdrawn: ${reason.trim()}`, actorKind: 'user' });
 

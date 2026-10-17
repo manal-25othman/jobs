@@ -105,7 +105,7 @@ export class AgentService {
       if (facts['evidenceId']) {
         const ev = await c.query(`select e.id, e.skill_id, sk.label_ar, sk.label_en, sc.state, p.title, e.evaluation_result_id
           from evidence e join skill sk on sk.id = e.skill_id join skill_claim sc on sc.user_id = e.user_id and sc.skill_id = e.skill_id
-          left join project p on p.id = e.project_id where e.id = $1 and e.user_id = $2`, [facts['evidenceId'], userId]);
+          left join project p on p.id = e.project_id where e.id = $1 and e.user_id = $2 and e.evidence_role = 'primary'`, [facts['evidenceId'], userId]);
         const r = ev.rows[0];
         if (r) {
           const crit = await c.query(`select criterion_key, score, max_score from evaluation_criterion_score where evaluation_result_id = $1`, [r.evaluation_result_id]);
@@ -263,7 +263,7 @@ export class AgentService {
     let evidence: Record<string, unknown> | null = null;
     if (evidenceId) {
       const r = (await c.query(`select e.id, canonical_skill_id(e.skill_id) as skill_id, sk.label_ar, sk.label_en, p.title, e.evaluation_result_id
-          from evidence e join skill sk on sk.id = canonical_skill_id(e.skill_id) left join project p on p.id = e.project_id where e.id = $1 and e.user_id = $2`, [evidenceId, userId])).rows[0];
+          from evidence e join skill sk on sk.id = canonical_skill_id(e.skill_id) left join project p on p.id = e.project_id where e.id = $1 and e.user_id = $2 and e.evidence_role = 'primary'`, [evidenceId, userId])).rows[0];
       const crit = r?.evaluation_result_id ? (await c.query('select criterion_key, score, max_score from evaluation_criterion_score where evaluation_result_id = $1', [r.evaluation_result_id])).rows : [];
       const states = canonicalEvidenceStates([], (await c.query('select canonical_skill_id(skill_id) as skill_id, state from skill_claim where user_id = $1', [userId])).rows.map((x) => ({ skillId: x.skill_id, state: x.state })));
       if (r) evidence = { id: r.id, skillId: r.skill_id, skillLabelAr: r.label_ar, skillLabelEn: r.label_en, state: states[r.skill_id] ?? 'gap', projectTitle: r.title ?? 'مشروع',
@@ -305,7 +305,7 @@ export class AgentService {
           policy: r ? { ref: claimPolicyRef(r.policy), resolution: r.resolution, minEvidenceLevel: r.policy.minEvidenceLevel, reviewStatus: r.policy.reviewStatus, validationNote: r.validationNote } : null });
       }
       const ev = await c.query(`select e.id, p.title, sk.label_ar, sk.label_en from evidence e join skill sk on sk.id = canonical_skill_id(e.skill_id)
-          left join project p on p.id = e.project_id where e.user_id = $1 and e.withdrawn_at is null order by e.created_at desc`, [userId]);
+          left join project p on p.id = e.project_id where e.user_id = $1 and e.withdrawn_at is null and e.evidence_role = 'primary' order by e.created_at desc`, [userId]);
       return { kinds, evidence: ev.rows.map((r) => ({ id: r.id, projectTitle: r.title, skillLabelAr: r.label_ar, skillLabelEn: r.label_en })) };
     });
   }
@@ -437,7 +437,7 @@ export class AgentService {
 
       let anchor: { skill_id: string | null; project_id: string | null; evaluation_result_id: string | null } = { skill_id: null, project_id: null, evaluation_result_id: null };
       if (p.evidence_refs.length > 0) {
-        const ev = await c.query('select skill_id, project_id, evaluation_result_id from evidence where id = $1 and user_id = $2 and withdrawn_at is null', [p.evidence_refs[0], userId]);
+        const ev = await c.query(`select skill_id, project_id, evaluation_result_id from evidence where id = $1 and user_id = $2 and withdrawn_at is null and evidence_role = 'primary'`, [p.evidence_refs[0], userId]);
         if (ev.rowCount === 0) throw new BadRequestException('the evidence behind this proposal was withdrawn or no longer exists');
         anchor = ev.rows[0];
       } else if (!CLAIM_KINDS_WITHOUT_EVIDENCE_REF.has(kind)) {

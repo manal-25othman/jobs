@@ -105,9 +105,11 @@ export interface ClaimSubject {
  * evidence it produced still stands, for the same skill, and no human has overridden it. A `not_applicable`,
  * pending-validation, rejected, downgraded, escalated (blocked) or exception decision never qualifies: the existence
  * of a decision row is not proof of the skill. `exception_granted` is excluded deliberately (fail closed) until its
- * claim semantics are an approved expert decision.
+ * claim semantics are an approved expert decision. `evidence_corroborated` (ENG-1 P4) is excluded for the same reason:
+ * corroborating evidence is non-promotional, and no approved claim-policy decision makes it qualify for a CV or LinkedIn
+ * claim (PO decision, condition 7).
  */
-export const POSITIVE_VERIFICATION_DECISIONS = ['accepted', 'evidence_reestablished', 'evidence_corroborated'] as const;
+export const POSITIVE_VERIFICATION_DECISIONS = ['accepted', 'evidence_reestablished'] as const;
 
 export interface RecordedVerificationDecisionFact {
   readonly skillId: string;
