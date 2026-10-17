@@ -107,7 +107,7 @@ export interface ClaimSubject {
  * of a decision row is not proof of the skill. `exception_granted` is excluded deliberately (fail closed) until its
  * claim semantics are an approved expert decision.
  */
-export const POSITIVE_VERIFICATION_DECISIONS = ['accepted', 'evidence_reestablished'] as const;
+export const POSITIVE_VERIFICATION_DECISIONS = ['accepted', 'evidence_reestablished', 'evidence_corroborated'] as const;
 
 export interface RecordedVerificationDecisionFact {
   readonly skillId: string;

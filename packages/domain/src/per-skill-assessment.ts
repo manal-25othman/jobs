@@ -216,3 +216,35 @@ export function decideSkillAssessment(policy: VerificationPolicy, a: SkillAssess
     reason: `skill ${a.skillId}: ${a.reason}`,
   });
 }
+
+/**
+ * ENG-1 P4 — a CORROBORATING decision (development pathway only). An independent task can only count for EXT-2 if it
+ * left standing evidence; under the ladder, evidence is written only when a level changes or is re-established. When the
+ * per-skill policy enables it, a claimed skill that is met on a verified basis but ALREADY at the level this rubric
+ * proposes records `evidence_corroborated`: previous = resulting state, no transition, no claim change. Returns null
+ * whenever any gate the policy would apply to a promotion does not hold — corroboration is never easier than promotion.
+ */
+export interface CorroborationDecision {
+  readonly decision: 'evidence_corroborated';
+  readonly previousState: EvidenceState;
+  readonly resultingState: EvidenceState;
+  readonly proposedState: null;
+  readonly reason: string;
+}
+export function decideCorroboration(policy: VerificationPolicy, a: SkillAssessment, ctx: {
+  readonly rubricProposesState: EvidenceState; readonly production: boolean; readonly evaluatorKind: AssessmentEvaluatorKind;
+}): CorroborationDecision | null {
+  if (ctx.production) throw new DomainError(`ENG-1 P4: corroborating evidence is a development-only behaviour (policy ${policy.key}@${policy.version})`);
+  if (!policy.recordCorroboratingEvidence || (policy.assessmentScope ?? 'primary_claimed_skill') !== 'per_skill') return null;
+  if (policy.perSkillEvidenceDerivation) return null;
+  if (ctx.evaluatorKind === 'llm') return null;
+  if (!a.claimed || a.outcome !== 'met' || a.proposedState !== null) return null;
+  if (!a.basis.independentlyVerified || policy.promotionBasis !== 'independently_verified') return null;
+  if (!policy.acceptRubricProposal) return null;
+  if (policy.minAssessmentConfidence !== null && (a.confidence === null || a.confidence < policy.minAssessmentConfidence)) return null;
+  // Only the level this rubric proposes is corroborated: a skill above it (or below, which would be a promotion) is not.
+  if (a.currentState !== ctx.rubricProposesState) return null;
+  if (evidenceOrdinal(a.currentState) < evidenceOrdinal('practiced')) return null;
+  return { decision: 'evidence_corroborated', previousState: a.currentState, resultingState: a.currentState, proposedState: null,
+    reason: `skill ${a.skillId}: ${a.reason}; already at '${a.currentState}' — corroborating evidence recorded, level unchanged (policy ${policy.key}@${policy.version})` };
+}

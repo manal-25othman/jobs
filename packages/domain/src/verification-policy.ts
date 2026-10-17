@@ -65,6 +65,11 @@ export interface VerificationPolicy {
    * `per_skill` (P3) is a development-only pathway: never approved, published or active for real users.
    */
   assessmentScope?: AssessmentScope;
+  /**
+   * ENG-1 P4 (development pathway only): when a claimed skill is met on a verified basis but already at the level the
+   * rubric proposes, record a CORROBORATING decision and evidence row (no level change). Default off; per_skill only.
+   */
+  recordCorroboratingEvidence?: boolean;
 }
 
 export const ASSESSMENT_SCOPES = ['primary_claimed_skill', 'per_skill'] as const;
@@ -94,13 +99,14 @@ export function assertVerificationPolicySane(p: VerificationPolicy): void {
     if (p.promotionBasis !== 'independently_verified') throw new DomainError(`policy ${p.key}@${p.version}: the per-skill scope requires the independently_verified promotion basis`);
     if (p.practicedOnSubmission) throw new DomainError(`policy ${p.key}@${p.version}: the per-skill scope never records a level on submission`);
   }
+  if (p.recordCorroboratingEvidence && scope !== 'per_skill') throw new DomainError(`policy ${p.key}@${p.version}: corroborating evidence exists only in the per-skill scope`);
 }
 
 export function verificationPolicyFromRow(r: {
   id: string; key: string; version: number | string; review_status: string; applies_outcomes: string[]; accept_rubric_proposal: boolean;
   max_resulting_state: string | null; min_assessment_confidence: string | number | null; min_independent_evidence: number | string | null;
   escalate_on: unknown; blocking_rule: string; per_skill_evidence_derivation: boolean; decision_actors: string[];
-  promotion_basis?: string | null; practiced_on_submission?: boolean | null; assessment_scope?: string | null;
+  promotion_basis?: string | null; practiced_on_submission?: boolean | null; assessment_scope?: string | null; record_corroborating_evidence?: boolean | null;
 }): VerificationPolicy {
   const p: VerificationPolicy = {
     id: r.id, key: r.key, version: Number(r.version), reviewStatus: r.review_status,
@@ -115,6 +121,7 @@ export function verificationPolicyFromRow(r: {
     promotionBasis: (r.promotion_basis ?? 'independently_verified') as PromotionBasis,
     practicedOnSubmission: r.practiced_on_submission === true,
     assessmentScope: (r.assessment_scope ?? 'primary_claimed_skill') as AssessmentScope,
+    recordCorroboratingEvidence: r.record_corroborating_evidence === true,
   };
   assertVerificationPolicySane(p);
   return p;

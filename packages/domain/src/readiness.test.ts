@@ -70,7 +70,7 @@ describe('rule types read facts; values come from the rule', () => {
     assert.throws(() => assertReadinessRuleSetSane(set([rule('min_skills_at_level', { min_count: 2, min_level: 'demonstrated', scope: 'mandatory' })])), DomainError);
     assert.throws(() => assertReadinessRuleSetSane(set([], { baselineOf: 'x' })), /never be a legacy baseline/);
     assert.throws(() => readinessRuleFromRow({ id: 'r', rule_type: 'percentage_of_skills', params: {}, skill_id: null, label_ar: 'x', label_en: 'x', enabled: true, position: 0 }), DomainError);
-    assert.equal(READINESS_RULE_TYPES.length, 6);
+    assert.equal(READINESS_RULE_TYPES.length, 7, 'six Phase 5 types + skill_evidence_path (ENG-1 P4, sealed)'); assert.equal(READINESS_RULE_TYPES[6], 'skill_evidence_path');
   });
   test('a skill\'s contribution states configuration, never a verdict', () => {
     const rep = evaluateReadiness({ ruleSet: set([rule('required_skill_at_level', { min_level: 'demonstrated' }, 'js')]), resolution: 'development_only', facts: FACTS });

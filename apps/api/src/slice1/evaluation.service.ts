@@ -23,6 +23,7 @@ import {
   attributeLegacyPrimarySkill, skillsCoveredByRubric, isValidSkillEvidenceCriterion, withheldPromotion, resolveRubricVersion, unattributedDecision,
   type LegacyAttribution, type RubricResolution,
   assessSkills, decideSkillAssessment, assertSkillAssessmentInvariants, standingEvidenceForSkill, assessmentScopeOf, type AssessmentScope, type SkillAssessment,
+  decideCorroboration,
 } from '@naqla/domain';
 import { isProduction } from '../configuration/configuration.service';
 
@@ -681,6 +682,14 @@ export class EvaluationService {
         // D-077 for this skill alone: its own evidence was withdrawn; its own criteria earn the same state again.
         reestablished = await this.reestablish(c, { userId: p.userId, skillId: a.skillId, state: a.currentState, evaluationResultId: p.resultId, projectId: p.projectId, reason: a.reason, skillAssessmentId: sa });
         record = { decision: 'evidence_reestablished', previousState: a.currentState, proposedState: null, resultingState: a.currentState, reason: `skill ${a.skillId}: ${a.reason}; evidence re-established` };
+      } else {
+        // ENG-1 P4 (policy flag, development only): an independent task on a skill already at this rubric's level leaves
+        // corroborating evidence — the only way a second task can count for EXT-2. No level change, no claim change.
+        const corr = decideCorroboration(policy, a, { rubricProposesState: p.rubric.proposesState, production: isProduction(), evaluatorKind: p.evaluatorKind });
+        if (corr) {
+          reestablished = await this.corroborate(c, { userId: p.userId, skillId: a.skillId, state: a.currentState, evaluationResultId: p.resultId, projectId: p.projectId, reason: corr.reason, skillAssessmentId: sa });
+          record = corr;
+        }
       }
       await this.assessments.recordDecision(c, { assessmentId: p.assessmentId, evaluationResultId: p.resultId, userId: p.userId, skillId: a.skillId, policy, policyResolution: resolution,
         trackConfigVersionId: p.trackConfigVersionId, decision: record, confidence: a.confidence, verificationId: null, evidenceId: transition?.evidenceId ?? reestablished, skillAssessmentId: sa });
@@ -702,6 +711,25 @@ export class EvaluationService {
       decisionReason: summary ? `per-skill assessment (${skills.length} skill(s)): ${summary.decision.reason}` : 'per-skill assessment: no claimed skill',
       skills,
     };
+  }
+
+  /** ENG-1 P4 corroborating evidence: a new standing evidence row citing its skill assessment. The claim, its level and its primary evidence are untouched. */
+  private async corroborate(c: PoolClient, p: {
+    userId: string; skillId: string; state: EvidenceState; evaluationResultId: string; projectId: string; reason: string; skillAssessmentId: string;
+  }): Promise<string> {
+    const evidence = await c.query(
+      `insert into evidence
+         (user_id, skill_id, source_strength, evaluation_result_id, project_id,
+          provenance_class, provenance_source, confidence, skill_assessment_id)
+       values ($1,$2,'platform_controlled',$3,$4,'system_derived',$5,1.0,$6)
+       returning id`,
+      [p.userId, p.skillId, p.evaluationResultId, p.projectId, `evaluation_result:${p.evaluationResultId}`, p.skillAssessmentId]);
+    const evidenceId: string = evidence.rows[0].id;
+    await emitAuditEvent(c, {
+      eventType: 'evidence.corroborated', userId: p.userId, actorKind: 'system', subjectTable: 'evidence', subjectId: evidenceId, reason: p.reason,
+      payload: { state: p.state, evidenceId, evaluationResultId: p.evaluationResultId, skillAssessmentId: p.skillAssessmentId, levelChange: false },
+    });
+    return evidenceId;
   }
 
   private async currentClaimState(

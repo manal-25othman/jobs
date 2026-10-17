@@ -5,8 +5,9 @@ import { emitAuditEvent } from '../infra/audit';
 import { ConfigurationService, governedFromRow, isProduction } from '../configuration/configuration.service';
 import {
   DOMAIN_RULESET_VERSION, evaluateReadiness, readinessRuleFromRow, resolveActiveConfig, skillReadinessContribution, trackSkillBadge, configIsValidated,
-  type ReadinessRuleSet, type SkillReadinessFacts, type ReadinessReport, type TrackSkillConfig, type ConfigResolution, type EvidenceState,
+  type ReadinessRuleSet, type SkillReadinessFacts, type ReadinessReport, type TrackSkillConfig, type ConfigResolution, type EvidenceState, type EvidencePathFacts,
 } from '@naqla/domain';
+import { evidencePathRules, loadEvidenceTaskFacts, loadUnderstanding } from './evidence-facts';
 
 /**
  * Readiness Engine (Phase 5). Reads facts, applies the ACTIVE rule set through
@@ -59,6 +60,17 @@ export class ReadinessService {
     }));
   }
 
+  /**
+   * ENG-1 P4 / EXT-2: the independent-evidence facts, loaded ONLY when the rule set in effect has a skill_evidence_path
+   * rule (sealed: development-only). Read-only; this user's rows only.
+   */
+  async evidenceFacts(c: PoolClient, userId: string, set: ReadinessRuleSet | null): Promise<EvidencePathFacts | undefined> {
+    const rules = evidencePathRules(set);
+    if (rules.length === 0) return undefined;
+    const sources = rules.map((r) => r.params.understanding_source).filter((x): x is NonNullable<typeof x> => !!x);
+    return { tasks: await loadEvidenceTaskFacts(c, userId, [...new Set(rules.map((r) => r.skillId))]), understanding: await loadUnderstanding(c, userId, sources), production: isProduction() };
+  }
+
   private async goalRole(c: PoolClient, userId: string): Promise<{ id: string; labelAr: string; labelEn: string } | null> {
     const { rows } = await c.query('select tr.id, tr.label_ar, tr.label_en from career_goal g join target_role tr on tr.id = g.target_role_id where g.user_id = $1 and g.is_current', [userId]);
     return rows[0] ? { id: rows[0].id, labelAr: rows[0].label_ar, labelEn: rows[0].label_en } : null;
@@ -71,7 +83,7 @@ export class ReadinessService {
       if (!role) return { role: null, report: evaluateReadiness({ ruleSet: null, resolution: 'none', facts: [] }), trackConfig: null, note: 'no current career goal' };
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
       const track = await this.config.resolveTrackConfig(c, role.id);
       return { role, report, trackConfig: track, production: isProduction(),
         note: 'Readiness is a report over configured rules. It never changes a verification level, and no verification level implies readiness.' };
@@ -85,7 +97,7 @@ export class ReadinessService {
       if (!role) throw new BadRequestException('no current career goal to evaluate readiness for');
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
       const track = await this.config.resolveTrackConfig(c, role.id);
       const { rows } = await c.query(
         `insert into readiness_evaluation (user_id, target_role_id, track_config_version_id, readiness_rule_set_id, rule_set_key, rule_set_version, rule_set_status, rule_set_resolution, status, result, domain_ruleset_version)
@@ -117,7 +129,7 @@ export class ReadinessService {
       if (!role) return { role: null, items: [], readiness: evaluateReadiness({ ruleSet: null, resolution: 'none', facts: [] }) };
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
       const states = (await c.query('select code, label_ar, label_en from skill_progress_state')).rows as { code: string; label_ar: string; label_en: string }[];
       const claims = (await c.query('select skill_id, state, state_reason from skill_claim where user_id = $1', [userId])).rows as { skill_id: string; state: string; state_reason: string }[];
       const items = await Promise.all(facts.map(async (f) => {

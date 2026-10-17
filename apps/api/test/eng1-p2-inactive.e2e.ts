@@ -64,7 +64,8 @@ describe('ENG-1 P2 — the per-skill pathway is inactive', () => {
     assert.ok(files.length > 50, 'the source tree was found');
     const forbidden = /skill_assessment|assessment_scope|assessSkills?\b|decideSkillAssessment|PER_SKILL_MODEL_VERSION/;
     const hits = files.filter((f) => forbidden.test(readFileSync(f, 'utf8'))).map((f) => f.slice(root.length + 1)).sort();
-    assert.deepEqual(hits, ['assessment/assessment-recorder.service.ts', 'configuration/config-admin.service.ts', 'slice1/activity-catalogue.service.ts', 'slice1/evaluation.service.ts']);
+    assert.deepEqual(hits, ['assessment/assessment-recorder.service.ts', 'configuration/config-admin.service.ts', 'readiness/evidence-facts.ts', 'slice1/activity-catalogue.service.ts', 'slice1/evaluation.service.ts']);
+    assert.doesNotMatch(readFileSync(join(root, 'readiness/evidence-facts.ts'), 'utf8'), /insert into|update |delete from/i, 'the EXT-2 fact builder only reads');
     assert.doesNotMatch(readFileSync(join(root, 'slice1/activity-catalogue.service.ts'), 'utf8'), /insert into|update skill_assessment|skill_assessment \(/, 'My Work only reads');
     const writer = readFileSync(join(root, 'slice1/evaluation.service.ts'), 'utf8');
     assert.match(writer, /scope === 'per_skill' && isProduction\(\)/, 'the scope resolver refuses per_skill in production');

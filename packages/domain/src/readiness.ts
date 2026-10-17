@@ -21,6 +21,7 @@
 import { DomainError, MissingPrerequisite } from './errors.js';
 import { EVIDENCE_STATES, evidenceOrdinal, type EvidenceState } from './evidence-state.js';
 import { configIsValidated, type ConfigResolution, type GovernedConfig, type TrackSkillConfig } from './configuration.js';
+import { parseSkillEvidencePathParams, evaluateSkillEvidencePath, understandingKey, type EvidenceTaskFact, type SkillEvidencePathAudit } from './evidence-path.js';
 
 export const READINESS_RULE_TYPES = [
   'required_skill_at_level',      // params: { min_level }            skill_id required — e.g. "JavaScript at demonstrated"
@@ -28,8 +29,12 @@ export const READINESS_RULE_TYPES = [
   'min_skills_at_level',          // params: { min_count, min_level, scope: 'all' | 'enabled' | 'core' }
   'all_core_skills_at_level',     // params: { min_level }            core = is_core AND classification approved; pending ⇒ indeterminate
   'all_skills_at_expected_level', // params: {}                       uses TrackSkill.expected_level; null ⇒ indeterminate for that skill
-  'min_evidence_per_skill',       // params: { min_count }            skill_id optional (null = every enabled skill)
+  'min_evidence_per_skill',       // params: { min_count }            skill_id optional (null = every enabled skill) — counts standing rows; NOT an independence rule
+  'skill_evidence_path',          // EXT-2 (ENG-1 P4): params per evidence-path.ts; skill_id required. SEALED: development-only until P6 (migration 0030)
 ] as const;
+
+/** Rule types that may never be approved or active for real users until the Product Owner's P6 decision (DB seal 0030 + config-admin). */
+export const SEALED_READINESS_RULE_TYPES: readonly ReadinessRuleType[] = ['skill_evidence_path'];
 export type ReadinessRuleType = (typeof READINESS_RULE_TYPES)[number];
 
 export interface ReadinessRule {
@@ -73,6 +78,17 @@ export interface RuleResult {
   detailEn: string;
   nonCompensable: boolean;
   skillIds: string[];
+  /** EXT-2: what was counted, collapsed and excluded (ids only). */
+  audit?: SkillEvidencePathAudit;
+}
+
+/** EXT-2 facts, loaded by the API only when the rule set in effect has a skill_evidence_path rule. */
+export interface EvidencePathFacts {
+  /** canonical skill id → its task candidates (per-skill and legacy). */
+  readonly tasks: Readonly<Record<string, readonly EvidenceTaskFact[]>>;
+  /** understandingKey(source) → met / not met / never assessed (null). */
+  readonly understanding: Readonly<Record<string, boolean | null>>;
+  readonly production: boolean;
 }
 
 export type ReadinessStatus = 'not_yet_configured' | 'pending_validation' | 'evaluated';
@@ -121,13 +137,16 @@ export function assertReadinessRuleSetSane(set: ReadinessRuleSet): void {
       case 'all_core_skills_at_level': levelParam(r.params, r.id); break;
       case 'all_skills_at_expected_level': break;
       case 'min_evidence_per_skill': intParam(r.params, 'min_count', r.id); break;
+      case 'skill_evidence_path':
+        if (!r.skillId) throw new DomainError(`rule ${r.id}: skill_evidence_path needs a skill_id (one path per skill)`);
+        parseSkillEvidencePathParams(r.params, r.id); break;
     }
   }
 }
 
 const atLeast = (level: EvidenceState, min: EvidenceState) => evidenceOrdinal(level) >= evidenceOrdinal(min);
 
-function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[]): RuleResult {
+function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[], evidence?: EvidencePathFacts): RuleResult {
   const base = { ruleId: rule.id, type: rule.type, labelAr: rule.labelAr, labelEn: rule.labelEn, nonCompensable: rule.type === 'non_compensable_skill' };
   const enabled = facts.filter((f) => f.config?.enabled !== false);
   switch (rule.type) {
@@ -170,20 +189,33 @@ function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[]
       const short = pool.filter((f) => f.standingEvidenceCount < n);
       return { ...base, outcome: short.length === 0 ? 'satisfied' : 'not_satisfied', detailEn: `${pool.length - short.length} of ${pool.length} skill(s) with at least ${n} standing evidence`, skillIds: pool.map((f) => f.skillId) };
     }
+    case 'skill_evidence_path': {
+      // Separation (ENG-1 P4): this rule reads authorized task results only — never the activity's completion, a
+      // per-skill outcome alone, or the claim level. A missing fact source is indeterminate, never satisfied.
+      const params = parseSkillEvidencePathParams(rule.params, rule.id);
+      if (!facts.some((x) => x.skillId === rule.skillId)) return { ...base, outcome: 'indeterminate', detailEn: `skill ${rule.skillId} is not part of this track`, skillIds: [rule.skillId!] };
+      if (!evidence) return { ...base, outcome: 'indeterminate', detailEn: 'independent-evidence facts were not loaded', skillIds: [rule.skillId!] };
+      const audit = evaluateSkillEvidencePath({ params, skillId: rule.skillId!, tasks: evidence.tasks[rule.skillId!] ?? [], production: evidence.production,
+        ...(params.understanding_source ? { understandingMet: evidence.understanding[understandingKey(params.understanding_source)] ?? null } : {}) });
+      return { ...base, outcome: audit.outcome, detailEn: `${audit.independentTasks} independent task(s) of ${audit.minDistinctTasks} needed${audit.reasons.length ? `; ${audit.reasons.join('; ')}` : ''}`,
+        skillIds: [rule.skillId!], audit };
+    }
   }
 }
 
 /**
  * Pure: f(rule set, facts) → report. Never writes, never derives a level, never a percentage.
  */
-export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolution: ConfigResolution | 'none'; facts: readonly SkillReadinessFacts[] }): ReadinessReport {
+export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolution: ConfigResolution | 'none'; facts: readonly SkillReadinessFacts[]; evidence?: EvidencePathFacts }): ReadinessReport {
   if (!p.ruleSet || p.resolution === 'none') {
     return { status: 'not_yet_configured', headlineAr: READINESS_PENDING_HEADLINE_AR, ruleSet: null, rules: [], summary: { satisfied: 0, notSatisfied: 0, indeterminate: 0, total: 0 }, overall: null, verificationEffect: READINESS_VERIFICATION_EFFECT };
   }
   assertReadinessRuleSetSane(p.ruleSet);
-  const rules = [...p.ruleSet.rules].filter((r) => r.enabled).sort((a, b) => a.position - b.position).map((r) => evaluateRule(r, p.facts));
+  const rules = [...p.ruleSet.rules].filter((r) => r.enabled).sort((a, b) => a.position - b.position).map((r) => evaluateRule(r, p.facts, p.evidence));
   const summary = { satisfied: rules.filter((r) => r.outcome === 'satisfied').length, notSatisfied: rules.filter((r) => r.outcome === 'not_satisfied').length, indeterminate: rules.filter((r) => r.outcome === 'indeterminate').length, total: rules.length };
-  const validated = configIsValidated(p.ruleSet) && p.resolution === 'production_active';
+  // A set with a sealed rule type (EXT-2) is never `evaluated`, whatever its configuration says (fail closed until P6).
+  const sealed = p.ruleSet.rules.some((r) => (SEALED_READINESS_RULE_TYPES as readonly string[]).includes(r.type));
+  const validated = configIsValidated(p.ruleSet) && p.resolution === 'production_active' && !sealed;
   const status: ReadinessStatus = validated ? 'evaluated' : 'pending_validation';
   return {
     status,

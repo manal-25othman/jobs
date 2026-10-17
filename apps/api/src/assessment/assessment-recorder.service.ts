@@ -33,7 +33,7 @@ export class AssessmentRecorderService {
     const { rows } = await c.query(
       `select id, key, version, review_status, applies_outcomes::text[] as applies_outcomes, accept_rubric_proposal, max_resulting_state, min_assessment_confidence,
               min_independent_evidence, escalate_on, blocking_rule, per_skill_evidence_derivation, decision_actors, activation, baseline_of, approved_by,
-              promotion_basis, practiced_on_submission, assessment_scope
+              promotion_basis, practiced_on_submission, assessment_scope, record_corroborating_evidence
          from verification_policy where key = $1`, [key]);
     const r = resolveActiveConfig(rows.map(governedFromRow), { production: isProduction() });
     if (!r.row) throw new MissingPrerequisite('verification_policy', `no usable verification policy '${key}': ${r.reason}`);
@@ -121,7 +121,7 @@ export class AssessmentRecorderService {
 
   async recordDecision(c: PoolClient, p: {
     assessmentId: string; evaluationResultId: string; userId: string; skillId: string; policy: VerificationPolicy; policyResolution: ConfigResolution; trackConfigVersionId: string | null;
-    decision: PolicyDecision | { decision: 'evidence_reestablished'; previousState: EvidenceState; proposedState: EvidenceState | null; resultingState: EvidenceState; reason: string };
+    decision: PolicyDecision | { decision: 'evidence_reestablished' | 'evidence_corroborated'; previousState: EvidenceState; proposedState: EvidenceState | null; resultingState: EvidenceState; reason: string };
     confidence: number | null; verificationId: string | null; evidenceId: string | null;
     /** ENG-1 P3: the per-skill assessment this decision rests on (development pathway only). */
     skillAssessmentId?: string | null;

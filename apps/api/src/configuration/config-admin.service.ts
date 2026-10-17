@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import type { Pool, PoolClient } from 'pg';
 import { assertActivationAllowed, configIsValidated, MissingPrerequisite, CLAIM_KIND_CLASS, evidenceOrdinal, assertSubmissionPromotionNotEnabled, DomainError, type ConfigActivation, type ClaimKind, type EvidenceState } from '@naqla/domain';
 import { GOVERNED_TABLES, governedFromRow, isProduction, type GovernedTable } from './configuration.service';
+import { loadPathCatalog } from '../readiness/evidence-facts';
 import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
 import { emitAuditEvent } from '../infra/audit';
 
@@ -29,6 +30,7 @@ export async function approveConfigRow(c: PoolClient, p: { table: string; id: st
   if (g.baselineOf) throw new BadRequestException('a legacy baseline is not approved in place; it is the pre-existing behaviour. Create a new version and approve that.');
   if (configIsValidated(g)) throw new BadRequestException(`${p.table} ${g.key}@${g.version} is already ${g.reviewStatus}`);
   if (p.table === 'verification_policy') assertVerificationPolicyMayBe(cur.rows[0], { reviewStatus: 'approved' });
+  if (p.table === 'readiness_rule_set') await assertReadinessSetMayBe(c, p.id, { reviewStatus: 'approved' });
   return withConfigActor(c, p.approvedByLabel, p.reason, async () => {
     const r = await c.query(`update ${p.table} set review_status = 'approved', approved_by = $2, approved_at = now(), validation_note_en = $3 where id = $1 returning *`,
       [p.id, p.approvedBy, `approved by ${p.approvedByLabel}: ${p.reason}`]);
@@ -50,6 +52,7 @@ export async function setConfigActivation(c: PoolClient, p: { table: string; id:
     : p.table === 'pack_constraint_set' ? "key, coalesce(track_id, '')" : 'key';
   if (p.activation !== 'inactive') assertActivationPermittedInPhase8(p.table, cur.rows[0], isProduction() || p.activation === 'production_active');
   if (p.table === 'verification_policy' && p.activation !== 'inactive') assertVerificationPolicyMayBe(cur.rows[0], { activation: p.activation });
+  if (p.table === 'readiness_rule_set' && p.activation !== 'inactive') await assertReadinessSetMayBe(c, p.id, { activation: p.activation });
   if (p.activation !== 'inactive') {
     const clash = await c.query(`select id, version, activation from ${p.table} where (${scope}) = (select ${scope} from ${p.table} where id = $1) and id <> $1 and activation <> 'inactive'`, [p.id]);
     if (clash.rowCount) throw new BadRequestException(`${p.table} already has an active row (${clash.rows[0].activation} v${clash.rows[0].version}); deactivate it explicitly first — a new row never replaces an active one by accident`);
@@ -91,7 +94,7 @@ export async function createTrackConfigVersion(c: PoolClient, p: { targetRoleId:
 /** A new DRAFT readiness rule set (inactive). Rule types are code constants; every value here is configuration. */
 export async function createReadinessRuleSet(c: PoolClient, p: { key: string; targetRoleId: string | null; labelAr: string; labelEn: string; description: string; createdBy: string;
   rules: { type: string; params: Record<string, unknown>; skillId?: string | null; labelAr: string; labelEn: string }[] }) {
-  const { assertReadinessRuleSetSane, readinessRuleFromRow } = await import('@naqla/domain');
+  const { assertReadinessRuleSetSane, readinessRuleFromRow, parseSkillEvidencePathParams, validateSkillEvidencePathCatalog } = await import('@naqla/domain');
   const next = await c.query('select coalesce(max(version), 0) + 1 as v from readiness_rule_set where key = $1', [p.key]);
   const set = await c.query(
     `insert into readiness_rule_set (key, version, target_role_id, label_ar, label_en, description_en, created_by) values ($1,$2,$3,$4,$5,$6,$7) returning id, version`,
@@ -102,6 +105,15 @@ export async function createReadinessRuleSet(c: PoolClient, p: { key: string; ta
     const row = await c.query(`insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en, position) values ($1,$2,$3,$4,$5,$6,$7) returning id, rule_type, params, skill_id, label_ar, label_en, enabled, position`,
       [set.rows[0].id, r.type, JSON.stringify(r.params), r.skillId ?? null, r.labelAr, r.labelEn, pos++]);
     rules.push(readinessRuleFromRow(row.rows[0]));
+    // ENG-1 P4 / EXT-2: a path names a canonical skill and only criteria of published, non-demo content that measure THAT skill.
+    if (r.type === 'skill_evidence_path') {
+      const params = parseSkillEvidencePathParams(r.params, `#${pos}`);
+      const canon = await c.query('select canonical_skill_id($1::uuid)::text as id', [r.skillId]);
+      if (canon.rows[0]?.id !== r.skillId) throw new BadRequestException(`skill_evidence_path rule #${pos}: the skill must be canonical (OPEN-039)`);
+      const codes = [...Object.keys(params.counted_criteria), ...(params.understanding_source ? [params.understanding_source.activity] : [])];
+      try { validateSkillEvidencePathCatalog(params, r.skillId!, await loadPathCatalog(c, codes), `#${pos}`); }
+      catch (e) { throw new BadRequestException((e as Error).message); }
+    }
   }
   assertReadinessRuleSetSane({ id: set.rows[0].id, key: p.key, version: Number(set.rows[0].version), reviewStatus: 'draft', activation: 'inactive', baselineOf: null, approvedBy: null, targetRoleId: p.targetRoleId, labelAr: p.labelAr, labelEn: p.labelEn, rules });
   return { id: set.rows[0].id as string, version: Number(set.rows[0].version), rules: rules.length };
@@ -157,6 +169,19 @@ export function assertVerificationPolicyMayBe(row: Record<string, unknown>, targ
     }
     if (isProduction()) throw new BadRequestException('the per-skill assessment scope (ENG-1 P3) can never be activated in production');
   }
+}
+
+/**
+ * ENG-1 P4 — validation-boundary twin of the 0030 seal: a readiness rule set with a skill_evidence_path (EXT-2) rule is
+ * never approved, and never activated except development_only outside production, until the Product Owner's P6 decision.
+ */
+export async function assertReadinessSetMayBe(c: PoolClient, setId: string, target: { reviewStatus?: string; activation?: string }): Promise<void> {
+  const ext = await c.query(`select 1 from readiness_rule where rule_set_id = $1 and rule_type = 'skill_evidence_path' limit 1`, [setId]);
+  if (!ext.rowCount) return;
+  if (target.reviewStatus === 'approved' || target.reviewStatus === 'published' || (target.activation !== undefined && target.activation !== 'development_only')) {
+    throw new BadRequestException('a readiness rule set with an independent-evidence (EXT-2) rule is sealed until P6: it cannot be approved, published or activated for real users');
+  }
+  if (isProduction()) throw new BadRequestException('an independent-evidence (EXT-2) readiness rule set can never be activated in production');
 }
 
 /** Activation of a Track Builder version: live TrackSkill rows take the version's snapshot. Audited per row; classification approval travels with the SME's name. */

@@ -222,3 +222,13 @@ describe('P5 — per-skill results are shown skill by skill, assessment apart fr
     assert.doesNotMatch(workSkillChip({ labelAr: 'JS', outcome: 'not_assessed', levelChanged: false }).textAr, FAIL_WORDS);
   });
 });
+
+describe('P4 — corroborating evidence reads as supporting evidence, never as a level change', () => {
+  test('evidence_corroborated with standing evidence ⇒ corroborated; withdrawn ⇒ unchanged; no CV proposal either way', () => {
+    const d = { decision: 'evidence_corroborated', previousState: 'demonstrated', resultingState: 'demonstrated' };
+    const c = skillLevelLine(sk({ decision: d, evidence: { id: 'e', withdrawn: false } }));
+    assert.equal(c.kind, 'corroborated'); assert.equal(c.evidenceId, null); assert.match(c.labelAr, /لم يتغيّر المستوى/); assert.doesNotMatch(c.labelAr, /←/);
+    assert.equal(skillLevelLine(sk({ decision: d, evidence: { id: 'e', withdrawn: true } })).kind, 'unchanged');
+    assert.equal(perSkillSummaryAr([sk({ decision: d, evidence: { id: 'e', withdrawn: false } })]).raised, 0);
+  });
+});

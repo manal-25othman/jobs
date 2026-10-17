@@ -223,7 +223,7 @@ export function skillCriterionCopy(status: string): { labelAr: string; tone: Ton
   }
 }
 
-export type SkillLevelKind = 'raised' | 'raised_withdrawn' | 'reestablished' | 'pending_validation' | 'unchanged' | 'not_decided';
+export type SkillLevelKind = 'raised' | 'raised_withdrawn' | 'reestablished' | 'corroborated' | 'pending_validation' | 'unchanged' | 'not_decided';
 
 /**
  * What the VERIFICATION DECISION did to this skill's level — separate from the assessment outcome. A level change is
@@ -246,6 +246,10 @@ export function skillLevelLine(s: Pick<SkillResultView, 'decision' | 'evidence' 
   }
   if (d.decision === 'evidence_reestablished' && s.evidence && !s.evidence.withdrawn) {
     return { kind: 'reestablished', labelAr: `أُعيد تثبيت دليل مستواك «${LEVEL_AR[d.resultingState] ?? d.resultingState}»`, tone: 'info', evidenceId: s.evidence.id, to: d.resultingState };
+  }
+  if (d.decision === 'evidence_corroborated' && s.evidence && !s.evidence.withdrawn) {
+    // ENG-1 P4 (development pathway): an independent task on a skill already at this level — supporting evidence, no level change.
+    return { kind: 'corroborated', labelAr: `لم يتغيّر المستوى «${LEVEL_AR[d.resultingState] ?? d.resultingState}» — سُجِّل دليل داعم إضافي`, tone: 'info', evidenceId: null, to: null };
   }
   if (d.decision === 'assessment_pending_validation') {
     return { kind: 'pending_validation', labelAr: 'المستوى بانتظار تحقق مستقل', tone: 'info', evidenceId: null, to: null };
