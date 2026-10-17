@@ -1,6 +1,6 @@
 # نَقْلة / NAQLA — ENG-1 P4: Per-Skill Evidence in Readiness (EXT-2) — Engineering Specification
 
-**Date:** 2026-10-12 · **Status:** DESIGN ONLY. Nothing here is implemented, registered or activated.
+**Date:** 2026-10-12 · **Status:** DESIGN ONLY at writing. **Update 2026-10-17:** implemented as an inactive, development-only pathway — see `ENG-1-P4-IMPLEMENTATION-REPORT.md` (D-125) for the as-built differences (corroborating evidence, `task_purpose`, demo never counts, legacy adapter as a rule param, EXT-1 not built).
 
 **What this does not do:**
 - No readiness policy is changed and no rule set is created or published.
