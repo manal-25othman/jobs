@@ -176,13 +176,13 @@ See `ENG-1-VERIFICATION-VS-READINESS-DECISION-MATRIX.md`.
 - Practiced is unreachable for this track;
 - a claim policy with `min_evidence_count = 2` could never be met by the two-task path after D-126.
 
-**The exact SME decision (SME-Q1):** does "two independent tasks" define readiness (L-1, current), the award of Demonstrated (L-2), or both (L-3)? No level semantics were changed.
+~~**The exact SME decision (SME-Q1):** does "two independent tasks" define readiness (L-1, current), the award of Demonstrated (L-2), or both (L-3)?~~ **Withdrawn by D-128:** the SME's existing decisions settle it, and L-1 is the provisional architecture (see `ENG-1-D127-SME-RECONCILIATION.md`). No level semantics were changed.
 
 ## 4. Task D — Arabic SME calibration package
 
 See `docs/sme-candidate/junior-frontend/10-sme-calibration-and-p6-decision-package.md` (draft, values blank). It covers:
 1. per-skill thresholds;
-2. level vs readiness evidence (SME-Q1, DM-2);
+2. the required level for readiness (DM-2) — the SME-Q1 question was removed by D-128;
 3. the integrated pass rule (PR-1/PR-2, mandatory set, borderline band);
 4. the Git and A11Y one-task exceptions;
 5. the final three-activity coverage matrix and independence;
@@ -213,7 +213,7 @@ It complements `09-sme-validation-package.md`.
 
 | # | Blocker | Owner |
 |---|---|---|
-| B-1 | **SME-Q1** (level vs readiness meaning of "two tasks"), then DM-2 (V-a/V-b/V-c) | SME, then PO |
+| B-1 | ~~SME-Q1~~ (withdrawn, D-128). DM-2 (V-a/V-b/V-c) remains | PO with SME |
 | B-2 | DM-6 integrated pass rule, mandatory set, borderline band; if PR-1, an approved pass threshold | SME + PO |
 | B-3 | Per-skill thresholds and level descriptors, approved and representable | SME |
 | B-4 | Per-skill path values, incl. P-GIT and A11Y one-task confirmation | SME |

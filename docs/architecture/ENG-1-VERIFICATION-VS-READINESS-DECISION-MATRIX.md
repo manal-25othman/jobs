@@ -4,13 +4,15 @@
 
 **Status:** analysis only. No level semantics, policy, claim policy, SRS or SME content was changed. **Waiting for Product Owner approval.**
 
+**Update (2026-10-18, D-128):** §4 is reconciled with the SME's existing decisions. SME-Q1 is withdrawn, and L-1 is the provisional architecture. See `ENG-1-D127-SME-RECONCILIATION.md`.
+
 ---
 
 ## 1. The question
 
 **Can the current model award Demonstrated from one assessment while the SME evidence path requires two independent tasks?**
 
-**Yes.** This is by design in the current proposal, not a defect. Whether it is the correct professional design has never been explicitly confirmed by the SME (§4).
+**Yes.** This is by design (L-1), not a defect. It is consistent with the SME's confirmed model: per-skill evidence paths, no universal two-task rule, readiness = Must + Core minimums + an integrated pass (§4). It does not approve any Demonstrated threshold.
 
 | Fact (as built) | Where |
 |---|---|
@@ -57,38 +59,35 @@ Each row is a separate record with separate rules. None implies another unless t
 | # | Consequence of the current design | Why it matters |
 |---|---|---|
 | K-1 | A graduate can hold **Demonstrated** in a Must skill from one task while **not** job-ready for lack of the second task | Intended if "2 tasks" is a readiness requirement. Wrong if it is a level requirement |
-| K-2 | A **CV / LinkedIn claim** at Demonstrated can be drafted after **one** task (claim policies read the level; `cv_bullet` and `linkedin_skill` need `demonstrated`) | If the SME meant "Demonstrated needs two tasks", claims would currently be issued on half the evidence |
+| K-2 | A **CV / LinkedIn claim** at Demonstrated can be drafted after **one** task (claim policies read the level; `cv_bullet` and `linkedin_skill` need `demonstrated`), before readiness | A claim-policy decision for the PO (A-1b); under L-1 it is consistent with the SME model, since the level and readiness are separate |
 | K-3 | A claim policy with `min_evidence_count = 2` (proposed "if approved later" for `linkedin_skill` in the integration plan §11) **can never be met by the two-task path**. The second task at the same level leaves corroborating evidence, which claims exclude (D-126). It would count only a re-established or a lower-then-higher pair | That proposal must be replaced by an explicit claim-policy decision (open item A-1b). Not applied anywhere today |
 | K-4 | `min_independent_evidence` on a verification policy is **not** independence-aware (row count). It must not be used to encode "two independent tasks for Demonstrated" | If L-2 (§4) is chosen, it needs a new, independence-aware level rule (EXT-2 logic) and its own approval |
 | K-5 | Practiced is unreachable for this track. Under V-b (Core at Practiced), Core skills still reach Demonstrated directly from one task | DM-2 V-b does not make readiness easier |
 
 ---
 
-## 4. The exact professional decision that requires SME confirmation
+## 4. Reconciled with the SME's existing decisions (D-128 — supersedes the original §4 "SME-Q1")
 
-> **SME-Q1:** For each Must and Core skill whose minimum is **2** distinct practical tasks (SME table: «Must · Working · 2 · Task»; C3: «مشروع عملي مع مهمة قصيرة مستقلة»), does the requirement of **two independent tasks** define:
-> - **(L-1)** what is needed for the skill to **count toward Junior job readiness**, with the **Demonstrated** level awardable for one independently assessed task that meets the skill's approved criteria? *(current proposal)* or
-> - **(L-2)** what is needed to **award Demonstrated** itself, so that one task alone may award at most a lower level, or none? or
-> - **(L-3)** both?
+D-127 framed the meaning of "two tasks" as a new SME question (SME-Q1). **That question is withdrawn.** The SME's confirmed decisions already settle what it needs, and the SME is not asked again:
 
-The SME's sources do not settle it:
-- The form row gives a count and an evidence type, not the level it applies to.
-- C3 and C5 speak about readiness («جاهزًا»).
-- SME-25 speaks about criteria that block Demonstrated, within one assessment.
+| SME decision (source) | What it settles |
+|---|---|
+| C3 «يكفي مشروع عملي مع مهمة قصيرة مستقلة… لا أرى ضرورة لطلب مشروعين منفصلين لكل مهارة»; decision pack §E "no universal two-activity rule" | Evidence is designed **per skill**, not as a universal two-project or two-task rule. The per-skill minimums are the SME table values (2 for most Must/Core skills, 1 for Git and accessibility) |
+| F3; C3 «تثبت أن المتقدم قادر على تطبيق المهارة بنفسه» | Independent practical application is what counts, through a per-skill **evidence path**; code plus theory alone is incomplete |
+| SME-16, SME-54, C5 «بدل الاعتماد على عدد المهارات»; F4 (a URL without inspection is not evidence) | Verification is never inferred from counts of files, rows or skills |
+| F4 | Git may be shown through **one** sufficiently verified project (G-1…G-4) |
+| C5, SME-18 | **Readiness** = every Must skill at the required level + every Core skill at its Junior minimum + a passed integrated practical assessment |
+| C4 | Assessment may be automated under approved, calibrated criteria; human review for exceptional cases |
 
-The interpretation L-1 was made in the plan (§5.3–5.4) and the decision pack (§E, §G). **The SME has not explicitly confirmed it.**
+**Provisional architecture (PO, D-128): L-1.**
+- Verification-level requirements (what awards Practiced / Demonstrated) and job-readiness requirements (per-skill evidence paths, EXT-2, and the integrated pass, EXT-1) stay **separate and independently configurable**.
+- This is what is built.
+- L-1 is an architecture choice, **not** SME approval of any Demonstrated threshold. What one assessment must show for Demonstrated is still set only by SME-calibrated rubric thresholds and level descriptors (not yet approved), under a validated verification policy (not yet existing).
+- L-2/L-3 would remain possible later as configuration plus a new policy version (K-4), only through a separately approved change request.
 
-**What each answer changes (no change without a separately approved change request):**
-
-| Answer | Verification level | Readiness | Claims | Engineering |
-|---|---|---|---|---|
-| **L-1** | Unchanged (one task ⇒ Demonstrated) | EXT-2 paths as built | CV / LinkedIn may follow one task (K-2). Confirm with the claim-policy decision A-1b | None beyond the P6 approvals |
-| **L-2** | One task ⇒ at most Practiced (or no change); the second independent task ⇒ Demonstrated. Needs the SME to define what one task awards | EXT-2 becomes largely redundant (level already requires two) | Claims at Demonstrated automatically need two tasks | New independence-aware level rule (reusing `evidence-path.ts`). A rubric proposing Practiced for single tasks, or a policy cap with an upgrade path. A new policy version, change request and approval. **Changes existing level semantics** |
-| **L-3** | As L-2 | As built | As L-2 | As L-2 |
-
-**Linked PO decisions (not SME):** DM-2 (V-a / V-b / V-c) and A-1b (whether corroborating evidence may ever support a claim). They must be decided **after** SME-Q1, because K-2 and K-3 depend on it.
-
----
+**Consequences now PO decisions, not SME questions:**
+- K-2 and K-3 are claim-policy questions (A-1b): whether a CV/LinkedIn claim may follow a level reached before readiness, and what replaces the unreachable `min_evidence_count = 2` idea.
+- DM-2 (V-a / V-b / V-c) is still open (PO with SME). It is a calibration/activation value, not a reopened question.
 
 ## 5. What was verified, and how
 
