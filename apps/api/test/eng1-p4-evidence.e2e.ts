@@ -47,7 +47,7 @@ const SME = '44444444-4444-4444-8444-444444444444';
 const TAG = Math.random().toString(16).slice(2, 8);
 const P4_POLICY = 'ENG-1 P4 TEST ONLY: per-skill development pathway with corroborating evidence; unapproved draft; never production.';
 let canonicalId = ''; let roleId = ''; let ruleSetId = ''; let policyId = '';
-const ACT: Record<'INT' | 'A' | 'SAMEFAM' | 'NOFAM' | 'CURATED', { id: string; slug: string }> = {} as never;
+const ACT: Record<'INT' | 'A' | 'SAMEFAM' | 'NOFAM' | 'CURATED' | 'EXT1', { id: string; slug: string; version: string; rubricVersion: string }> = {} as never;
 const S: Record<'html' | 'ui' | 'api', string> = { html: '', ui: '', api: '' };
 const SOLID: Record<string, string> = { semantic_structure: 'solid', form_validation: 'solid', data_states: 'solid', state_transitions: 'solid', responsive_layout: 'solid',
   explanation_clarity: 'solid', judgment_assumption_check: 'met' };
@@ -69,7 +69,7 @@ async function walk(kind: 'activity_spec' | 'rubric_version', id: string) {
   if ((await st()) === 'approved') await reviewTransition(pool, { entityKind: kind, entityId: id, to: 'published', decidedBy: null, decidedByLabel: 'Product Owner', rolePerformed: 'product_owner', reason: 'publish', production: false });
 }
 /** A TEST clone of the canonical activity (content, deliverables, skills, checks, rubric with criteria and levels) with its own family and purpose. */
-async function cloneActivity(name: string, family: string | null, purpose: string | null, publish = true): Promise<{ id: string; slug: string }> {
+async function cloneActivity(name: string, family: string | null, purpose: string | null, publish = true, bindRubric = false): Promise<{ id: string; slug: string; version: string; rubricVersion: string }> {
   const slug = `p4_${name}_${TAG}`;
   const id = await tx(async (c) => {
     const newId = (await c.query(`insert into activity_spec select (jsonb_populate_record(null::activity_spec, to_jsonb(a) || jsonb_build_object(
@@ -83,7 +83,7 @@ async function cloneActivity(name: string, family: string | null, purpose: strin
     const rub = (await c.query(`insert into rubric_version select (jsonb_populate_record(null::rubric_version, to_jsonb(r) || jsonb_build_object(
         'id', gen_random_uuid(), 'activity_spec_id', $2::uuid, 'version', $3::text, 'status', 'curated', 'published_at', null, 'reviewed_by', null, 'reviewed_at', null,
         'values_approved_by', null, 'values_approved_by_label', null, 'values_approved_at', null, 'values_approval_reason', null, 'pass_threshold_status', 'proposed',
-        'activity_spec_version', null, 'promoted_from_id', null, 'created_at', now()))).* from rubric_version r where r.id = $1 returning id`, [src, newId, `rub_${slug}@1`])).rows[0].id as string;
+        'activity_spec_version', case when $4::boolean then (select version from activity_spec where id = $2::uuid) else null end, 'promoted_from_id', null, 'created_at', now()))).* from rubric_version r where r.id = $1 returning id`, [src, newId, `rub_${slug}@1`, bindRubric])).rows[0].id as string;
     for (const cr of (await c.query('select id, criterion_kind::text as kind from rubric_criterion where rubric_version_id = $1', [src])).rows) {
       const ncr = (await c.query(`insert into rubric_criterion select (jsonb_populate_record(null::rubric_criterion, to_jsonb(x) || jsonb_build_object('id', gen_random_uuid(), 'rubric_version_id', $2::uuid,
           'weight_status', 'proposed', 'threshold_status', case when $3::text = 'skill_evidence' then 'proposed' else null end, 'created_at', now()))).* from rubric_criterion x where x.id = $1 returning id`,
@@ -94,7 +94,8 @@ async function cloneActivity(name: string, family: string | null, purpose: strin
   });
   await approveRubricValues(pool, { rubricVersionId: id.rub, decidedBy: SME, decidedByLabel: 'Named SME', reason: 'ENG-1 P4 test clone: test values (not professional values)' });
   if (publish) { await walk('activity_spec', id.newId); await walk('rubric_version', id.rub); }
-  return { id: id.newId, slug };
+  const v = await one('select version from activity_spec where id = $1', [id.newId]);
+  return { id: id.newId, slug, version: v.version as string, rubricVersion: `rub_${slug}@1` };
 }
 
 before(async () => {
@@ -115,6 +116,7 @@ before(async () => {
   ACT.SAMEFAM = await cloneActivity('samefam', `fam_int_${TAG}`, 'practice');
   ACT.NOFAM = await cloneActivity('nofam', null, null);
   ACT.CURATED = await cloneActivity('curated', `fam_c_${TAG}`, 'practice', false);
+  ACT.EXT1 = await cloneActivity('ext1', `fam_x_${TAG}`, 'integrated', true, true);
   // TEST-ONLY verification policy: per-skill scope with corroborating evidence (0029 + 0030 opt-in).
   policyId = await tx(async (c) => {
     let id = (await c.query(`select id from verification_policy where key = 'default' and description_en = $1`, [P4_POLICY])).rows[0]?.id as string | undefined;
@@ -154,7 +156,7 @@ async function graduate(): Promise<TestUser> {
   return u;
 }
 /** Submits and has a named reviewer decide every human criterion. `seed` makes the uploaded files and texts unique to this task. */
-async function reviewedTask(u: TestUser, act: string, skills: string[], seed: string, levels: Record<string, string> = {}, texts?: { flow: string; clarification: string }): Promise<{ sid: string; resultId: string }> {
+async function reviewedTask(u: TestUser, act: string, skills: string[], seed: string, levels: Record<string, string> = {}, texts?: { flow: string; clarification: string }, review = true): Promise<{ sid: string; resultId: string }> {
   const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'P4', kind: 'platform_activity', activitySpecId: act }).expect(201)).body.data.id;
   const bytes = (s: string) => new TextEncoder().encode(`${s} :: ${seed}`);
   const f1 = await uploadFile(app, http, u, 'index.html', bytes('<form><label for=n>Name</label><input id=n></form>'), 'text/plain');
@@ -166,7 +168,7 @@ async function reviewedTask(u: TestUser, act: string, skills: string[], seed: st
       { key: 'answer.clarification', kind: 'text', valueText: texts?.clarification ?? `The brief says four fields and the spec lists five; I implemented four and flagged the fifth. (${seed})`, locator: 'notes.md' },
     ] }).expect(201)).body.data.id as string;
   const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
-  if (ev.outcome === 'needs_human_review') {
+  if (ev.outcome === 'needs_human_review' && review) {
     const r = await newUser(); await http.post('/v1/me/bootstrap').set(auth(r)).send({}).expect(201);
     await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'e2e operator')`, [r.id]);
     for (const it of (await pool.query(`select id, criterion_key from review_queue_item where evaluation_id = $1 order by criterion_key`, [ev.evaluationId])).rows) {
@@ -523,6 +525,137 @@ describe('ENG-1 — versioned text fingerprints (naqla-text-fp-v1): consistent d
     await pool.query(`insert into artifact_text_fingerprint (submission_artifact_id, fingerprint_version, user_id, submission_id, fingerprint, normalized_length, runtime_unicode)
       values ($1, 'naqla-text-fp-v0', $2, $3, $4, 60, 'test')`, [art, u.id, int.sid, 'a'.repeat(64)]);
     assert.equal((await one('select evidence_corroboration_conflict($1, $2, $3) as k', [u.id, S.api, int.resultId])).k, 'text_fingerprint_missing');
+  });
+});
+
+/* ───────────── Task C: EXT-1 integrated_assessment_passed (inactive, development-only, sealed) ───────────── */
+describe('EXT-1 — integrated_assessment_passed in readiness, development pathway', () => {
+  let ext1Set = '';
+  type IRule = { labelEn: string; outcome: string; skillIds: string[]; integratedAudit?: { completion: { submitted: number; finalResults: number; passed: boolean }; counted: { evaluationResultId: string; perSkill: { skillId: string; outcome: string; decision: string | null }[] } | null;
+    excluded: { evaluationResultId: string; reason: string }[]; judged: { evaluationResultId: string; verdict: string; reasons: string[] }[]; reasons: string[] } };
+  const ext1 = async (u: TestUser, label = 'EXT-1 PR-2 (test)') => ((await readiness(u)).rules as unknown as IRule[]).find((r) => r.labelEn === label)!;
+  const pin = () => ({ activity_code: ACT.EXT1.slug, allowed: [{ activity_version: ACT.EXT1.version, rubric_version: ACT.EXT1.rubricVersion }], require_concluded_review: true });
+  const create = (rules: { type: string; params: Record<string, unknown>; skillId?: string | null; labelAr: string; labelEn: string }[], key: string) =>
+    tx((c) => createReadinessRuleSet(c, { key, targetRoleId: roleId, labelAr: 'اختبار', labelEn: 'EXT-1 test (development only)', description: 'EXT-1 e2e: test pins, not SME values', createdBy: 'e2e', rules }));
+
+  before(async () => {
+    ext1Set = (await create([
+      { type: 'integrated_assessment_passed', params: { ...pin(), pass_rule: 'PR-2' }, labelAr: 'تكاملي', labelEn: 'EXT-1 PR-2 (test)' },
+      { type: 'integrated_assessment_passed', params: { ...pin(), pass_rule: 'PR-1' }, labelAr: 'تكاملي', labelEn: 'EXT-1 PR-1 (test)' },
+    ], `p4_ext1_${TAG}`)).id;
+    await tx(async (c) => {
+      await c.query(`update readiness_rule_set set activation = 'inactive' where target_role_id = $1 and activation <> 'inactive'`, [roleId]);
+      await c.query(`update readiness_rule_set set activation = 'development_only' where id = $1`, [ext1Set]);
+    }, { 'naqla.readiness_ext_dev_activation': 'on' });
+  });
+  after(async () => {
+    await tx(async (c) => {
+      await c.query(`update readiness_rule_set set activation = 'inactive' where id = $1`, [ext1Set]);
+      await c.query(`update readiness_rule_set set activation = 'development_only' where id = $1`, [ruleSetId]);
+    }, { 'naqla.readiness_ext_dev_activation': 'on' });
+  });
+
+  test('C1 · creation fails closed: wildcard, unpinned or unbound rubric, unpublished content, a skill, an unknown parameter or an invented threshold are refused', async () => {
+    const bad: [Record<string, unknown>, RegExp, (string | null)?][] = [
+      [{ ...pin(), allowed: [{ activity_version: '*', rubric_version: ACT.EXT1.rubricVersion }], pass_rule: 'PR-2' }, /explicit version/],
+      [{ ...pin(), allowed: [{ activity_version: ACT.EXT1.version, rubric_version: 'rub_other@9' }], pass_rule: 'PR-2' }, /not a published, non-demo rubric/],
+      [{ activity_code: 'act_fe_003', allowed: [{ activity_version: '0.2.0', rubric_version: 'rub_fe_003@0.2.0' }], pass_rule: 'PR-2', require_concluded_review: true }, /not a published, non-demo activity version/],
+      [{ activity_code: ACT.CURATED.slug, allowed: [{ activity_version: ACT.CURATED.version, rubric_version: ACT.CURATED.rubricVersion }], pass_rule: 'PR-2', require_concluded_review: true }, /not a published, non-demo activity version/],
+      [{ ...pin(), pass_rule: 'PR-2', min_total: 0.8 }, /unknown parameter/],
+      [{ ...pin(), pass_rule: 'PR-2', require_concluded_review: false }, /require_concluded_review/],
+      [{ ...pin(), pass_rule: 'PR-2' }, /never a skill|integrated_has_no_skill/, S.html],
+    ];
+    for (const [params, re, skill] of bad) {
+      await assert.rejects(() => create([{ type: 'integrated_assessment_passed', params, skillId: skill ?? null, labelAr: 'x', labelEn: 'x' }], `p4_ext1_bad_${Math.random().toString(16).slice(2, 8)}`), re, JSON.stringify(params));
+    }
+  });
+
+  test('C2 · not attempted ⇒ not satisfied (completion 0); readiness stays pending_validation with no verdict', async () => {
+    const u = await graduate();
+    const r = await ext1(u);
+    assert.equal(r.outcome, 'not_satisfied'); assert.deepEqual(r.integratedAudit!.completion, { submitted: 0, finalResults: 0, passed: false });
+    const rep = await readiness(u); assert.equal(rep.status, 'pending_validation'); assert.equal(rep.overall, null);
+  });
+
+  test('C3 · a concluded, eligible final result with standing evidence ⇒ satisfied under PR-2; per-skill results are listed, unmerged; PR-1 applies the APPROVED threshold to the same result', async () => {
+    const u = await graduate();
+    // Two non-mandatory criteria missed: every gate and mandatory criterion is met (PR-2 passes), the total 11/15 is below the approved 0.75 (PR-1 does not),
+    // and the skill measured by responsive_layout is not met in the same result.
+    const resp = (await one(`select canonical_skill_id(rc.linked_skill_id)::text as id from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id
+      where rv.activity_spec_id = $1 and rc.key = 'responsive_layout'`, [ACT.EXT1.id])).id as string;
+    const before = (await pool.query('select skill_id, state::text from skill_claim where user_id = $1 order by 1', [u.id])).rows;
+    const t = await reviewedTask(u, ACT.EXT1.id, [S.html, resp], 'ext1-c3', { responsive_layout: 'missing', explanation_clarity: 'missing' });
+    const r = await ext1(u);
+    assert.equal(r.outcome, 'satisfied', JSON.stringify(r.integratedAudit)); assert.equal(r.integratedAudit!.counted!.evaluationResultId, t.resultId);
+    assert.deepEqual(r.integratedAudit!.completion, { submitted: 1, finalResults: 1, passed: true });
+    const ps = r.integratedAudit!.counted!.perSkill;
+    assert.equal(ps.find((x) => x.skillId === S.html)!.outcome, 'met'); assert.notEqual(ps.find((x) => x.skillId === resp)!.outcome, 'met', 'a skill not met in the same result: reported, not merged');
+    assert.deepEqual(r.skillIds.sort(), [S.html, resp].sort());
+    const pr1 = await ext1(u, 'EXT-1 PR-1 (test)');
+    assert.equal(pr1.outcome, 'not_satisfied', JSON.stringify(pr1.integratedAudit)); assert.match(JSON.stringify(pr1.integratedAudit!.judged), /below the approved pass threshold/);
+    const rec = (await http.post('/v1/me/readiness/evaluations').set(auth(u)).send({}).expect(201)).body.data;
+    assert.equal(rec.report.status, 'pending_validation');
+    const after = (await pool.query('select skill_id, state::text from skill_claim where user_id = $1 order by 1', [u.id])).rows;
+    assert.ok(after.length >= before.length, 'levels come only from the per-skill writer');
+    assert.deepEqual((await pool.query('select skill_id, state::text from skill_claim where user_id = $1 order by 1', [u.id])).rows, after, 'readiness moved no level');
+    shared3 = { u, resultId: t.resultId };
+  });
+  let shared3: { u: TestUser; resultId: string } | null = null;
+
+  test('C4 · a pending human review is never a pass (indeterminate); a failed mandatory criterion ⇒ not satisfied', async () => {
+    const pending = await graduate();
+    await reviewedTask(pending, ACT.EXT1.id, [S.html], 'ext1-c4a', {}, undefined, false);
+    const p = await ext1(pending);
+    assert.equal(p.outcome, 'indeterminate'); assert.ok(p.integratedAudit!.excluded.some((x) => x.reason === 'review_pending' || x.reason === 'not_final'));
+    assert.equal(p.integratedAudit!.completion.passed, false); assert.equal(p.integratedAudit!.completion.submitted, 1, 'completed the activity, no assessment success yet');
+    const failed = await graduate();
+    await reviewedTask(failed, ACT.EXT1.id, [S.html, S.ui], 'ext1-c4b', { state_transitions: 'missing' });
+    const f = await ext1(failed);
+    assert.equal(f.outcome, 'not_satisfied', JSON.stringify(f.integratedAudit)); assert.match(JSON.stringify(f.integratedAudit!.judged), /not met: state_transitions/, 'one mandatory criterion decides');
+  });
+
+  test('C5 · withdrawn evidence voids the pass; the result and its decisions are unchanged history', async () => {
+    const { u, resultId } = shared3!;
+    const ev = (await pool.query(`select id from evidence where evaluation_result_id = $1 and withdrawn_at is null`, [resultId])).rows;
+    assert.ok(ev.length >= 1);
+    const decisions = (await pool.query('select id, decision from verification_decision where evaluation_result_id = $1 order by id', [resultId])).rows;
+    await http.post(`/v1/evidence/${ev[0].id}/withdraw`).set(auth(u)).send({ reason: 'لم يكن العمل عملي بالكامل' }).expect(201);
+    const r = await ext1(u);
+    assert.equal(r.outcome, 'not_satisfied'); assert.ok(r.integratedAudit!.excluded.some((x) => x.evaluationResultId === resultId && x.reason === 'evidence_withdrawn'));
+    assert.deepEqual((await pool.query('select id, decision from verification_decision where evaluation_result_id = $1 order by id', [resultId])).rows, decisions);
+  });
+
+  test('C6 · tenant isolation: another learner\'s results never appear; a client cannot read or write the rule', async () => {
+    const other = await graduate();
+    const r = await ext1(other);
+    assert.equal(r.integratedAudit!.completion.submitted, 0); assert.equal(r.integratedAudit!.excluded.length + r.integratedAudit!.judged.length, 0);
+    await asAuthenticatedUser(pool, other.id, async (cc) => {
+      await expectRejected(cc, `insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ($1, 'integrated_assessment_passed', '{}', null, 'x', 'x')`, [ext1Set], /permission denied|row-level security/);
+    });
+  });
+
+  test('C7 · sealed: never approved, published or production-activated; development_only only with the opt-in; production sees it unconfigured', async () => {
+    for (const attempt of [
+      (c: PoolClient) => approveConfigRow(c, { table: 'readiness_rule_set', id: ext1Set, approvedBy: SME, approvedByLabel: 'Named SME', reason: 'try' }),
+      (c: PoolClient) => setConfigActivation(c, { table: 'readiness_rule_set', id: ext1Set, activation: 'production_active', actor: 'e2e', reason: 'try' }),
+    ]) {
+      const c = await pool.connect();
+      try { await c.query('begin'); await assert.rejects(() => attempt(c), /sealed|approved/); } finally { await c.query('rollback'); c.release(); }
+    }
+    const audited = { 'naqla.config_actor': 'e2e', 'naqla.config_reason': 'prove the EXT-1 seal' };
+    await refused(`update readiness_rule_set set review_status = 'approved', approved_by = 'po', approved_at = now() where id = $1`, [ext1Set], /EXT-1 \(integrated_assessment_passed\) or EXT-2/, audited);
+    await refused(`update readiness_rule set label_en = 'retyped' where rule_set_id = $1`, [ext1Set], /only to an inactive, unapproved/, audited);
+    await tx(async (c) => { await c.query(`update readiness_rule_set set activation = 'inactive' where id = $1`, [ext1Set]); });
+    try {
+      await refused(`update readiness_rule_set set activation = 'development_only' where id = $1`, [ext1Set], /readiness_ext_dev_activation/, audited);
+      await refused(`update readiness_rule_set set activation = 'development_only' where id = $1`, [ext1Set], /never be activated in production|production/,
+        { ...audited, 'naqla.readiness_ext_dev_activation': 'on', 'naqla.production': 'on' });
+    } finally {
+      await tx(async (c) => { await c.query(`update readiness_rule_set set activation = 'development_only' where id = $1`, [ext1Set]); }, { 'naqla.readiness_ext_dev_activation': 'on' });
+    }
+    const prev = process.env['NODE_ENV']; process.env['NODE_ENV'] = 'production';
+    try { assert.equal((await readiness(shared3!.u)).status, 'not_yet_configured'); } finally { process.env['NODE_ENV'] = prev; }
+    assert.equal(Number((await one(`select count(*)::int as n from readiness_rule_set s where readiness_rule_set_has_sealed_rule(s.id) and (s.review_status in ('approved','published') or s.activation in ('production_active','legacy_baseline'))`)).n), 0);
   });
 });
 

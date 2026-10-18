@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { assertActivationAllowed, configIsValidated, MissingPrerequisite, CLAIM_KIND_CLASS, evidenceOrdinal, assertSubmissionPromotionNotEnabled, DomainError, type ConfigActivation, type ClaimKind, type EvidenceState } from '@naqla/domain';
 import { GOVERNED_TABLES, governedFromRow, isProduction, type GovernedTable } from './configuration.service';
 import { loadPathCatalog } from '../readiness/evidence-facts';
+import { loadIntegratedCatalog } from '../readiness/integrated-facts';
 import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
 import { emitAuditEvent } from '../infra/audit';
 
@@ -94,7 +95,7 @@ export async function createTrackConfigVersion(c: PoolClient, p: { targetRoleId:
 /** A new DRAFT readiness rule set (inactive). Rule types are code constants; every value here is configuration. */
 export async function createReadinessRuleSet(c: PoolClient, p: { key: string; targetRoleId: string | null; labelAr: string; labelEn: string; description: string; createdBy: string;
   rules: { type: string; params: Record<string, unknown>; skillId?: string | null; labelAr: string; labelEn: string }[] }) {
-  const { assertReadinessRuleSetSane, readinessRuleFromRow, parseSkillEvidencePathParams, validateSkillEvidencePathCatalog } = await import('@naqla/domain');
+  const { assertReadinessRuleSetSane, readinessRuleFromRow, parseSkillEvidencePathParams, validateSkillEvidencePathCatalog, parseIntegratedAssessmentParams, validateIntegratedCatalog } = await import('@naqla/domain');
   const next = await c.query('select coalesce(max(version), 0) + 1 as v from readiness_rule_set where key = $1', [p.key]);
   const set = await c.query(
     `insert into readiness_rule_set (key, version, target_role_id, label_ar, label_en, description_en, created_by) values ($1,$2,$3,$4,$5,$6,$7) returning id, version`,
@@ -113,6 +114,14 @@ export async function createReadinessRuleSet(c: PoolClient, p: { key: string; ta
       const codes = [...Object.keys(params.counted_criteria), ...(params.understanding_source ? [params.understanding_source.activity] : [])];
       try { validateSkillEvidencePathCatalog(params, r.skillId!, await loadPathCatalog(c, codes), `#${pos}`); }
       catch (e) { throw new BadRequestException((e as Error).message); }
+    }
+    // EXT-1: one explicitly approved integrated activity, each allowed version pinned to its bound, published, values-approved rubric.
+    if (r.type === 'integrated_assessment_passed') {
+      if (r.skillId) throw new BadRequestException(`integrated_assessment_passed rule #${pos}: it names an activity, never a skill`);
+      try {
+        const params = parseIntegratedAssessmentParams(r.params, `#${pos}`);
+        validateIntegratedCatalog(params, await loadIntegratedCatalog(c, params.activity_code));
+      } catch (e) { throw new BadRequestException((e as Error).message); }
     }
   }
   assertReadinessRuleSetSane({ id: set.rows[0].id, key: p.key, version: Number(set.rows[0].version), reviewStatus: 'draft', activation: 'inactive', baselineOf: null, approvedBy: null, targetRoleId: p.targetRoleId, labelAr: p.labelAr, labelEn: p.labelEn, rules });
@@ -172,16 +181,16 @@ export function assertVerificationPolicyMayBe(row: Record<string, unknown>, targ
 }
 
 /**
- * ENG-1 P4 — validation-boundary twin of the 0030 seal: a readiness rule set with a skill_evidence_path (EXT-2) rule is
+ * ENG-1 — validation-boundary twin of the 0030/0033 seal: a readiness rule set with an EXT-1 or EXT-2 rule is
  * never approved, and never activated except development_only outside production, until the Product Owner's P6 decision.
  */
 export async function assertReadinessSetMayBe(c: PoolClient, setId: string, target: { reviewStatus?: string; activation?: string }): Promise<void> {
-  const ext = await c.query(`select 1 from readiness_rule where rule_set_id = $1 and rule_type = 'skill_evidence_path' limit 1`, [setId]);
+  const ext = await c.query(`select 1 from readiness_rule where rule_set_id = $1 and rule_type in ('skill_evidence_path', 'integrated_assessment_passed') limit 1`, [setId]);
   if (!ext.rowCount) return;
   if (target.reviewStatus === 'approved' || target.reviewStatus === 'published' || (target.activation !== undefined && target.activation !== 'development_only')) {
-    throw new BadRequestException('a readiness rule set with an independent-evidence (EXT-2) rule is sealed until P6: it cannot be approved, published or activated for real users');
+    throw new BadRequestException('a readiness rule set with an EXT-1 (integrated assessment) or EXT-2 (independent-evidence) rule is sealed until P6: it cannot be approved, published or activated for real users');
   }
-  if (isProduction()) throw new BadRequestException('an independent-evidence (EXT-2) readiness rule set can never be activated in production');
+  if (isProduction()) throw new BadRequestException('an EXT-1 / EXT-2 readiness rule set can never be activated in production');
 }
 
 /** Activation of a Track Builder version: live TrackSkill rows take the version's snapshot. Audited per row; classification approval travels with the SME's name. */

@@ -22,6 +22,7 @@ import { DomainError, MissingPrerequisite } from './errors.js';
 import { EVIDENCE_STATES, evidenceOrdinal, type EvidenceState } from './evidence-state.js';
 import { configIsValidated, type ConfigResolution, type GovernedConfig, type TrackSkillConfig } from './configuration.js';
 import { parseSkillEvidencePathParams, evaluateSkillEvidencePath, understandingKey, type EvidenceTaskFact, type SkillEvidencePathAudit } from './evidence-path.js';
+import { parseIntegratedAssessmentParams, evaluateIntegratedAssessment, type IntegratedResultFact, type IntegratedAssessmentAudit } from './integrated-assessment.js';
 
 export const READINESS_RULE_TYPES = [
   'required_skill_at_level',      // params: { min_level }            skill_id required — e.g. "JavaScript at demonstrated"
@@ -31,10 +32,11 @@ export const READINESS_RULE_TYPES = [
   'all_skills_at_expected_level', // params: {}                       uses TrackSkill.expected_level; null ⇒ indeterminate for that skill
   'min_evidence_per_skill',       // params: { min_count }            skill_id optional (null = every enabled skill) — counts standing rows; NOT an independence rule
   'skill_evidence_path',          // EXT-2 (ENG-1 P4): params per evidence-path.ts; skill_id required. SEALED: development-only until P6 (migration 0030)
+  'integrated_assessment_passed', // EXT-1: params per integrated-assessment.ts; skill_id null. SEALED: development-only until P6 (migration 0033)
 ] as const;
 
 /** Rule types that may never be approved or active for real users until the Product Owner's P6 decision (DB seal 0030 + config-admin). */
-export const SEALED_READINESS_RULE_TYPES: readonly ReadinessRuleType[] = ['skill_evidence_path'];
+export const SEALED_READINESS_RULE_TYPES: readonly ReadinessRuleType[] = ['skill_evidence_path', 'integrated_assessment_passed'];
 export type ReadinessRuleType = (typeof READINESS_RULE_TYPES)[number];
 
 export interface ReadinessRule {
@@ -80,6 +82,8 @@ export interface RuleResult {
   skillIds: string[];
   /** EXT-2: what was counted, collapsed and excluded (ids only). */
   audit?: SkillEvidencePathAudit;
+  /** EXT-1: completion, the counted result (with its per-skill attribution), exclusions and verdicts (ids only). */
+  integratedAudit?: IntegratedAssessmentAudit;
 }
 
 /** EXT-2 facts, loaded by the API only when the rule set in effect has a skill_evidence_path rule. */
@@ -89,6 +93,8 @@ export interface EvidencePathFacts {
   /** understandingKey(source) → met / not met / never assessed (null). */
   readonly understanding: Readonly<Record<string, boolean | null>>;
   readonly production: boolean;
+  /** EXT-1: activity code → this learner's final-result candidates and submission count (loaded only for an EXT-1 rule). */
+  readonly integrated?: Readonly<Record<string, { readonly results: readonly IntegratedResultFact[]; readonly submissions: number }>>;
 }
 
 export type ReadinessStatus = 'not_yet_configured' | 'pending_validation' | 'evaluated';
@@ -140,6 +146,9 @@ export function assertReadinessRuleSetSane(set: ReadinessRuleSet): void {
       case 'skill_evidence_path':
         if (!r.skillId) throw new DomainError(`rule ${r.id}: skill_evidence_path needs a skill_id (one path per skill)`);
         parseSkillEvidencePathParams(r.params, r.id); break;
+      case 'integrated_assessment_passed':
+        if (r.skillId) throw new DomainError(`rule ${r.id}: integrated_assessment_passed is about one activity, not a skill (skill_id must be null)`);
+        parseIntegratedAssessmentParams(r.params, r.id); break;
     }
   }
 }
@@ -199,6 +208,16 @@ function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[]
         ...(params.understanding_source ? { understandingMet: evidence.understanding[understandingKey(params.understanding_source)] ?? null } : {}) });
       return { ...base, outcome: audit.outcome, detailEn: `${audit.independentTasks} independent task(s) of ${audit.minDistinctTasks} needed${audit.reasons.length ? `; ${audit.reasons.join('; ')}` : ''}`,
         skillIds: [rule.skillId!], audit };
+    }
+    case 'integrated_assessment_passed': {
+      // Separation (EXT-1): the only rule that reads an activity's overall pass — through the pinned, approved rubric's
+      // own gate/mandatory criteria. It never reads or moves a level; per-skill results are reported, not merged.
+      const params = parseIntegratedAssessmentParams(rule.params, rule.id);
+      const src = evidence?.integrated?.[params.activity_code];
+      if (!src) return { ...base, outcome: 'indeterminate', detailEn: 'integrated-assessment facts were not loaded', skillIds: [] };
+      const integratedAudit = evaluateIntegratedAssessment({ params, results: src.results, submissions: src.submissions });
+      return { ...base, outcome: integratedAudit.outcome, detailEn: `${params.activity_code} (${params.pass_rule}): ${integratedAudit.outcome}${integratedAudit.reasons.length ? `; ${integratedAudit.reasons.join('; ')}` : ''}`,
+        skillIds: [...new Set((integratedAudit.counted?.perSkill ?? []).map((x) => x.skillId))], integratedAudit };
     }
   }
 }

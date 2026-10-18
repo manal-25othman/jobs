@@ -8,6 +8,7 @@ import {
   type ReadinessRuleSet, type SkillReadinessFacts, type ReadinessReport, type TrackSkillConfig, type ConfigResolution, type EvidenceState, type EvidencePathFacts,
 } from '@naqla/domain';
 import { evidencePathRules, loadEvidenceTaskFacts, loadUnderstanding } from './evidence-facts';
+import { integratedRules, loadIntegratedFacts } from './integrated-facts';
 
 /**
  * Readiness Engine (Phase 5). Reads facts, applies the ACTIVE rule set through
@@ -62,14 +63,17 @@ export class ReadinessService {
   }
 
   /**
-   * ENG-1 P4 / EXT-2: the independent-evidence facts, loaded ONLY when the rule set in effect has a skill_evidence_path
-   * rule (sealed: development-only). Read-only; this user's rows only.
+   * ENG-1 P4 / EXT-2 and EXT-1: the independent-evidence and integrated-assessment facts, loaded ONLY when the rule set in
+   * effect has such a rule (sealed: development-only). Read-only; this user's rows only.
    */
   async evidenceFacts(c: PoolClient, userId: string, set: ReadinessRuleSet | null): Promise<EvidencePathFacts | undefined> {
     const rules = evidencePathRules(set);
-    if (rules.length === 0) return undefined;
+    const integrated = integratedRules(set);
+    if (rules.length === 0 && integrated.length === 0) return undefined;
     const sources = rules.map((r) => r.params.understanding_source).filter((x): x is NonNullable<typeof x> => !!x);
-    return { tasks: await loadEvidenceTaskFacts(c, userId, [...new Set(rules.map((r) => r.skillId))]), understanding: await loadUnderstanding(c, userId, sources), production: isProduction() };
+    return { tasks: await loadEvidenceTaskFacts(c, userId, [...new Set(rules.map((r) => r.skillId))]), understanding: await loadUnderstanding(c, userId, sources), production: isProduction(),
+      // EXT-1 (sealed, development-only): this learner's results of each named integrated activity.
+      ...(integrated.length ? { integrated: await loadIntegratedFacts(c, userId, [...new Set(integrated.map((p) => p.activity_code))]) } : {}) };
   }
 
   private async goalRole(c: PoolClient, userId: string): Promise<{ id: string; labelAr: string; labelEn: string } | null> {

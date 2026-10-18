@@ -77,8 +77,8 @@ insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, 
   ('9a000000-0000-4000-8000-000000000031', 'skill_evidence_path', '{"min_distinct_tasks": 2}'::jsonb, '9a000000-0000-4000-8000-000000000011', 'x', 'x');
 select ie_must_fail(null, $$insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ('9a000000-0000-4000-8000-000000000031', 'skill_evidence_path', '{}'::jsonb, null, 'x', 'x')$$,
   '0030: an EXT-2 rule names its skill', 'evidence_path_has_skill');
-select ie_must_fail(null, $$insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ('9a000000-0000-4000-8000-000000000031', 'integrated_assessment_passed', '{}'::jsonb, null, 'x', 'x')$$,
-  '0030: EXT-1 is NOT a rule type (recommendation only; nothing bypasses it silently)', 'rule_type_check');
+select ie_must_fail(null, $$insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ('9a000000-0000-4000-8000-000000000031', 'integrated_assessment_percent', '{}'::jsonb, null, 'x', 'x')$$,
+  '0030: an unknown rule type is refused (EXT-1 exists only as the sealed type of 0033, proven below)', 'rule_type_check');
 select ie_must_fail(null, $$update readiness_rule_set set review_status = 'approved', approved_by = 'po', approved_at = now() where id = '9a000000-0000-4000-8000-000000000031'$$,
   'SEAL: an EXT-2 rule set cannot be APPROVED', 'sealed');
 select ie_must_fail(null, $$update readiness_rule_set set review_status = 'published', approved_by = 'po', approved_at = now() where id = '9a000000-0000-4000-8000-000000000031'$$,
@@ -116,4 +116,31 @@ select ie_must_fail(null, $$insert into verification_decision (assessment_id, ev
 do $$ begin
   if exists (select 1 from verification_policy where record_corroborating_evidence) then raise exception 'FAIL  a policy enables corroboration after migration'; end if;
   raise notice 'PASS  CORROBORATION: no policy enables it after the migration (default off)';
+end $$;
+
+-- ─────────────────────────────── EXT-1 (0033): integrated_assessment_passed is sealed like EXT-2 ───────────────────────────────
+set naqla.config_actor = 'eng1 ext1 proof'; set naqla.config_reason = 'prove the EXT-1 seal';
+insert into readiness_rule_set (id, key, version, label_ar, label_en, description_en, created_by) values
+  ('9a000000-0000-4000-8000-000000000033', 'ie_ext1', 1, 'x', 'x', 'EXT-1 proof set', 'proof');
+insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values
+  ('9a000000-0000-4000-8000-000000000033', 'integrated_assessment_passed', '{"activity_code": "act_x", "allowed": [], "pass_rule": "PR-2", "require_concluded_review": true}'::jsonb, null, 'x', 'x');
+select ie_must_fail(null, $$insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ('9a000000-0000-4000-8000-000000000033', 'integrated_assessment_passed', '{}'::jsonb, '9a000000-0000-4000-8000-000000000011', 'x', 'x')$$,
+  '0033: an EXT-1 rule names an activity, never a skill', 'integrated_has_no_skill');
+select ie_must_fail(null, $$update readiness_rule_set set review_status = 'approved', approved_by = 'po', approved_at = now() where id = '9a000000-0000-4000-8000-000000000033'$$,
+  'SEAL 0033: an EXT-1 rule set cannot be APPROVED', 'sealed');
+select ie_must_fail(null, $$update readiness_rule_set set activation = 'production_active' where id = '9a000000-0000-4000-8000-000000000033'$$,
+  'SEAL 0033: … nor PRODUCTION_ACTIVE', 'sealed|approved');
+select ie_must_fail(null, $$update readiness_rule_set set activation = 'development_only' where id = '9a000000-0000-4000-8000-000000000033'$$,
+  'SEAL 0033: development_only needs the explicit opt-in', 'readiness_ext_dev_activation');
+select ie_must_fail($$select set_config('naqla.readiness_ext_dev_activation', 'on', true), set_config('naqla.production', 'on', true)$$,
+  $$update readiness_rule_set set activation = 'development_only' where id = '9a000000-0000-4000-8000-000000000033'$$,
+  'SEAL 0033: never in production, even with the opt-in', 'production');
+select ie_must_fail(null, $$insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en) values ('9a000000-0000-4000-8000-000000000032', 'integrated_assessment_passed', '{}'::jsonb, null, 'x', 'x')$$,
+  'SEAL 0033: an EXT-1 rule cannot be slipped into an APPROVED set', 'only to an inactive, unapproved');
+reset naqla.config_actor; reset naqla.config_reason;
+do $$ begin
+  if exists (select 1 from readiness_rule_set s where readiness_rule_set_has_sealed_rule(s.id) and (s.review_status in ('approved','published') or s.activation <> 'inactive')) then
+    raise exception 'FAIL  an EXT-1/EXT-2 rule set is approved or active';
+  end if;
+  raise notice 'PASS  at rest: no EXT-1 or EXT-2 rule set is approved or active';
 end $$;
