@@ -39,6 +39,7 @@ export * from './activity-catalogue.js';
 export * from './skill-attribution.js';
 export * from './per-skill-assessment.js';
 export * from './evidence-path.js';
+export * from './text-fingerprint.js';
 
 /** Version of the rule set. Bumped when a rule changes, via a CHG record. */
 export const DOMAIN_RULESET_VERSION = '0.21.0';

@@ -37,7 +37,8 @@ import { createReadinessRuleSet, approveConfigRow, setConfigActivation } from '.
 import { loadEvidenceTaskFacts } from '../src/readiness/evidence-facts';
 import { loadClaimSubject } from '../src/agents/claim-drafts';
 import { loadDomainFacts } from '../src/agents/domain-facts';
-import { claimEligibility, type ClaimPolicy } from '@naqla/domain';
+import { claimEligibility, TEXT_FINGERPRINT_VERSION, type ClaimPolicy } from '@naqla/domain';
+import { textFingerprint } from '../src/readiness/text-fingerprints';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const auth = (u: TestUser) => ({ Authorization: `Bearer ${u.token}` });
@@ -153,7 +154,7 @@ async function graduate(): Promise<TestUser> {
   return u;
 }
 /** Submits and has a named reviewer decide every human criterion. `seed` makes the uploaded files and texts unique to this task. */
-async function reviewedTask(u: TestUser, act: string, skills: string[], seed: string, levels: Record<string, string> = {}): Promise<{ sid: string; resultId: string }> {
+async function reviewedTask(u: TestUser, act: string, skills: string[], seed: string, levels: Record<string, string> = {}, texts?: { flow: string; clarification: string }): Promise<{ sid: string; resultId: string }> {
   const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'P4', kind: 'platform_activity', activitySpecId: act }).expect(201)).body.data.id;
   const bytes = (s: string) => new TextEncoder().encode(`${s} :: ${seed}`);
   const f1 = await uploadFile(app, http, u, 'index.html', bytes('<form><label for=n>Name</label><input id=n></form>'), 'text/plain');
@@ -161,8 +162,8 @@ async function reviewedTask(u: TestUser, act: string, skills: string[], seed: st
   const f3 = await uploadFile(app, http, u, 'app.js', bytes('const state = { items: [] };'));
   const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: skills, files: filesFor([f1, f2, f3], ['file.index_html', 'file.styles_css', 'file.app_js']),
     aiDisclosure: { declaredUse: [] }, artifacts: [
-      { key: 'note.data_flow', kind: 'text', valueText: `The form submits to a state object; the list is re-rendered from state; loading, error and empty are explicit. (${seed})`, locator: 'notes.md' },
-      { key: 'answer.clarification', kind: 'text', valueText: `The brief says four fields and the spec lists five; I implemented four and flagged the fifth. (${seed})`, locator: 'notes.md' },
+      { key: 'note.data_flow', kind: 'text', valueText: texts?.flow ?? `The form submits to a state object; the list is re-rendered from state; loading, error and empty are explicit. (${seed})`, locator: 'notes.md' },
+      { key: 'answer.clarification', kind: 'text', valueText: texts?.clarification ?? `The brief says four fields and the spec lists five; I implemented four and flagged the fifth. (${seed})`, locator: 'notes.md' },
     ] }).expect(201)).body.data.id as string;
   const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
   if (ev.outcome === 'needs_human_review') {
@@ -440,3 +441,88 @@ describe('ENG-1 P4 — independent evidence (EXT-2) in readiness, development pa
     assert.equal(Number((await one(`select count(*)::int as n from verification_policy where record_corroborating_evidence and (review_status in ('approved','published') or activation in ('production_active','legacy_baseline'))`)).n), 0);
   });
 });
+
+/* ───────────── Task A (0032): one versioned text fingerprint; uncertain duplicates fail closed ───────────── */
+describe('ENG-1 — versioned text fingerprints (naqla-text-fp-v1): consistent duplicate checks, Arabic and English', () => {
+  const AR = 'يرسل النموذج البيانات إلى كائن الحالة ثم تُعرض القائمة من جديد، وحالات التحميل والخطأ والفراغ واضحة في 3 خطوات';
+  // The same Arabic text with harakat, tatweel, an RLM mark, Arabic-Indic digits and no-break spaces (representation only).
+  const AR_VARIANT = AR.replace('يرسل', 'يُرسِلُ').replace('النموذج', 'النمـــوذج').replace('3', String.fromCharCode(0x0663))
+    .replace('الحالة ', 'الحالة' + String.fromCharCode(0x200F) + ' ').replace(/ من /g, String.fromCharCode(0x00A0) + 'من' + String.fromCharCode(0x00A0));
+  const EN = 'The brief says four fields and the spec lists five; I implemented four and flagged the fifth to the team lead.';
+  const EN_VARIANT = '  ' + EN.toUpperCase().replace(/ /g, String.fromCharCode(0x2009) + ' ') + '\n';
+  const own = (seed: string) => ({ flow: `Own Arabic-free flow note written for this task only: ${seed} — state drives the list.`, clarification: `Own clarification for ${seed}: four fields were implemented as briefed.` });
+
+  test('A1 · the database and EXT-2 use the same version; every stored fingerprint equals the one TypeScript definition', async () => {
+    assert.equal((await one('select current_text_fingerprint_version() as v')).v, TEXT_FINGERPRINT_VERSION);
+    assert.equal(Number((await one(`select count(*)::int as n from pg_proc where proname = 'evidence_normalized_text_hash'`)).n), 0, 'no second (SQL) normalizer');
+    const stored = (await pool.query(`select sa.value_text, f.fingerprint, f.normalized_length from artifact_text_fingerprint f join submission_artifact sa on sa.id = f.submission_artifact_id
+      where f.fingerprint_version = $1 limit 200`, [TEXT_FINGERPRINT_VERSION])).rows;
+    assert.ok(stored.length > 0, 'fixture: earlier tests stored fingerprints');
+    for (const r of stored) { const f = textFingerprint(String(r.value_text)); assert.equal(f.fingerprint, r.fingerprint); assert.equal(f.normalizedLength, r.normalized_length); }
+  });
+
+  test('A2 · Arabic: the same text with diacritics, tatweel, marks, digits and spaces is a reused artifact — no corroborating evidence', async () => {
+    const u = await graduate();
+    await reviewedTask(u, ACT.INT.id, [S.html], 'ar-int', {}, { flow: AR, clarification: own('ar-int').clarification });
+    const a = await reviewedTask(u, ACT.A.id, [S.html], 'ar-a', {}, { flow: AR_VARIANT, clarification: own('ar-a').clarification });
+    assert.equal((await decisionOf(a.resultId, S.html)).evidence_id, null);
+    assert.match(await reasonOf(a.resultId, S.html), /\(reused_text\)/);
+    const r = rule(await readiness(u), 'P-HTML (test)');
+    assert.equal(r.audit!.independentTasks, 1); assert.ok(r.audit!.excluded.some((x) => x.evaluationResultId === a.resultId && x.reason === 'decision_not_positive'));
+    // EXT-2's own comparison (the same stored fingerprints) also sees the two tasks share a text artifact.
+    const c = await pool.connect();
+    try {
+      const facts = (await loadEvidenceTaskFacts(c, u.id, [S.html]))[S.html]!;
+      const [x, y] = [facts.find((f) => f.activitySpecId === ACT.INT.id)!, facts.find((f) => f.activitySpecId === ACT.A.id)!];
+      assert.ok(x.textHashes.some((h) => y.textHashes.includes(h)), 'EXT-2 and the database agree: reused text');
+      assert.equal(x.artifactsVerifiable && y.artifactsVerifiable, true);
+    } finally { c.release(); }
+  });
+
+  test('A3 · English: the same text in another case and spacing is reused; a genuinely different text (a paraphrase) is NOT accused', async () => {
+    const u = await graduate();
+    await reviewedTask(u, ACT.INT.id, [S.html], 'en-int', {}, { flow: own('en-int').flow, clarification: EN });
+    const a = await reviewedTask(u, ACT.A.id, [S.html], 'en-a', {}, { flow: own('en-a').flow, clarification: EN_VARIANT });
+    assert.match(await reasonOf(a.resultId, S.html), /\(reused_text\)/);
+    const v = await graduate();
+    await reviewedTask(v, ACT.INT.id, [S.html], 'en-int2', {}, { flow: own('en-int2').flow, clarification: EN });
+    const b = await reviewedTask(v, ACT.A.id, [S.html], 'en-a2', {}, { flow: own('en-a2').flow, clarification: 'Four fields were requested and the specification listed five; I built the four and raised the fifth with the lead.' });
+    assert.equal((await decisionOf(b.resultId, S.html)).decision, 'evidence_corroborated', 'no similarity judgment: different wording is a different text');
+    assert.equal(rule(await readiness(v), 'P-HTML (test)').audit!.independentTasks, 2);
+  });
+
+  test('A4 · cross-tenant: another learner\'s identical text is never compared (no accusation across learners)', async () => {
+    const first = await graduate();
+    await reviewedTask(first, ACT.INT.id, [S.html], 'xt-1', {}, { flow: AR + ' (xt)', clarification: own('xt-1').clarification });
+    const second = await graduate();
+    await reviewedTask(second, ACT.INT.id, [S.html], 'xt-2', {}, { flow: own('xt-2').flow, clarification: own('xt-2').clarification });
+    const b = await reviewedTask(second, ACT.A.id, [S.html], 'xt-3', {}, { flow: AR + ' (xt)', clarification: own('xt-3').clarification });
+    assert.equal((await decisionOf(b.resultId, S.html)).decision, 'evidence_corroborated', 'the first learner\'s artifact is not this learner\'s earlier evidence');
+    await asAuthenticatedUser(pool, second.id, async (cc) => { await expectRejected(cc, 'select 1 from artifact_text_fingerprint', [], /permission denied/); });
+  });
+
+  test('A5 · withdrawn evidence still blocks reuse: a withdrawal never makes a resubmitted artifact independent', async () => {
+    const u = await graduate();
+    await reviewedTask(u, ACT.INT.id, [S.html], 'wd-int', {}, own('wd-int'));
+    const a = await reviewedTask(u, ACT.A.id, [S.html], 'wd-a', {}, { flow: AR + ' (wd)', clarification: own('wd-a').clarification });
+    const corr = (await decisionOf(a.resultId, S.html)).evidence_id as string; assert.ok(corr);
+    await http.post(`/v1/evidence/${corr}/withdraw`).set(auth(u)).send({ reason: 'سحب الدليل الداعم' }).expect(201);
+    const again = await reviewedTask(u, ACT.NOFAM.id, [S.html], 'wd-nofam', {}, { flow: AR.replace('يرسل', 'يُرسِل') + ' (wd)', clarification: own('wd-n').clarification });
+    assert.equal((await decisionOf(again.resultId, S.html)).evidence_id, null);
+    assert.match(await reasonOf(again.resultId, S.html), /\(reused_text\)/);
+  });
+
+  test('A6 · uncertain duplicates fail closed: an artifact without a current-version fingerprint is a conflict, never "independent"', async () => {
+    const u = await graduate();
+    const int = await reviewedTask(u, ACT.INT.id, [S.html], 'fc-int', {}, own('fc-int'));
+    // The accepted (first) task stores no fingerprint; for a skill with no earlier evidence the only thing left to compare is its text.
+    assert.equal(Number((await one('select count(*)::int as n from artifact_text_fingerprint where submission_id = $1', [int.sid])).n), 0, 'fixture: not fingerprinted yet');
+    assert.equal((await one('select evidence_corroboration_conflict($1, $2, $3) as k', [u.id, S.api, int.resultId])).k, 'text_fingerprint_missing');
+    // A fingerprint of ANOTHER version does not count as the current one.
+    const art = (await one(`select id from submission_artifact where submission_id = $1 and kind = 'text' limit 1`, [int.sid])).id;
+    await pool.query(`insert into artifact_text_fingerprint (submission_artifact_id, fingerprint_version, user_id, submission_id, fingerprint, normalized_length, runtime_unicode)
+      values ($1, 'naqla-text-fp-v0', $2, $3, $4, 60, 'test')`, [art, u.id, int.sid, 'a'.repeat(64)]);
+    assert.equal((await one('select evidence_corroboration_conflict($1, $2, $3) as k', [u.id, S.api, int.resultId])).k, 'text_fingerprint_missing');
+  });
+});
+

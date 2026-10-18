@@ -152,8 +152,13 @@ export interface EvidenceTaskFact {
   readonly skillAssessmentId: string | null;
   /** Server-measured checksums of the learner's uploads in this submission (never returned to a client). */
   readonly uploadChecksums: readonly string[];
-  /** Server-computed hashes of the normalized text deliverables of this submission (never returned to a client). */
+  /** Versioned text fingerprints (`naqla-text-fp-v1`, text-fingerprint.ts) of this submission's text deliverables (never returned to a client). */
   readonly textHashes: readonly string[];
+  /**
+   * Every learner upload of this submission carries a server-measured checksum AND every text deliverable has a
+   * current-version fingerprint. When false, reuse cannot be ruled out: the task cannot establish independence (fail closed).
+   */
+  readonly artifactsVerifiable: boolean;
   /** Platform starter-file checksums of this activity: never a reuse conflict. */
   readonly starterChecksums: readonly string[];
 }
@@ -268,6 +273,10 @@ export function evaluateSkillEvidencePath(p: {
   // Independence can be established only when every counted task's family is known (for a ≥ 2-task path).
   if (min >= 2 && count >= min && kept.some((f) => f.variantFamily === null)) {
     indeterminate = true; reasons.push('variant family unknown for a counted task: independence cannot be established');
+  }
+  // Uncertain duplicates fail closed: an artifact that cannot be compared could be a reused one.
+  if (min >= 2 && count >= min && kept.some((f) => !f.artifactsVerifiable)) {
+    indeterminate = true; reasons.push('an artifact of a counted task cannot be compared (missing checksum or text fingerprint): reuse cannot be ruled out');
   }
   let validationPresent: boolean | null = null;
   if (min >= 2 && params.require_validation_activity) {

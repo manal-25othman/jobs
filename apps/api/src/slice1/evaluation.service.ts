@@ -25,6 +25,7 @@ import {
   assessSkills, decideSkillAssessment, assertSkillAssessmentInvariants, standingEvidenceForSkill, assessmentScopeOf, type AssessmentScope, type SkillAssessment,
   decideCorroboration,
 } from '@naqla/domain';
+import { ensureTextFingerprints } from '../readiness/text-fingerprints';
 import { isProduction } from '../configuration/configuration.service';
 
 /** ENG-1 P3: under the per-skill scope the whole-activity result never moves a level by itself. */
@@ -691,6 +692,11 @@ export class EvaluationService {
         if (corr) {
           // Condition 5: a repeat, resubmission, re-evaluation, same family or reused artifact is not independent. The database
           // refuses the row for the same reasons (evidence_role_guard); asking first records WHY no evidence was written.
+          // 0032: every text deliverable compared is fingerprinted first with the ONE versioned definition (idempotent).
+          const subs = (await c.query(`select distinct r.submission_id::text as id from evaluation_result r where r.id = $3
+              union select distinct r.submission_id::text from evidence e join evaluation_result r on r.id = e.evaluation_result_id
+               where e.user_id = $1 and canonical_skill_id(e.skill_id) = canonical_skill_id($2)`, [p.userId, a.skillId, p.resultId])).rows.map((r) => r.id as string);
+          await ensureTextFingerprints(c, p.userId, subs);
           const conflict = (await c.query('select evidence_corroboration_conflict($1, $2, $3) as k', [p.userId, a.skillId, p.resultId])).rows[0].k as string | null;
           if (conflict) {
             record = { ...pd, reason: `${pd.reason}; no corroborating evidence: not independent of earlier evidence of this skill (${conflict})` };

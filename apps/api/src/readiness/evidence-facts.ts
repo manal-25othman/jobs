@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import {
-  parseSkillEvidencePathParams, understandingKey,
+  parseSkillEvidencePathParams, understandingKey, TEXT_FINGERPRINT_VERSION,
   type EvidenceTaskFact, type PathCatalogActivity, type ReadinessRuleSet, type SkillEvidencePathParams, type TaskPurpose,
 } from '@naqla/domain';
+import { textFingerprint } from './text-fingerprints';
 
 /**
  * ENG-1 P4 / EXT-2 — the facts the `skill_evidence_path` rule reads, built from rows. READ-ONLY.
@@ -12,14 +12,6 @@ import {
  * selects whose facts are read. Upload checksums and text hashes are compared in the pure domain function and never
  * returned to a client (the audit carries ids only).
  */
-
-/** Text deliverables shorter than this (after normalization) are answers, not artifacts: they are not hashed for reuse. */
-export const MIN_HASHED_TEXT = 40;
-
-export function normalizedTextHash(text: string): string | null {
-  const n = text.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
-  return n.length < MIN_HASHED_TEXT ? null : createHash('sha256').update(n).digest('hex');
-}
 
 export function evidencePathRules(set: ReadinessRuleSet | null): { skillId: string; params: SkillEvidencePathParams }[] {
   return (set?.rules ?? []).filter((r) => r.enabled && r.type === 'skill_evidence_path' && r.skillId)
@@ -75,13 +67,20 @@ export async function loadEvidenceTaskFacts(c: PoolClient, userId: string, skill
 
   const submissions = [...new Set([...perSkill, ...legacy].map((r) => r.submission_id as string))];
   const activities = [...new Set([...perSkill, ...legacy].map((r) => r.activity_id as string))];
+  // A learner upload without a server-measured checksum cannot be compared (fail closed: the task is not verifiable).
   const uploads = submissions.length ? (await c.query(
-    `select sa.submission_id::text as submission_id, array_agg(distinct u.checksum_sha256) filter (where u.checksum_sha256 is not null) as checksums
-       from submission_artifact sa join upload u on u.id = sa.upload_id and u.user_id = sa.user_id
-      where sa.submission_id = any($1::uuid[]) and sa.user_id = $2 group by 1`, [submissions, userId])).rows : [];
+    `select sa.submission_id::text as submission_id, array_agg(distinct u.checksum_sha256) filter (where u.checksum_sha256 is not null) as checksums,
+            bool_or(u.checksum_sha256 is null) as unmeasured
+       from submission_artifact sa left join upload u on u.id = sa.upload_id and u.user_id = sa.user_id
+      where sa.submission_id = any($1::uuid[]) and sa.user_id = $2 and sa.upload_id is not null group by 1`, [submissions, userId])).rows : [];
+  // 0032: the stored versioned fingerprint (the same one the database duplicate check compares); when none is stored
+  // yet, the same definition computed read-only. Never returned to a client.
   const texts = submissions.length ? (await c.query(
-    `select submission_id::text as submission_id, value_text from submission_artifact where submission_id = any($1::uuid[]) and user_id = $2 and kind = 'text' and value_text is not null`,
-    [submissions, userId])).rows : [];
+    `select sa.submission_id::text as submission_id, sa.value_text, f.fingerprint as stored, (f.submission_artifact_id is not null) as has_stored
+       from submission_artifact sa
+       left join artifact_text_fingerprint f on f.submission_artifact_id = sa.id and f.fingerprint_version = $3
+      where sa.submission_id = any($1::uuid[]) and sa.user_id = $2 and sa.kind = 'text' and sa.value_text is not null`,
+    [submissions, userId, TEXT_FINGERPRINT_VERSION])).rows : [];
   const starters = activities.length ? (await c.query(
     `select activity_spec_id::text as activity_id, array_agg(checksum_sha256) as checksums from activity_starter_checksum where activity_spec_id = any($1::uuid[]) group by 1`, [activities])).rows : [];
   // Audit anomaly classes C1–C3 for the claim behind each (submission, skill): wrong owner, non-canonical skill, outside the mapping.
@@ -94,7 +93,9 @@ export async function loadEvidenceTaskFacts(c: PoolClient, userId: string, skill
     [submissions])).rows : [];
 
   const uploadsOf = (sid: string) => (uploads.find((u) => u.submission_id === sid)?.checksums as string[] | null) ?? [];
-  const textsOf = (sid: string) => [...new Set(texts.filter((t) => t.submission_id === sid).map((t) => normalizedTextHash(String(t.value_text))).filter((h): h is string => h !== null))];
+  const fingerprintOf = (t: Record<string, unknown>) => (t['has_stored'] === true ? (t['stored'] as string | null) : textFingerprint(String(t['value_text'])).fingerprint);
+  const textsOf = (sid: string) => [...new Set(texts.filter((t) => t.submission_id === sid).map(fingerprintOf).filter((h): h is string => h !== null))];
+  const verifiable = (sid: string) => uploads.find((u) => u.submission_id === sid)?.unmeasured !== true;
   const startersOf = (aid: string) => (starters.find((x) => x.activity_id === aid)?.checksums as string[] | null) ?? [];
   const anomalous = (sid: string, skill: string) => anomalies.some((x) => x.submission_id === sid && x.skill_id === skill);
   const validated = (status: string | null) => status === 'approved' || status === 'published';
@@ -107,6 +108,7 @@ export async function loadEvidenceTaskFacts(c: PoolClient, userId: string, skill
     evidence: r['evidence_id'] ? { id: r['evidence_id'] as string, standing: r['standing'] === true } : null,
     claimAnomaly: anomalous(r['submission_id'] as string, r['skill_id'] as string),
     uploadChecksums: uploadsOf(r['submission_id'] as string), textHashes: textsOf(r['submission_id'] as string), starterChecksums: startersOf(r['activity_id'] as string),
+    artifactsVerifiable: verifiable(r['submission_id'] as string),
   });
   for (const r of perSkill) {
     out[r.skill_id]?.push({ ...common(r), source: 'per_skill', claimed: r.claimed === true, outcome: r.outcome, basisIndependentlyVerified: r.basis_independently_verified === true,

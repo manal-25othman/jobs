@@ -14,7 +14,7 @@ const task = (o: Partial<EvidenceTaskFact> = {}): EvidenceTaskFact => {
     activityVersion: '1.0.0', activityPublished: true, activityIsDemo: false, rubricIsDemo: false, rubricValuesApproved: true, variantFamily: 'fam_int', taskPurpose: 'integrated',
     resultFinal: true, source: 'per_skill', claimed: true, outcome: 'met', basisIndependentlyVerified: true, criteria: { int1: 'met' },
     decision: { id: `d${n}`, decision: 'accepted', overridden: false, policyValidated: false }, evidence: { id: `e${n}`, standing: true },
-    legacyAttribution: null, claimAnomaly: false, skillAssessmentId: `sa${n}`, uploadChecksums: [`u${n}`], textHashes: [`t${n}`], starterChecksums: [], ...o,
+    legacyAttribution: null, claimAnomaly: false, skillAssessmentId: `sa${n}`, uploadChecksums: [`u${n}`], textHashes: [`t${n}`], starterChecksums: [], artifactsVerifiable: true, ...o,
   };
 };
 const shortTask = (o: Partial<EvidenceTaskFact> = {}) => task({ activitySpecId: 'act-a', activityCode: 'act_a', variantFamily: 'fam_a', taskPurpose: 'validation', criteria: { a1: 'met' }, ...o });
@@ -81,6 +81,12 @@ describe('EXT-2 — duplicates, repeated submissions and artifact reuse', () => 
   });
   test('reused text (normalized hash) ⇒ one task', () => {
     assert.equal(evalHtml([task({ textHashes: ['h'] }), shortTask({ textHashes: ['h'] })]).independentTasks, 1);
+  });
+  test('uncertain duplicates fail closed: a counted task whose artifacts cannot be compared makes the path indeterminate, never satisfied', () => {
+    const r = evaluateSkillEvidencePath({ params: P_HTML, skillId: 'html', tasks: [task(), shortTask({ artifactsVerifiable: false })], production: false });
+    assert.equal(r.outcome, 'indeterminate'); assert.match(r.reasons.join(' '), /cannot be compared/);
+    const one = evaluateSkillEvidencePath({ params: { ...P_HTML, min_distinct_tasks: 1 }, skillId: 'html', tasks: [task({ artifactsVerifiable: false })], production: false });
+    assert.equal(one.outcome, 'satisfied', 'a one-task path compares nothing, so nothing is uncertain');
   });
   test('an unchanged platform starter file in both tasks is not a reuse conflict', () => {
     const r = evalHtml([task({ uploadChecksums: ['starter', 'u-x'], starterChecksums: ['starter'] }), shortTask({ uploadChecksums: ['starter', 'u-y'], starterChecksums: ['starter'] })]);
