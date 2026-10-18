@@ -26,6 +26,7 @@ The three activities are **adapted from the 0.2.1 activities**, not written from
 | `08-sme-review-checklist.md` | What remains to sign | J |
 | `09-sme-validation-package.md` | **Ready to send to the SME:** the three briefs, rubrics, evidence paths, answer sheet (Arabic) | L |
 | `10-sme-calibration-and-p6-decision-package.md` | **Pre-P6 (2026-10-18):** per-skill thresholds, level-vs-readiness evidence question (SME-Q1), integrated pass rule, Git/A11Y exceptions, final coverage matrix, anchor submissions and reviewer calibration, remaining decisions (Arabic; values blank) | — |
+| `11-sme-review-package-final.md` | **The one package to send (final):** established decisions as context, the three briefs, rubrics, per-skill paths, calibration method and the approval sheet S1–S13 (Arabic; values blank). Supersedes 09 and 10 for sending | L |
 
 ## Before any of this becomes content
 
