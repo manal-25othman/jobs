@@ -6,7 +6,7 @@ import { api, type TrackSkillDetail } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../../components/Session';
 
 /** Skill detail (Phase 5): the four dimensions in four cards; the true state is never softened or merged. */
-const BADGE_AR: Record<string, string> = { core: 'أساسية', supporting: 'مساندة', pending_expert_validation: 'التصنيف قيد اعتماد الخبراء', disabled: 'غير مفعَّلة' };
+const BADGE_AR: Record<string, string> = { must: 'إلزامية', core: 'أساسية', supporting: 'مساندة', pending_expert_validation: 'التصنيف قيد اعتماد الخبراء', disabled: 'غير مفعَّلة' };
 const LEVEL_AR: Record<string, string> = { gap: 'فجوة', self_reported: 'مُعلنة ذاتيًا', practiced: 'ظهرت في مشروع', demonstrated: 'مُثبتة بدليل', verified: 'موثّقة' };
 
 export default function SkillDetailPage() {
@@ -80,6 +80,7 @@ export default function SkillDetailPage() {
       <section className="card">
         <h2>٤ · المساهمة في الجاهزية</h2>
         <p className="body-sm"><span className="chip">{BADGE_AR[s.readiness.badge]}</span>
+              {s.readiness.classSource === 'po_default' ? <span className="chip chip--attention">تصنيف افتراضي من مالك المنتج، غير معتمد من الخبراء</span> : null}
           {s.readiness.category ? <> <span className="chip">{s.readiness.category}</span></> : null}
         </p>
         <p className="body-sm muted">

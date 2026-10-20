@@ -12,6 +12,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { approveConfigRow, setConfigActivation, withConfigActor, assertActivationPermittedInPhase8 } from '../configuration/config-admin.service';
 import { governedFromRow, isProduction } from '../configuration/configuration.service';
+import { classificationEntriesInEffect } from '../configuration/professional-classification';
 import { reviewTransition, approveRubricValues, supersedePrevious } from '../career-data/review';
 
 export interface AdminIdentity { readonly id: string; readonly label: string; readonly roles: readonly AdminRole[] }
@@ -342,13 +343,17 @@ export class AdminService {
       const changes = (await c.query(`select * from track_skill_change where target_role_id = $1 order by drafted_at desc`, [roleId])).rows;
       const versions = (await c.query(`select id, version, label, review_status::text, activation, activated_at, baseline_of, drafted_by, applies_skill_config, created_at from track_config_version where target_role_id = $1 order by version`, [roleId])).rows;
       const res = resolveActiveConfig((await c.query('select * from track_config_version where target_role_id = $1', [roleId])).rows.map(governedFromRow), { production: isProduction() });
+      // DM-7b / P-3: the professional class is read-only here; it changes only by a new classification version (D-130).
+      const cls = await classificationEntriesInEffect(c, roleId);
       return {
+        classification: { inEffect: cls !== null, developmentOnly: cls !== null },
         track: { id: role.id, slug: role.slug, labelAr: role.label_ar, labelEn: role.label_en, isDemo: role.is_demo_fixture, ...stageView(contentStage(role.review_status)) },
         fieldHelp: Object.fromEntries(Object.keys(TRACK_SKILL_FIELDS).map((f) => [f, RULE_CATALOG[`role_requirement.${f}`] ?? null])),
         skills: skills.map((s) => ({ roleRequirementId: s.id, skillId: s.skill_id, labelAr: s.label_ar, labelEn: s.label_en,
           values: { is_core: s.is_core, importance: s.importance, expected_level: s.expected_level, minimum_evidence_count: s.minimum_evidence_count, readiness_contribution: s.readiness_contribution,
             enabled: s.enabled, display_order: s.display_order, category: s.category },
-          classificationStatus: s.classification_status, classificationPending: s.classification_status !== 'approved', ...stageView(contentStage(s.review_status)) })),
+          classificationStatus: s.classification_status, classificationPending: s.classification_status !== 'approved',
+          professionalClass: cls?.get(s.skill_id)?.cls ?? null, classSource: cls?.get(s.skill_id)?.source ?? null, ...stageView(contentStage(s.review_status)) })),
         changes: changes.map((ch) => ({ id: ch.id, roleRequirementId: ch.role_requirement_id, proposed: ch.proposed, base: ch.base, professional: ch.professional, status: ch.status,
           reason: ch.reason, draftedBy: ch.drafted_by, decidedBy: ch.decided_by, decidedRole: ch.decided_role, decisionReason: ch.decision_reason, includedIn: ch.included_in_version_id, ...stageView(trackChangeStage(ch.status)) })),
         versions: versions.map((v) => ({ id: v.id, version: Number(v.version), label: v.label, appliesSkillConfig: v.applies_skill_config, draftedBy: v.drafted_by, inEffect: res.row?.id === v.id,
@@ -365,6 +370,10 @@ export class AdminService {
     return this.db.asService(async (c) => {
       const rr = (await c.query('select * from role_requirement where id = $1 and target_role_id = $2', [p.roleRequirementId, roleId])).rows[0];
       if (!rr) throw new NotFoundException('track skill not found on this track');
+      // DM-7b / P-3 (D-2): with a classification in effect, is_core no longer carries Must/Core for this role; it is not edited around the classification.
+      if ('is_core' in (p.proposed ?? {}) && await classificationEntriesInEffect(c, roleId)) {
+        throw new BadRequestException('this track has a professional classification in effect: is_core is not the source of Must/Core here; change the classification version instead');
+      }
       const base = Object.fromEntries(Object.keys(p.proposed).map((f) => [f, rr[f]]));
       const r = await c.query(`insert into track_skill_change (target_role_id, role_requirement_id, proposed, base, professional, reason, drafted_by) values ($1,$2,$3,$4,$5,$6,$7) returning id`,
         [roleId, p.roleRequirementId, JSON.stringify(p.proposed), JSON.stringify(base), professional, p.reason.trim(), who.id]);

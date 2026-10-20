@@ -286,7 +286,9 @@ export interface TrackSkillView {
   evidence: { standingEvaluatedCount: number; submittedMaterialCount: number };
   readiness: { configured: boolean; rulesNamingSkill: { ruleId: string; labelAr: string; outcome: string; nonCompensable: boolean }[]; expectedLevel: string | null;
     expectedLevelStatus: 'pending_expert_validation' | 'approved' | 'undecided'; readinessContribution: 'counts' | 'informational' | 'undecided';
-    badge: 'core' | 'supporting' | 'pending_expert_validation' | 'disabled'; classificationStatus: string; category: string | null; displayOrder: number | null; enabled: boolean };
+    badge: 'must' | 'core' | 'supporting' | 'pending_expert_validation' | 'disabled'; classificationStatus: string;
+    /** DM-7b / P-3: the professional class in effect (development only); null = legacy. A `po_default` class is not expert-approved. */
+    professionalClass?: 'must' | 'core' | 'supporting' | null; classSource?: 'sme' | 'po_default' | null; expertApproved?: boolean | null; category: string | null; displayOrder: number | null; enabled: boolean };
   verificationEffectOfReadiness: 'none';
 }
 export interface TrackSkillsPage { role: { id: string; labelAr: string; labelEn: string } | null; items: TrackSkillView[]; readiness: ReadinessReport }

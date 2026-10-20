@@ -106,14 +106,15 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
   // Career Data Foundation: role requirements are READ, never invented. Unpublished
   // or missing role data becomes a stated limitation, not a guess.
   const rr = ctx['roleRequirements'] as { status: 'published' | 'unpublished' | 'missing'; roleLabelEn: string | null;
-    requirements: { skillId: string; labelAr: string; labelEn: string; isCore: boolean; whyRequiredAr: string | null }[] } | undefined;
+    requirements: { skillId: string; labelAr: string; labelEn: string; isCore: boolean; requiredForRole?: boolean; professionalClass?: string | null; whyRequiredAr: string | null }[] } | undefined;
   const states = (ctx['evidenceStates'] as Record<string, string> | undefined) ?? { [ev.skillId]: ev.state };
   const roleWarnings: string[] = rr && rr.status !== 'published' ? [`role requirements ${rr.status}: readiness against the role cannot be stated`] : [];
   const gaps: unknown[] = rr && rr.status === 'published'
-    ? rr.requirements.filter((r) => r.isCore && !['demonstrated', 'verified'].includes(states[r.skillId] ?? 'gap')).map((r) => ({
+    // DM-7b / P-3: version-aware — Must ∪ Core when a classification is in effect, else the legacy is_core flag.
+    ? rr.requirements.filter((r) => (r.requiredForRole ?? r.isCore) && !['demonstrated', 'verified'].includes(states[r.skillId] ?? 'gap')).map((r) => ({
         proposalType: 'profile_gap', subjectType: 'skill_claim', subjectId: r.skillId,
-        summary: `مهارة أساسية للدور بلا دليل بعد: «${r.labelAr}»`,
-        structuredPayload: { kind: 'gap', skillId: r.skillId, explanation: `${rr.roleLabelEn ?? 'the role'} lists "${r.labelEn}" as a core requirement${r.whyRequiredAr ? ` (${r.whyRequiredAr})` : ''}; the current state is '${states[r.skillId] ?? 'gap'}'`, currentState: states[r.skillId] ?? 'gap' },
+        summary: `${r.professionalClass === 'must' ? 'مهارة إلزامية للدور' : 'مهارة أساسية للدور'} بلا دليل بعد: «${r.labelAr}»`,
+        structuredPayload: { kind: 'gap', skillId: r.skillId, explanation: `${rr.roleLabelEn ?? 'the role'} lists "${r.labelEn}" as a ${r.professionalClass === 'must' ? 'Must' : r.professionalClass === 'core' ? 'Core' : 'core'} requirement${r.whyRequiredAr ? ` (${r.whyRequiredAr})` : ''}; the current state is '${states[r.skillId] ?? 'gap'}'`, currentState: states[r.skillId] ?? 'gap' },
         evidenceRefs: [], sourceRefs: [{ kind: 'target_role', id: String((ctx['targetRole'] as { id?: string } | undefined)?.id ?? '') }],
         rationale: 'a published role requirement with no qualifying evidence is a gap the user should see, not a claim', warnings: [], requiresUserApproval: false,
       }))

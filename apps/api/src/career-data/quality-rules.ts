@@ -44,11 +44,13 @@ export const QUALITY_RULES: readonly QualityRule[] = [
   { id: 'Q05', title: 'skill-evidence criterion without a linked skill; gate/quality criterion mapped to a skill; published rubric with no criteria at all', severity: 'fail',
     run: q(`select 'criterion ' || rc.key as label from rubric_criterion rc where (rc.criterion_kind = 'skill_evidence' and rc.linked_skill_id is null) or (rc.criterion_kind <> 'skill_evidence' and rc.linked_skill_id is not null)
             union all select 'rubric ' || rv.version from rubric_version rv where rv.status = 'published' and not exists (select 1 from rubric_criterion rc where rc.rubric_version_id = rv.id) and rv.criteria is null`, (r) => String(r.label)) },
-  { id: 'Q06', title: 'core skill without an evidence path (no activity measures it through a linked criterion)', severity: 'fail',
+  { id: 'Q06', title: 'core (or Must/Core when classified) skill without an evidence path (no activity measures it through a linked criterion)', severity: 'fail',
     async run(c) { const { rows } = await c.query(`select tr.slug as role, s.slug as skill, rr.minimum_evidence_count as min,
         (select count(distinct rv.activity_spec_id) from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id join activity_spec a on a.id = rv.activity_spec_id
           where rc.linked_skill_id = rr.skill_id and a.target_role_id = rr.target_role_id and rv.status <> 'superseded')::int as activities
-        from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id where rr.is_core`);
+        from role_requirement rr join skill s on s.id = rr.skill_id join target_role tr on tr.id = rr.target_role_id
+       where coalesce(role_professional_class(rr.target_role_id, rr.skill_id) in ('must', 'core'), rr.is_core) -- DM-7b / P-3: version-aware
+`);
       return rows.filter((r) => evidencePathStatus({ minimumEvidenceCount: r.min === null ? null : Number(r.min), activitiesWithLinkedCriterion: Number(r.activities) }) === 'none').map((r) => `${r.role} → ${r.skill}`); } },
   { id: 'Q07', title: 'published content without SME approval (non-demo)', severity: 'fail',
     async run(c) { const out: string[] = [];
@@ -150,6 +152,7 @@ export async function coreSkillEvidencePaths(pool: Pool, roleSlug: string): Prom
       left join rubric_criterion rc on rc.linked_skill_id = s.id
       left join rubric_version rv on rv.id = rc.rubric_version_id and rv.status <> 'superseded'
       left join activity_spec a on a.id = rv.activity_spec_id and a.target_role_id = tr.id
-      where tr.slug = $1 and rr.is_core group by s.slug order by s.slug`, [roleSlug]);
+      where tr.slug = $1 and coalesce(role_professional_class(rr.target_role_id, rr.skill_id) in ('must', 'core'), rr.is_core)  -- DM-7b / P-3: version-aware
+      group by s.slug order by s.slug`, [roleSlug]);
   return rows.map((r) => ({ skill: r.skill, activities: r.activities, status: evidencePathStatus({ minimumEvidenceCount: r.min === null ? null : Number(r.min), activitiesWithLinkedCriterion: r.activities.length }), canYieldVerified: false as const }));
 }

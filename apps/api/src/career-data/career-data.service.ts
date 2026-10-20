@@ -2,8 +2,12 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { consumableByProduct, demoContentAllowedInProduction, type ReviewState } from '@naqla/domain';
+import { classificationEntriesInEffect, entryFor } from '../configuration/professional-classification';
+import { requiredForRole } from '@naqla/domain';
 
-export interface RoleRequirementFact { skillId: string; skillCode: string; labelAr: string; labelEn: string; isCore: boolean; importance: string | null; targetProficiency: string | null; whyRequiredAr: string | null; whyRequiredEn: string | null; }
+export interface RoleRequirementFact { skillId: string; skillCode: string; labelAr: string; labelEn: string; isCore: boolean;
+  /** DM-7b / P-3: the professional class in effect (development only), else null; and the version-aware "required for the role" (Must ∪ Core, or legacy is_core). */
+  professionalClass: 'must' | 'core' | 'supporting' | null; requiredForRole: boolean; importance: string | null; targetProficiency: string | null; whyRequiredAr: string | null; whyRequiredEn: string | null; }
 export interface RoleRequirementsContext { status: 'published' | 'unpublished' | 'missing'; roleId: string | null; roleLabelEn: string | null; reviewStatus: ReviewState | null; requirements: RoleRequirementFact[]; }
 export interface ActivityContext {
   status: 'structured' | 'legacy_snapshot' | 'missing';
@@ -61,9 +65,12 @@ export async function loadRoleRequirements(c: PoolClient, roleId: string | null)
     `select rr.skill_id, s.slug, s.label_ar, s.label_en, rr.is_core, rr.importance, rr.target_proficiency, rr.why_required_ar, rr.why_required_en
        from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 and rr.review_status = 'published' and s.status = 'active'
       order by rr.is_core desc, s.label_en`, [roleId]);
+  const cls = await classificationEntriesInEffect(c, roleId);
   if (rows.length === 0) return { status: 'unpublished', roleId, roleLabelEn: role.rows[0].label_en, reviewStatus: st, requirements: [] };
   return { status: 'published', roleId, roleLabelEn: role.rows[0].label_en, reviewStatus: st,
-    requirements: rows.map((r) => ({ skillId: r.skill_id, skillCode: r.slug, labelAr: r.label_ar, labelEn: r.label_en, isCore: r.is_core, importance: r.importance, targetProficiency: r.target_proficiency, whyRequiredAr: r.why_required_ar, whyRequiredEn: r.why_required_en })) };
+    requirements: (await Promise.all(rows.map(async (r) => ({ r, e: await entryFor(c, cls, r.skill_id) }))))
+      .sort((a, b) => Number(requiredForRole(b.e, b.r.is_core)) - Number(requiredForRole(a.e, a.r.is_core)) || String(a.r.label_en).localeCompare(String(b.r.label_en)))
+      .map(({ r, e }) => ({ skillId: r.skill_id, skillCode: r.slug, labelAr: r.label_ar, labelEn: r.label_en, isCore: r.is_core, professionalClass: e?.cls ?? null, requiredForRole: requiredForRole(e, r.is_core), importance: r.importance, targetProficiency: r.target_proficiency, whyRequiredAr: r.why_required_ar, whyRequiredEn: r.why_required_en })) };
 }
 
 export async function loadActivityContext(c: PoolClient, activitySpecId: string | null): Promise<ActivityContext> {

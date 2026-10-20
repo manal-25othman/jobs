@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
 import { resolveActiveConfig, configIsValidated, trackSkillBadge, trackSkillConfigFromSnapshot, type GovernedConfig, type ConfigActivation } from '@naqla/domain';
+import { professionalLabel } from '@naqla/domain';
+import { classificationEntriesInEffect } from './professional-classification';
 
 export const GOVERNED_TABLES = ['verification_policy', 'assessment_context_policy', 'claim_policy', 'challenge_policy', 'track_config_version', 'readiness_rule_set', 'grounding_lexicon', 'pack_constraint_set'] as const;
 export type GovernedTable = (typeof GOVERNED_TABLES)[number];
@@ -80,8 +82,12 @@ export class ConfigurationService {
       const skills = await c.query(
         `select rr.id, rr.skill_id, s.slug, s.label_ar, s.label_en, rr.is_core, rr.importance, rr.category, rr.display_order, rr.expected_level, rr.readiness_contribution, rr.enabled, rr.classification_status, rr.minimum_evidence_count, rr.review_status, rr.version
            from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 order by rr.display_order nulls last, s.label_en`, [targetRoleId]);
+      // DM-7b / P-3: the professional classification in effect (development only) decides the badge; otherwise legacy is_core, unchanged.
+      const cls = await classificationEntriesInEffect(c, targetRoleId);
+      const pro = (skillId: string) => professionalLabel(cls?.get(skillId) ?? null);
       return {
         track: { id: role.rows[0].id, slug: role.rows[0].slug, labelAr: role.rows[0].label_ar, labelEn: role.rows[0].label_en, reviewStatus: role.rows[0].review_status },
+        classification: cls ? { inEffect: true, developmentOnly: true } : { inEffect: false, developmentOnly: false },
         production,
         active: res.row ? { id: res.row.id, version: res.row.version, resolution: res.resolution } : { id: null, version: null, resolution: 'no_active_track_config', reason: res.resolution === 'none' ? res.reason : null },
         versions: rows.map((r) => ({ ...presentGoverned(r), label: r['label'], packVersion: r['pack_version'], verificationPolicy: `${r['vp_key']}@${r['vp_version']}`, assessmentContextPolicy: `${r['cx_key']}@${r['cx_version']}`,
@@ -90,7 +96,9 @@ export class ConfigurationService {
         // The live TrackSkill rows with the badge the UI may show (never "core" before approval).
         trackSkills: skills.rows.map((r) => ({ roleRequirementId: r.id, skillId: r.skill_id, slug: r.slug, labelAr: r.label_ar, labelEn: r.label_en, isCore: r.is_core, importance: r.importance, category: r.category,
           displayOrder: r.display_order, expectedLevel: r.expected_level, readinessContribution: r.readiness_contribution, enabled: r.enabled, classificationStatus: r.classification_status,
-          badge: trackSkillBadge({ isCore: r.is_core, classificationStatus: r.classification_status, enabled: r.enabled }), minimumEvidenceCount: r.minimum_evidence_count, reviewStatus: r.review_status, version: Number(r.version) })),
+          badge: r.enabled && pro(r.skill_id) ? pro(r.skill_id)!.badge : trackSkillBadge({ isCore: r.is_core, classificationStatus: r.classification_status, enabled: r.enabled }),
+          professionalClass: pro(r.skill_id)?.badge ?? null, classSource: pro(r.skill_id)?.source ?? null, expertApproved: pro(r.skill_id)?.expertApproved ?? null,
+          minimumEvidenceCount: r.minimum_evidence_count, reviewStatus: r.review_status, version: Number(r.version) })),
         readinessRules: { exist: false, note: 'No readiness threshold exists (Phase 5).' },
       };
     });

@@ -9,6 +9,8 @@ import {
 } from '@naqla/domain';
 import { evidencePathRules, loadEvidenceTaskFacts, loadUnderstanding } from './evidence-facts';
 import { integratedRules, loadIntegratedFacts } from './integrated-facts';
+import { classificationEntriesInEffect, entryFor } from '../configuration/professional-classification';
+import { professionalLabel, type SkillClassificationEntry } from '@naqla/domain';
 
 /**
  * Readiness Engine (Phase 5). Reads facts, applies the ACTIVE rule set through
@@ -76,6 +78,12 @@ export class ReadinessService {
       ...(integrated.length ? { integrated: await loadIntegratedFacts(c, userId, [...new Set(integrated.map((p) => p.activity_code))]) } : {}) };
   }
 
+  /** DM-7b / P-3: the professional classification in effect for the role (development only) — categories checked against the rule set; never grants readiness. */
+  private async classificationFor(c: PoolClient, roleId: string): Promise<{ classification?: SkillClassificationEntry[] }> {
+    const map = await classificationEntriesInEffect(c, roleId);
+    return map ? { classification: [...map.values()] } : {};
+  }
+
   private async goalRole(c: PoolClient, userId: string): Promise<{ id: string; labelAr: string; labelEn: string } | null> {
     const { rows } = await c.query('select tr.id, tr.label_ar, tr.label_en from career_goal g join target_role tr on tr.id = g.target_role_id where g.user_id = $1 and g.is_current', [userId]);
     return rows[0] ? { id: rows[0].id, labelAr: rows[0].label_ar, labelEn: rows[0].label_en } : null;
@@ -88,7 +96,7 @@ export class ReadinessService {
       if (!role) return { role: null, report: evaluateReadiness({ ruleSet: null, resolution: 'none', facts: [] }), trackConfig: null, note: 'no current career goal' };
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set), ...(await this.classificationFor(c, role.id)) });
       const track = await this.config.resolveTrackConfig(c, role.id);
       return { role, report, trackConfig: track, production: isProduction(),
         note: 'Readiness is a report over configured rules. It never changes a verification level, and no verification level implies readiness.' };
@@ -102,7 +110,7 @@ export class ReadinessService {
       if (!role) throw new BadRequestException('no current career goal to evaluate readiness for');
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set), ...(await this.classificationFor(c, role.id)) });
       const track = await this.config.resolveTrackConfig(c, role.id);
       const { rows } = await c.query(
         `insert into readiness_evaluation (user_id, target_role_id, track_config_version_id, readiness_rule_set_id, rule_set_key, rule_set_version, rule_set_status, rule_set_resolution, status, result, domain_ruleset_version)
@@ -134,19 +142,21 @@ export class ReadinessService {
       if (!role) return { role: null, items: [], readiness: evaluateReadiness({ ruleSet: null, resolution: 'none', facts: [] }) };
       const { set, resolution } = await this.resolveRuleSet(c, role.id);
       const facts = await this.facts(c, userId, role.id);
-      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set) });
+      const report = evaluateReadiness({ ruleSet: set, resolution, facts, evidence: await this.evidenceFacts(c, userId, set), ...(await this.classificationFor(c, role.id)) });
       const states = (await c.query('select code, label_ar, label_en from skill_progress_state')).rows as { code: string; label_ar: string; label_en: string }[];
+      const cls = await classificationEntriesInEffect(c, role.id);
       const claims = (await c.query('select skill_id, state, state_reason from skill_claim where user_id = $1', [userId])).rows as { skill_id: string; state: string; state_reason: string }[];
       const items = await Promise.all(facts.map(async (f) => {
         const materials = await c.query(`select count(*)::int as n from evidence_item_skill l join evidence_item i on i.id = l.evidence_item_id where l.user_id = $1 and l.skill_id = $2 and i.status = 'submitted'`, [userId, f.skillId]);
         const st = states.find((s) => s.code === f.progressState);
-        return this.present(f, report, claims.find((x) => x.skill_id === f.skillId) ?? null, st ?? null, Number(materials.rows[0].n));
+        return this.present(f, report, claims.find((x) => x.skill_id === f.skillId) ?? null, st ?? null, Number(materials.rows[0].n), professionalLabel(await entryFor(c, cls, f.skillId)));
       }));
       return { role, items, readiness: report };
     });
   }
 
-  private present(f: SkillReadinessFacts, report: ReadinessReport, claim: { state: string; state_reason: string } | null, progressState: { code: string; label_ar: string; label_en: string } | null, materials: number) {
+  private present(f: SkillReadinessFacts, report: ReadinessReport, claim: { state: string; state_reason: string } | null, progressState: { code: string; label_ar: string; label_en: string } | null, materials: number,
+    pro: ReturnType<typeof professionalLabel> = null) {
     const config = f.config as TrackSkillConfig;
     return {
       skillId: f.skillId, labelAr: f.labelAr, labelEn: f.labelEn,
@@ -157,7 +167,10 @@ export class ReadinessService {
       // 3. evidence
       evidence: { standingEvaluatedCount: f.standingEvidenceCount, submittedMaterialCount: materials },
       // 4. readiness contribution — configuration only; badges never show pending classification as fact
-      readiness: { ...skillReadinessContribution(f.skillId, report, config), badge: trackSkillBadge({ isCore: config.isCore, classificationStatus: config.classificationStatus, enabled: config.enabled }),
+      // DM-7b / P-3: the professional class in effect (development only) decides the badge; otherwise legacy is_core, unchanged.
+      readiness: { ...skillReadinessContribution(f.skillId, report, config),
+        badge: config.enabled && pro ? pro.badge : trackSkillBadge({ isCore: config.isCore, classificationStatus: config.classificationStatus, enabled: config.enabled }),
+        professionalClass: pro?.badge ?? null, classSource: pro?.source ?? null, expertApproved: pro?.expertApproved ?? null,
         classificationStatus: config.classificationStatus, category: config.category, displayOrder: config.displayOrder, enabled: config.enabled },
       verificationEffectOfReadiness: 'none' as const,
     };

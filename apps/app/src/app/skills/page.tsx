@@ -11,7 +11,7 @@ import { JourneyNav } from '../../components/JourneyNav';
  * Classification badges show "pending expert validation" until approved; the
  * readiness card shows the neutral owner wording until an approved rule set is active.
  */
-const BADGE_AR: Record<string, string> = { core: 'أساسية', supporting: 'مساندة', pending_expert_validation: 'التصنيف قيد اعتماد الخبراء', disabled: 'غير مفعَّلة' };
+const BADGE_AR: Record<string, string> = { must: 'إلزامية', core: 'أساسية', supporting: 'مساندة', pending_expert_validation: 'التصنيف قيد اعتماد الخبراء', disabled: 'غير مفعَّلة' };
 
 export default function SkillsPage() {
   const { token, loading } = useSession();
@@ -75,6 +75,7 @@ export default function SkillsPage() {
             <a key={s.skillId} className="row" href={`/skills/${s.skillId}`} style={{ gap: 10, flexWrap: 'wrap', textDecoration: 'none' }}>
               <span className="grow body-sm" style={{ fontWeight: 500 }}>{s.labelAr}</span>
               <span className="chip">{BADGE_AR[s.readiness.badge]}</span>
+              {s.readiness.classSource === 'po_default' ? <span className="chip chip--attention">تصنيف افتراضي من مالك المنتج، غير معتمد من الخبراء</span> : null}
               <span className="chip chip--info">{s.progress ? s.progress.labelAr : 'لم تبدأ'}</span>
               <EvidenceState state={s.verification.level} />
               <span className="chip">دليل مُقيَّم <span className="num">{s.evidence.standingEvaluatedCount}</span> · مادة <span className="num">{s.evidence.submittedMaterialCount}</span></span>

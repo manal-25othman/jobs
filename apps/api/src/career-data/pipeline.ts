@@ -11,7 +11,7 @@ import {
   normalizeMatchKey, nearDuplicateCandidates, integrityClassificationOf, type IntegrityCheckType, type NearDuplicateCandidate, type DuplicateResolution,
 } from '@naqla/domain';
 import type { Pack, PackCheckDef } from './pack-schema';
-import { validatePack, PackValidationError } from './pack-schema';
+import { validatePack, PackValidationError, packFormatVersion } from './pack-schema';
 import { resolvePackConstraintsFor } from './pack-constraints';
 import type { RawFile } from './pack-loader';
 
@@ -44,12 +44,23 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
       [m.pack_id, m.pack_version, m.pack_id, row.setId, row.ref, row.resolution, row.passed, JSON.stringify(row.problems)]);
   };
   let constraints;
-  try { constraints = await resolvePackConstraintsFor(pool, m.pack_id); }
+  const format = packFormatVersion(pack);
+  try { constraints = await resolvePackConstraintsFor(pool, m.pack_id, format); }
   catch (e) { await record({ setId: null, ref: null, resolution: null, passed: false, problems: [(e as Error).message] }); throw new PackValidationError([(e as Error).message]); }
   try { validatePack(pack, constraints); }
   catch (e) {
     if (e instanceof PackValidationError) await record({ setId: constraints.setId, ref: constraints.ref, resolution: constraints.resolution, passed: false, problems: e.problems });
     throw e;
+  }
+  // DM-7b / P-3: a format-2 pack can be VALIDATED (dry run) but not imported. Writing a classified track is part of its
+  // publication with CHG-017 (not authorized); the classification itself is created through the governed set, never by an import.
+  if (format === 2 && !opts.dryRun) {
+    throw new PackValidationError(['pack format 2 (professionally classified) validates, but importing it is not enabled: it is published only with CHG-017 and the governed classification set (D-130)']);
+  }
+  // Its dry run is validation only: the write path below is the v1 path and is never exercised with a classified pack.
+  if (format === 2) {
+    return { packId: m.pack_id, packVersion: m.pack_version, isDemoFixture: m.is_demo_fixture, constraints: { ref: constraints.ref, scope: constraints.scope, resolution: constraints.resolution },
+      snapshots: [], normalizedRecords: 0, nearDuplicates: [], resolutions: [], written: {}, skippedFrozen: [], unmapped: [] };
   }
   const c = await pool.connect();
   try {

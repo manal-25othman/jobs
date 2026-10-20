@@ -23,6 +23,7 @@ import { EVIDENCE_STATES, evidenceOrdinal, type EvidenceState } from './evidence
 import { configIsValidated, type ConfigResolution, type GovernedConfig, type TrackSkillConfig } from './configuration.js';
 import { parseSkillEvidencePathParams, evaluateSkillEvidencePath, understandingKey, type EvidenceTaskFact, type SkillEvidencePathAudit } from './evidence-path.js';
 import { parseIntegratedAssessmentParams, evaluateIntegratedAssessment, type IntegratedResultFact, type IntegratedAssessmentAudit } from './integrated-assessment.js';
+import { classificationReadinessProblems, type SkillClassificationEntry } from './professional-classification.js';
 
 export const READINESS_RULE_TYPES = [
   'required_skill_at_level',      // params: { min_level }            skill_id required — e.g. "JavaScript at demonstrated"
@@ -109,6 +110,8 @@ export interface ReadinessReport {
   /** Only when status = evaluated. Never a level, never a percentage. */
   overall: 'meets_rule_set' | 'does_not_meet_rule_set' | null;
   verificationEffect: 'none';
+  /** DM-7b / P-3: inconsistencies between the professional classification in effect and this rule set. Non-empty ⇒ never `evaluated`. */
+  classificationProblems?: string[];
 }
 
 export const READINESS_PENDING_HEADLINE_AR = 'معيار الجاهزية لهذا المسار قيد الاعتماد';
@@ -225,7 +228,9 @@ function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[]
 /**
  * Pure: f(rule set, facts) → report. Never writes, never derives a level, never a percentage.
  */
-export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolution: ConfigResolution | 'none'; facts: readonly SkillReadinessFacts[]; evidence?: EvidencePathFacts }): ReadinessReport {
+export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolution: ConfigResolution | 'none'; facts: readonly SkillReadinessFacts[]; evidence?: EvidencePathFacts;
+  /** DM-7b / P-3: the professional classification in effect for the role (categories). It never grants readiness; inconsistency blocks a verdict. */
+  classification?: readonly SkillClassificationEntry[] }): ReadinessReport {
   if (!p.ruleSet || p.resolution === 'none') {
     return { status: 'not_yet_configured', headlineAr: READINESS_PENDING_HEADLINE_AR, ruleSet: null, rules: [], summary: { satisfied: 0, notSatisfied: 0, indeterminate: 0, total: 0 }, overall: null, verificationEffect: READINESS_VERIFICATION_EFFECT };
   }
@@ -234,7 +239,9 @@ export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolut
   const summary = { satisfied: rules.filter((r) => r.outcome === 'satisfied').length, notSatisfied: rules.filter((r) => r.outcome === 'not_satisfied').length, indeterminate: rules.filter((r) => r.outcome === 'indeterminate').length, total: rules.length };
   // A set with a sealed rule type (EXT-2) is never `evaluated`, whatever its configuration says (fail closed until P6).
   const sealed = p.ruleSet.rules.some((r) => (SEALED_READINESS_RULE_TYPES as readonly string[]).includes(r.type));
-  const validated = configIsValidated(p.ruleSet) && p.resolution === 'production_active' && !sealed;
+  // D-3: Must/Core can never be bypassed silently — a rule set inconsistent with the classification in effect yields no verdict.
+  const classificationProblems = p.classification ? classificationReadinessProblems(p.classification, p.ruleSet) : [];
+  const validated = configIsValidated(p.ruleSet) && p.resolution === 'production_active' && !sealed && classificationProblems.length === 0;
   const status: ReadinessStatus = validated ? 'evaluated' : 'pending_validation';
   return {
     status,
@@ -243,6 +250,7 @@ export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolut
     rules, summary,
     overall: status === 'evaluated' ? (summary.notSatisfied === 0 && summary.indeterminate === 0 ? 'meets_rule_set' : 'does_not_meet_rule_set') : null,
     verificationEffect: READINESS_VERIFICATION_EFFECT,
+    ...(p.classification ? { classificationProblems } : {}),
   };
 }
 

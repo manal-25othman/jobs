@@ -6,6 +6,7 @@ import { useAdmin, AdminShell, Loading, StageChip, Help, ReasonButton, PendingEx
 
 interface Skill extends StageView {
   roleRequirementId: string; skillId: string; labelAr: string; labelEn: string; values: Record<string, unknown>; classificationStatus: string; classificationPending: boolean;
+  professionalClass?: 'must' | 'core' | 'supporting' | null; classSource?: 'sme' | 'po_default' | null;
 }
 interface Change extends StageView {
   id: string; roleRequirementId: string; proposed: Record<string, unknown>; base: Record<string, unknown>; professional: boolean; status: string; reason: string;
@@ -14,6 +15,7 @@ interface Change extends StageView {
 interface Version extends StageView { id: string; version: number; label: string; appliesSkillConfig: boolean; draftedBy: string | null; inEffect: boolean }
 interface Track {
   track: { id: string; slug: string; labelAr: string; labelEn: string; isDemo: boolean } & StageView;
+  classification?: { inEffect: boolean; developmentOnly: boolean };
   fieldHelp: Record<string, RuleHelp | null>; skills: Skill[]; changes: Change[]; versions: Version[];
 }
 interface VersionDiff extends StageView {
@@ -21,6 +23,8 @@ interface VersionDiff extends StageView {
   appliesSkillConfig: boolean; impactAr: string; skills: { roleRequirementId: string; labelAr: string | null; fields: { field: string; before: unknown; after: unknown }[] }[];
 }
 
+/** DM-7b / P-3: read-only; the class changes only by a new classification version. */
+const CLASS_AR: Record<string, string> = { must: 'إلزامية', core: 'أساسية', supporting: 'مساندة' };
 const FIELDS = ['is_core', 'importance', 'expected_level', 'minimum_evidence_count', 'readiness_contribution', 'enabled', 'display_order', 'category'] as const;
 
 /** One track: its skills as they are live, proposed changes, and the versions that carry approved changes into effect. */
@@ -54,6 +58,7 @@ export default function TrackPage() {
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     <strong className="grow" style={{ fontWeight: 500 }}>{s.labelAr} <span className="term">{s.labelEn}</span></strong>
                     {s.classificationPending ? <PendingExpert /> : <span className="chip chip--info">تصنيف معتمد</span>}
+                    {s.professionalClass ? <span className="chip">{CLASS_AR[s.professionalClass]}{s.classSource === 'po_default' ? ' · افتراضي من مالك المنتج' : ' · خبير'} (للتطوير فقط)</span> : null}
                   </div>
                   <span className="body-sm muted">
                     {FIELDS.map((f) => `${data.fieldHelp[f]?.labelAr ?? f}: ${show(s.values[f])}`).join(' · ')}

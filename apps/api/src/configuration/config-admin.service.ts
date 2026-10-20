@@ -6,6 +6,7 @@ import { loadPathCatalog } from '../readiness/evidence-facts';
 import { loadIntegratedCatalog } from '../readiness/integrated-facts';
 import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
 import { emitAuditEvent } from '../infra/audit';
+import { classificationEntriesInEffect } from './professional-classification';
 
 /**
  * The explicit, audited acts on configuration (Phase 4): approve a row, change
@@ -185,12 +186,29 @@ export function assertVerificationPolicyMayBe(row: Record<string, unknown>, targ
  * never approved, and never activated except development_only outside production, until the Product Owner's P6 decision.
  */
 export async function assertReadinessSetMayBe(c: PoolClient, setId: string, target: { reviewStatus?: string; activation?: string }): Promise<void> {
+  await assertReadinessSetConsistentWithClassification(c, setId);
   const ext = await c.query(`select 1 from readiness_rule where rule_set_id = $1 and rule_type in ('skill_evidence_path', 'integrated_assessment_passed') limit 1`, [setId]);
   if (!ext.rowCount) return;
   if (target.reviewStatus === 'approved' || target.reviewStatus === 'published' || (target.activation !== undefined && target.activation !== 'development_only')) {
     throw new BadRequestException('a readiness rule set with an EXT-1 (integrated assessment) or EXT-2 (independent-evidence) rule is sealed until P6: it cannot be approved, published or activated for real users');
   }
   if (isProduction()) throw new BadRequestException('an EXT-1 / EXT-2 readiness rule set can never be activated in production');
+}
+
+/**
+ * DM-7b / P-3 (D-3): the approved classification decides the categories, the readiness rule set decides levels and pass
+ * conditions; a set for a classified role is never approved or activated while the two disagree (every Must non-compensable,
+ * every Core required, no Supporting blocker, no legacy is_core aggregate). Classification alone never grants readiness.
+ */
+export async function assertReadinessSetConsistentWithClassification(c: PoolClient, setId: string): Promise<void> {
+  const set = (await c.query('select target_role_id from readiness_rule_set where id = $1', [setId])).rows[0];
+  const cls = await classificationEntriesInEffect(c, set?.target_role_id ?? null);
+  if (!cls) return;
+  const { readinessRuleFromRow, classificationReadinessProblems } = await import('@naqla/domain');
+  const rows = (await c.query('select id, rule_type, params, skill_id, label_ar, label_en, enabled, position, canonical_skill_id(skill_id)::text as canon from readiness_rule where rule_set_id = $1 order by position', [setId])).rows;
+  const canon = new Map(rows.filter((r) => r.skill_id).map((r) => [String(r.skill_id), String(r.canon)]));
+  const problems = classificationReadinessProblems([...cls.values()], { rules: rows.map(readinessRuleFromRow) }, (id) => canon.get(id) ?? id);
+  if (problems.length) throw new BadRequestException(`this readiness rule set disagrees with the professional classification in effect for its role: ${problems.join('; ')}`);
 }
 
 /** Activation of a Track Builder version: live TrackSkill rows take the version's snapshot. Audited per row; classification approval travels with the SME's name. */

@@ -94,7 +94,7 @@ export class AgentService {
       // Career Data Foundation: role requirements come from the PUBLISHED layer, or are reported missing.
       const roleReq = await loadRoleRequirements(c, goal.rows[0]?.id ?? null);
       ctx['roleRequirements'] = { status: roleReq.status, roleLabelEn: roleReq.roleLabelEn, reviewStatus: roleReq.reviewStatus,
-        requirements: roleReq.requirements.map((r) => ({ skillId: r.skillId, labelAr: r.labelAr, labelEn: r.labelEn, isCore: r.isCore, importance: r.importance, targetProficiency: r.targetProficiency, whyRequiredAr: r.whyRequiredAr })) };
+        requirements: roleReq.requirements.map((r) => ({ skillId: r.skillId, labelAr: r.labelAr, labelEn: r.labelEn, isCore: r.isCore, requiredForRole: r.requiredForRole, professionalClass: r.professionalClass, importance: r.importance, targetProficiency: r.targetProficiency, whyRequiredAr: r.whyRequiredAr })) };
       // OPEN-039: a claim on an alias skill is reported under its canonical skill (the higher state wins).
       const claims = await c.query('select canonical_skill_id(skill_id) as skill_id, state from skill_claim where user_id = $1', [userId]);
       ctx['evidenceStates'] = canonicalEvidenceStates([], claims.rows.map((r) => ({ skillId: r.skill_id, state: r.state })));

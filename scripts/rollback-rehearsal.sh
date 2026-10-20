@@ -56,4 +56,15 @@ missing="$(comm -23 <(echo "$before_rows") <(echo "$after_rows") | grep -c . || 
 [[ "$missing" == "0" ]] || { echo "FAIL  $missing fingerprint(s) recomputed differently" >&2; exit 1; }
 [[ "$(snap)" == "$before" ]] || { echo "FAIL  the backfill changed history" >&2; exit 1; }
 echo "PASS  backfill recomputed every earlier fingerprint identically (${fp_before#*:} before, ${fp_after#*:} after); history identical"
+# 5. DM-7b / P-3: rolling back 0034 is REFUSED once classification history or a schema-2 constraint set exists (never deleted), and changes nothing.
+cls="$(q "select (select count(*) from skill_classification_set) + (select count(*) from pack_constraint_set where schema_version = 2)")"
+if [[ "$cls" -gt 0 ]]; then
+  if psql "$CURL" -X -q -1 -v ON_ERROR_STOP=1 -f "$ROOT/supabase/rollback/0034_dm7b_professional_classification.down.sql" >/dev/null 2>&1; then
+    echo "FAIL  0034 rollback ran although classification history exists" >&2; exit 1
+  fi
+  [[ "$(snap)" == "$before" && "$(q "select to_regclass('skill_classification_set') is not null")" == "t" ]] || { echo "FAIL  a refused 0034 rollback changed something" >&2; exit 1; }
+  echo "PASS  0034 rollback refused with $cls classification / schema-2 set(s) present; history and schema unchanged"
+else
+  echo "NOTE  no classification history in the source (run the DM-7b e2e first); the 0034 refusal is proven by scripts/db-test.sh only"
+fi
 echo "==> rollback / forward-recovery rehearsal passed (clone dropped)"

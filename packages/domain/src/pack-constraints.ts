@@ -38,7 +38,86 @@ export const PACK_CONSTRAINT_TYPES = [
 export type PackConstraintType = (typeof PACK_CONSTRAINT_TYPES)[number];
 
 export interface PackConstraint { readonly type: PackConstraintType; readonly min: number | null; readonly max: number | null }
-export interface PackConstraintSet extends GovernedConfig { readonly trackId: string | null; readonly constraints: readonly PackConstraint[] }
+export interface PackConstraintSet extends GovernedConfig {
+  readonly trackId: string | null; readonly constraints: readonly PackConstraint[];
+  /** DM-7b / P-3: 1 = the legacy is_core-based vocabulary (every pre-existing set); 2 = the class-based vocabulary. Absent ⇒ 1. */
+  readonly schemaVersion?: 1 | 2;
+  /** Schema 2 only. */
+  readonly constraintsV2?: readonly PackConstraintV2[];
+}
+
+/**
+ * DM-7b / P-3 — constraint SCHEMA 2 (for pack format 2: professionally classified packs). The legacy is_core-based
+ * types are not in it; everything else keeps its meaning. A set states every type of ITS schema; old sets stay valid and
+ * frozen. A v2 pack is validated only against a schema-2 set (no fallback to schema 1), and a v1 pack only against schema 1.
+ */
+export const PACK_CONSTRAINT_TYPES_V2 = [
+  'must_skill_count',                        // Must skills per role (track-specific; e.g. Junior Frontend v2: 6)
+  'core_class_skill_count',                  // Core-class skills per role (e.g. 3)
+  'supporting_skill_count',                  // Supporting skills per role (e.g. 3)
+  'task_count', 'activity_count', 'activity_primary_skill_count',
+  'activity_required_primary_skill_count',   // of an activity's primary skills, those classified Must or Core
+  'rubric_min_criteria', 'resources_per_skill_max',
+] as const;
+export type PackConstraintTypeV2 = (typeof PACK_CONSTRAINT_TYPES_V2)[number];
+export interface PackConstraintV2 { readonly type: PackConstraintTypeV2; readonly min: number | null; readonly max: number | null }
+const SHAPE_V2: Readonly<Record<PackConstraintTypeV2, { readonly bounds: 'range' | 'min' | 'max'; readonly floor: number }>> = {
+  must_skill_count: { bounds: 'range', floor: 1 }, core_class_skill_count: { bounds: 'range', floor: 0 }, supporting_skill_count: { bounds: 'range', floor: 0 },
+  task_count: { bounds: 'range', floor: 1 }, activity_count: { bounds: 'range', floor: 1 }, activity_primary_skill_count: { bounds: 'range', floor: 1 },
+  activity_required_primary_skill_count: { bounds: 'range', floor: 1 }, rubric_min_criteria: { bounds: 'min', floor: 1 }, resources_per_skill_max: { bounds: 'max', floor: 1 },
+};
+
+/** Schema 2 completeness and shape: every v2 type exactly once, known, integers at or above the floor, min ≤ max. */
+export function assertPackConstraintsSaneV2(constraints: readonly { type: string; min: number | null; max: number | null }[]): asserts constraints is readonly PackConstraintV2[] {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  for (const c of constraints) {
+    if (!(PACK_CONSTRAINT_TYPES_V2 as readonly string[]).includes(c.type)) throw new UnsupportedRuleType(c.type);
+    if (seen.has(c.type)) problems.push(`${c.type}: stated twice`);
+    seen.add(c.type);
+    const shape = SHAPE_V2[c.type as PackConstraintTypeV2];
+    for (const [name, v] of [['min', c.min], ['max', c.max]] as const) if (v !== null && (!Number.isInteger(v) || v < shape.floor)) problems.push(`${c.type}: ${name} must be an integer ≥ ${shape.floor}, got ${String(v)}`);
+    if (shape.bounds === 'range' && (c.min === null || c.max === null)) problems.push(`${c.type}: needs both a minimum and a maximum`);
+    if (shape.bounds === 'min' && (c.min === null || c.max !== null)) problems.push(`${c.type}: carries a minimum only`);
+    if (shape.bounds === 'max' && (c.max === null || c.min !== null)) problems.push(`${c.type}: carries a maximum only`);
+    if (c.min !== null && c.max !== null && c.min > c.max) problems.push(`${c.type}: minimum ${c.min} is above maximum ${c.max}`);
+  }
+  for (const t of PACK_CONSTRAINT_TYPES_V2) if (!seen.has(t)) problems.push(`${t}: missing — a schema-2 set states every constraint (no silent default)`);
+  if (problems.length) throw new DomainError(`pack constraint set (schema 2) is not usable:\n  - ${problems.join('\n  - ')}`);
+}
+
+/** The counts a professionally classified (format 2) pack exhibits. */
+export interface PackCountsV2 {
+  readonly mustSkills: number; readonly coreClassSkills: number; readonly supportingSkills: number;
+  readonly tasks: number; readonly activities: number;
+  readonly activityPrimaries: readonly { readonly code: string; readonly primaries: number; readonly requiredPrimaries: number }[];
+  readonly rubricCriteria: readonly { readonly code: string; readonly criteria: number }[];
+  readonly resourcesPerSkill: readonly { readonly skill: string; readonly resources: number }[];
+}
+
+export function checkPackCountsV2(counts: PackCountsV2, resolved: { readonly ref: string; readonly constraintsV2: readonly PackConstraintV2[] }): PackCountViolation[] {
+  const by = new Map(resolved.constraintsV2.map((c) => [c.type, c]));
+  const get = (t: PackConstraintTypeV2): PackConstraintV2 => { const c = by.get(t); if (!c) throw new InvariantViolation('INV-8', `pack constraint '${t}' missing from ${resolved.ref}`); return c; };
+  const out: PackCountViolation[] = [];
+  const v = (type: PackConstraintTypeV2, subject: string, found: number, message: string) => out.push({ type: type as unknown as PackConstraintType, subject, found, message: `${message} [${resolved.ref}]` });
+  const w = (c: PackConstraintV2, n: number) => (c.min === null || n >= c.min) && (c.max === null || n <= c.max);
+  const sp = (c: PackConstraintV2) => span(c as unknown as PackConstraint);
+  for (const [t, n, label] of [['must_skill_count', counts.mustSkills, 'Must'], ['core_class_skill_count', counts.coreClassSkills, 'Core'], ['supporting_skill_count', counts.supportingSkills, 'Supporting']] as const) {
+    const c = get(t); if (!w(c, n)) v(t, 'role', n, `role: ${label} skills must be ${sp(c)}, found ${n}`);
+  }
+  const tasks = get('task_count'); if (!w(tasks, counts.tasks)) v('task_count', 'tasks', counts.tasks, `tasks: ${sp(tasks)} expected, found ${counts.tasks}`);
+  const acts = get('activity_count'); if (!w(acts, counts.activities)) v('activity_count', 'activities', counts.activities, `activities: ${sp(acts)} expected, found ${counts.activities}`);
+  const prim = get('activity_primary_skill_count'); const req = get('activity_required_primary_skill_count');
+  for (const a of counts.activityPrimaries) {
+    if (!w(prim, a.primaries)) v('activity_primary_skill_count', a.code, a.primaries, `activity '${a.code}': an activity measures ${sp(prim)} skills deeply (primary), found ${a.primaries}`);
+    if (!w(req, a.requiredPrimaries)) v('activity_required_primary_skill_count', a.code, a.requiredPrimaries, `activity '${a.code}': an activity measures ${sp(req)} Must/Core skills deeply, found ${a.requiredPrimaries}`);
+  }
+  const crit = get('rubric_min_criteria');
+  for (const r of counts.rubricCriteria) if (!w(crit, r.criteria)) v('rubric_min_criteria', r.code, r.criteria, `rubric '${r.code}': ${sp(crit)} criteria, found ${r.criteria}`);
+  const res = get('resources_per_skill_max');
+  for (const r of counts.resourcesPerSkill) if (!w(res, r.resources)) v('resources_per_skill_max', r.skill, r.resources, `skill '${r.skill}' has ${r.resources} resources; ${sp(res)} per gap`);
+  return out;
+}
 
 /** Which bounds each type may carry, and the structural floor a value may never go below. */
 export const PACK_CONSTRAINT_SHAPE: Readonly<Record<PackConstraintType, { readonly bounds: 'range' | 'min' | 'max'; readonly floor: number; readonly labelAr: string; readonly labelEn: string }>> = {
@@ -96,7 +175,12 @@ export function assertPackConstraintsSane(constraints: readonly { type: string; 
 
 export class PackConstraintsUnavailable extends DomainError {}
 
-export interface ResolvedPackConstraints { readonly ref: string; readonly setId: string; readonly scope: 'track' | 'global'; readonly resolution: ConfigResolution; readonly constraints: readonly PackConstraint[] }
+export interface ResolvedPackConstraints {
+  readonly ref: string; readonly setId: string; readonly scope: 'track' | 'global'; readonly resolution: ConfigResolution; readonly constraints: readonly PackConstraint[];
+  /** DM-7b / P-3: the schema of the resolved set (absent ⇒ 1). */
+  readonly schemaVersion?: 1 | 2;
+  readonly constraintsV2?: readonly PackConstraintV2[];
+}
 
 /**
  * The set in effect for a pack's track: a track-specific set in effect wins;
@@ -104,18 +188,25 @@ export interface ResolvedPackConstraints { readonly ref: string; readonly setId:
  * (never in production) > legacy_baseline; two rows at the same level is a
  * CONFLICT and fails. Nothing in effect fails. Never a silent default.
  */
-export function resolvePackConstraints(sets: readonly PackConstraintSet[], trackId: string, env: { production: boolean }): ResolvedPackConstraints {
+export function resolvePackConstraints(sets: readonly PackConstraintSet[], trackId: string, env: { production: boolean }, schemaVersion: 1 | 2 = 1): ResolvedPackConstraints {
+  // DM-7b / P-3: only sets of the pack's own schema are candidates. A v1 pack never sees a schema-2 set (so a
+  // development v2 set for a track can never displace that track's v1 behaviour), and a v2 pack never falls back to v1.
+  const own = sets.filter((s) => (s.schemaVersion ?? 1) === schemaVersion);
   for (const scope of ['track', 'global'] as const) {
-    const rows = sets.filter((s) => (scope === 'track' ? s.trackId === trackId : s.trackId === null));
+    const rows = own.filter((s) => (scope === 'track' ? s.trackId === trackId : s.trackId === null));
     let r: ReturnType<typeof resolveActiveConfig<PackConstraintSet>>;
     try { r = resolveActiveConfig(rows, env); }
     catch (e) { throw new PackConstraintsUnavailable(`conflicting pack constraint configuration for ${scope === 'track' ? `track '${trackId}'` : 'the global scope'}: ${(e as Error).message}`); }
     if (r.row) {
+      if (schemaVersion === 2) {
+        assertPackConstraintsSaneV2(r.row.constraintsV2 ?? []);
+        return { ref: `${r.row.key}@${r.row.version}`, setId: r.row.id, scope, resolution: r.resolution, constraints: [], schemaVersion: 2, constraintsV2: r.row.constraintsV2 ?? [] };
+      }
       assertPackConstraintsSane(r.row.constraints);
       return { ref: `${r.row.key}@${r.row.version}`, setId: r.row.id, scope, resolution: r.resolution, constraints: r.row.constraints };
     }
   }
-  throw new PackConstraintsUnavailable(`no pack constraint set is in effect for track '${trackId}' (none track-specific, none global${env.production ? ' validated for production' : ''}); the pack cannot be validated`);
+  throw new PackConstraintsUnavailable(`no${schemaVersion === 2 ? ' schema-2 (professionally classified)' : ''} pack constraint set is in effect for track '${trackId}' (none track-specific, none global${env.production ? ' validated for production' : ''}); the pack cannot be validated`);
 }
 
 /** The counts a pack exhibits, computed by the validator. */

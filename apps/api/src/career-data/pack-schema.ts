@@ -10,7 +10,7 @@ import {
   assertLearningResourceHonest, INTEGRITY_EVALUATION_MODES, CRITERION_KINDS, artifactHasProducer, artifactKeysOf, assertDuplicateResolutionWellFormed, assertCriterionKindShape,
   checkPackCounts,
   type SynonymRelation, type PresentationAssetType, type EvidenceState, type DuplicateResolution, type IntegrityEvaluationMode, type CriterionKind,
-  type PackCounts, type ResolvedPackConstraints,
+  type PackCounts, type PackCountsV2, type ResolvedPackConstraints, checkPackCountsV2,
 } from '@naqla/domain';
 
 export interface PackSource { code: string; source_type: 'official' | 'curated' | 'platform_generated' | 'market_signal'; source_name: string; publisher?: string | null; jurisdiction: string; language: string; url: string | null; url_verified?: boolean; retrieved_at: string | null; version: string; license_or_usage_notes: string; reliability: 'high' | 'medium' | 'low'; }
@@ -22,9 +22,16 @@ export interface PackSynonym { skill: string; relation: SynonymRelation; surface
 export interface PackCriterionLib { key: string; name_ar: string; name_en: string; dimension: string; description_ar: string; description_en: string; default_evaluator: string; }
 export interface PackPresentationRule { asset_type: PresentationAssetType; evidence_level: EvidenceState; allowed: boolean; minimum_source_strength: string | null; minimum_evidence_count: number; requires_verified: boolean; allowed_claim_verbs_ar: string[]; allowed_claim_verbs_en: string[]; forbidden_phrases_ar: string[]; forbidden_phrases_en: string[]; template_pattern_en?: string; numeric_claims_policy_en?: string; ai_disclosure_handling_en?: string; recency_handling_en?: string; language_target?: 'ar' | 'en'; on_user_edit_en?: string; source_refs: string[]; }
 export interface PackResource { code: string; skill: string; title_ar: string; title_en: string; provider: string; resource_type: string; language: 'ar' | 'en'; level: string; duration_minutes: number; free_or_paid: string; url: string | null; why_recommended_ar: string; why_recommended_en: string; covers_target_level: boolean; practice_activity: string; quality_status: string; last_checked: string | null; access_notes_en?: string; source_refs: string[]; }
-export interface PackManifest { pack_id: string; track_id: string; pack_version: string; status: string; dataset_label: string; is_demo_fixture: boolean; drafting_aid: 'none' | 'ai_assisted'; levels_included: string[]; language_coverage: string[]; region_scope?: string; primary_source: string; sources: string[]; global_registry_versions: Record<string, string>; framework_policy?: string; duplicate_resolutions?: DuplicateResolution[]; changelog_ref?: string; contents?: Record<string, number>; }
+export interface PackManifest { pack_id: string; track_id: string; pack_version: string; status: string; dataset_label: string; is_demo_fixture: boolean; drafting_aid: 'none' | 'ai_assisted'; levels_included: string[]; language_coverage: string[]; region_scope?: string; primary_source: string; sources: string[]; global_registry_versions: Record<string, string>; framework_policy?: string; duplicate_resolutions?: DuplicateResolution[]; changelog_ref?: string; contents?: Record<string, number>;
+  /** DM-7b / P-3: 1 (absent) = legacy is_core_for_role; 2 = professionally classified (professional_class per role skill). */
+  pack_format_version?: 1 | 2; }
 export interface PackRole { code: string; name_ar: string; name_en: string; family: string; level: 'junior' | 'mid' | 'senior'; description_ar: string; description_en: string; mission_statement_ar?: string; mission_statement_en?: string; typical_responsibilities_ar: string[]; typical_responsibilities_en: string[]; expected_outputs_ar: string[]; expected_outputs_en: string[]; expected_from_junior_ar: string[]; expected_from_junior_en: string[]; not_expected_from_junior_ar: string[]; not_expected_from_junior_en: string[]; common_tools: { name: string; criticality: 'essential' | 'common' | 'optional'; skill?: string; note_en?: string }[]; region_scope?: string; source_refs: string[]; }
-export interface PackRoleSkill { skill: string; is_core_for_role: boolean; importance: string; target_proficiency: string; why_required_ar: string; why_required_en: string; evidence_type_expected: string[]; minimum_evidence_count: number; can_be_partially_auto_evaluated: boolean; human_review_required: boolean; source_refs: string[]; }
+export interface PackRoleSkill { skill: string;
+  /** Format 1 only (legacy semantics). Absent in format 2. */
+  is_core_for_role: boolean;
+  /** Format 2 only: the professional class, its provenance (D-4) and the source reference. */
+  professional_class?: 'must' | 'core' | 'supporting'; class_source?: 'sme' | 'po_default'; class_source_ref?: string;
+  importance: string; target_proficiency: string; why_required_ar: string; why_required_en: string; evidence_type_expected: string[]; minimum_evidence_count: number; can_be_partially_auto_evaluated: boolean; human_review_required: boolean; source_refs: string[]; }
 export interface PackTask { code: string; title_ar: string; title_en: string; description_ar: string; description_en: string; frequency: string; complexity: string; expected_output_ar: string; expected_output_en: string; expected_output_kind: string; typical_inputs_en?: string[]; common_tools?: string[]; common_failure_modes_ar: string[]; common_failure_modes_en: string[]; realism_notes_en?: string; related_skills: { skill: string; involvement: 'primary' | 'secondary' }[]; source_refs: string[]; }
 export interface PackCheckDef { type: 'artifact_present' | 'artifact_at_least' | 'artifact_text' | 'all_of'; artifactKey?: string; artifactKeys?: string[]; min?: number; minLength?: number; }
 export interface PackHumanObservation { type: 'human_observation'; criterionKey: string; reviewerPromptAr: string; reviewerPromptEn: string; passWhenEn: string; failWhenEn: string; affectsEvidence: boolean; }
@@ -44,6 +51,24 @@ export class PackValidationError extends Error {
 
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
 const isArr = (v: unknown): v is unknown[] => Array.isArray(v);
+
+/** DM-7b / P-3: the counts a format-2 pack is checked against (classes; Must ∪ Core primaries per activity — Task B counts code reading, debugging and JS). */
+export function packCountsV2(p: Pack): PackCountsV2 {
+  const cls = (c: string) => p.track.roleSkills.filter((x) => x.professional_class === c).length;
+  const required = new Set(p.track.roleSkills.filter(requiredInPack(p)).map((x) => x.skill));
+  const perSkill = new Map<string, number>();
+  for (const r of p.global.resources) perSkill.set(r.skill, (perSkill.get(r.skill) ?? 0) + 1);
+  return {
+    mustSkills: cls('must'), coreClassSkills: cls('core'), supportingSkills: cls('supporting'),
+    tasks: p.track.tasks.length, activities: p.track.activities.length,
+    activityPrimaries: p.track.activities.map((a) => {
+      const primaries = a.related_skills.filter((s) => s.depth === 'primary');
+      return { code: a.code, primaries: primaries.length, requiredPrimaries: primaries.filter((s) => required.has(s.skill)).length };
+    }),
+    rubricCriteria: p.track.rubrics.map((r) => ({ code: r.code, criteria: r.criteria.length })),
+    resourcesPerSkill: [...perSkill].map(([skill, resources]) => ({ skill, resources })),
+  };
+}
 
 /** The counts the configurable numeric constraints (H5, Phase 9) are checked against. */
 export function packCounts(p: Pack): PackCounts {
@@ -70,8 +95,17 @@ export function packCounts(p: Pack): PackCounts {
  * configuration — there is no default). Technical, security and structural
  * invariants below stay in code.
  */
-export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints, 'ref' | 'constraints'>): void {
-  if (!constraints?.constraints?.length) throw new PackValidationError(['no pack constraint set was resolved for this validation (Phase 9): refusing to validate with assumed numbers']);
+/** DM-7b / P-3: the pack's format (absent ⇒ 1). It decides the constraint schema it is validated against — never a fallback. */
+export function packFormatVersion(p: Pack): 1 | 2 { return p.track.manifest.pack_format_version === 2 ? 2 : 1; }
+/** Format 2: a role skill is REQUIRED for the role when classified Must or Core. Format 1: the legacy is_core_for_role. */
+const requiredInPack = (p: Pack) => (x: PackRoleSkill) => packFormatVersion(p) === 2 ? x.professional_class === 'must' || x.professional_class === 'core' : x.is_core_for_role === true;
+
+export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints, 'ref' | 'constraints' | 'schemaVersion' | 'constraintsV2'>): void {
+  const format = packFormatVersion(p);
+  if (format === 1 && (constraints?.schemaVersion === 2 || !constraints?.constraints?.length)) throw new PackValidationError(['no pack constraint set was resolved for this validation (Phase 9): refusing to validate with assumed numbers']);
+  if (format === 2 && (constraints?.schemaVersion !== 2 || !constraints.constraintsV2?.length)) {
+    throw new PackValidationError([`pack format 2 (professionally classified) needs a schema-2 pack constraint set; ${constraints?.ref ?? 'none'} is not one (no fallback to the legacy is_core constraints)`]);
+  }
   const problems: string[] = [];
   const need = (cond: boolean, msg: string) => { if (!cond) problems.push(msg); };
   const codes = new Set<string>();
@@ -265,13 +299,25 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
     const act = p.track.activities.find((a) => a.code === r.activity);
     for (const c of act?.integrity_checks ?? []) if (c.linked_criterion_key) need(keys.has(c.linked_criterion_key), `${o}: integrity check '${c.key}' links unknown criterion '${c.linked_criterion_key}'`);
   }
-  // Every core skill: covered by ≥1 activity through a linked criterion (evidence path).
-  for (const rs of p.track.roleSkills.filter((x) => x.is_core_for_role)) {
+  // DM-7b / P-3: the professional classification belongs to format 2 only, with provenance on every row (D-4); one source of truth.
+  for (const rs of p.track.roleSkills) {
+    const o = `role skill '${rs.skill}'`;
+    if (format === 1) need(rs.professional_class === undefined && rs.class_source === undefined, `${o}: a format-1 pack carries no professional class (declare pack_format_version 2)`);
+    else {
+      need(['must', 'core', 'supporting'].includes(rs.professional_class as string), `${o}: professional_class must be must | core | supporting`);
+      need(['sme', 'po_default'].includes(rs.class_source as string), `${o}: class_source must be sme | po_default (provenance)`);
+      need(isStr(rs.class_source_ref), `${o}: class_source_ref is required (provenance)`);
+      need((rs as Partial<PackRoleSkill>).is_core_for_role === undefined, `${o}: a format-2 pack does not carry the legacy is_core_for_role (one source of truth)`);
+    }
+  }
+  // Every core (format 1) / Must-or-Core (format 2) skill: covered by ≥1 activity through a linked criterion (evidence path).
+  for (const rs of p.track.roleSkills.filter(requiredInPack(p))) {
     const acts = new Set<string>();
     for (const r of p.track.rubrics) if (r.criteria.some((c) => (c.criterion_kind ?? 'skill_evidence') === 'skill_evidence' && c.linked_skill === rs.skill)) acts.add(r.activity);
-    need(acts.size >= 1, `core skill '${rs.skill}' has no evidence path: no activity measures it through a linked criterion`);
+    need(acts.size >= 1, `${format === 2 ? `${rs.professional_class} skill` : 'core skill'} '${rs.skill}' has no evidence path: no activity measures it through a linked criterion`);
   }
-  // H5 (Phase 9): the configured numeric constraints, from the set in effect for this track.
-  for (const v of checkPackCounts(packCounts(p), constraints)) problems.push(v.message);
+  // H5 (Phase 9): the configured numeric constraints, from the set in effect for this track and of this pack's schema.
+  if (format === 2) for (const v of checkPackCountsV2(packCountsV2(p), { ref: constraints.ref, constraintsV2: constraints.constraintsV2 ?? [] })) problems.push(v.message);
+  else for (const v of checkPackCounts(packCounts(p), constraints)) problems.push(v.message);
   if (problems.length) throw new PackValidationError(problems);
 }
