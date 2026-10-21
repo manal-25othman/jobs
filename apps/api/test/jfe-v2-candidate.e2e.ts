@@ -139,6 +139,40 @@ describe('the candidate content', () => {
   });
 });
 
+describe('final candidate review: Forms validation criterion and J-7 activity identity', () => {
+  test('every one of the twelve skills is measured by a criterion; Forms validation by its own non-mandatory criterion in Task A', () => {
+    const { pack, paths } = fresh();
+    const measured = new Set(pack.track.rubrics.flatMap((r) => r.criteria.map((c) => c.linked_skill)));
+    for (const rs of pack.track.roleSkills) assert.ok(measured.has(rs.skill), rs.skill);
+    const forms = pack.track.rubrics.find((r) => r.activity === TA)!.criteria.filter((c) => c.linked_skill === 'skl_forms_validation');
+    assert.deepEqual(forms.map((c) => c.key), ['form_submission_flow']);
+    const c = forms[0]!;
+    assert.deepEqual([c.mandatory, c.evaluator_type, c.weight, c.threshold_for_skill, c.weight_status, c.threshold_status, c.levels_status], [false, 'human', null, null, 'TBD', 'TBD', 'TBD']);
+    assert.ok(!paths.some((p) => p.skill === 'skl_forms_validation'), 'Supporting: no evidence path, never a readiness blocker');
+    // Distinct from the JavaScript rule and the accessibility criterion of the same activity: separate criteria, separate skills.
+    const others = pack.track.rubrics.find((r) => r.activity === TA)!.criteria.filter((x) => ['validation_fixed', 'a11y_keyboard_forms'].includes(x.key)).map((x) => x.linked_skill);
+    assert.deepEqual(others.sort(), ['skl_accessibility_basics', 'skl_js_fundamentals']);
+    const supporting = new Set(pack.track.roleSkills.filter((r) => r.professional_class === 'supporting').map((r) => r.skill));
+    for (const r of pack.track.rubrics) for (const x of r.criteria) if (x.linked_skill && supporting.has(x.linked_skill)) assert.equal(x.mandatory, false, `${r.code}/${x.key}: a Supporting criterion never decides an activity pass`);
+    assert.ok(pack.track.activities.find((a) => a.code === TA)!.unresolved!.some((u) => /form_submission_flow.*S4/.test(u)), 'listed as a proposal pending SME S4');
+  });
+  test('J-7: the three codes are kept; each is a new immutable version; learning-resource links hold; nothing existing is overwritten', async () => {
+    const { pack } = fresh();
+    const canonical = loadPack(CANON, 'trk_frontend_junior').pack;
+    assert.deepEqual(pack.track.activities.map((a) => a.code).sort(), canonical.track.activities.map((a) => a.code).sort());
+    for (const a of pack.track.activities) {
+      const existing = (await pool.query('select version from activity_spec where slug = $1', [a.code])).rows.map((r) => String(r.version));
+      assert.ok(existing.length >= 1, `${a.code} exists today`);
+      assert.ok(!existing.includes(a.version), `${a.code}@${a.version} is a new version, never an overwrite of ${existing.join(', ')}`);
+    }
+    const codes = new Set(pack.track.activities.map((a) => a.code));
+    for (const r of canonical.global.resources) assert.ok(codes.has(r.practice_activity), `learning resource ${r.code} keeps its practice activity ${r.practice_activity}`);
+    // The one link whose meaning goes stale is reported, not changed (a global registry change at publication).
+    const adv = validateCandidate(fresh()).advisories;
+    assert.equal(adv.length, 1); assert.match(adv[0]!, /lr_html_forms_mdn.*act_fe_build_interface.*act_fe_debug_improve does/);
+  });
+});
+
 describe('the real pipeline: dry run only', () => {
   test('under a development schema-2 set built from the candidate constraints the dry run passes; importing is refused; nothing is written', async () => {
     const b = fresh();

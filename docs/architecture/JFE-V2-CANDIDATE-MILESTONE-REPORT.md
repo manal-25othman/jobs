@@ -63,3 +63,17 @@ CHG-017 (CR-1, CR-8, CR-12, CR-13, + proposed CR-14) · EXT-3 row (+ format 2 / 
 ## 6. What remains inactive
 
 The candidate (not imported; format-2 import refused) · every classification and schema-2 set (test fixtures only, left inactive) · readiness rule sets for the track (none created) · verification, readiness and claims policies (unchanged) · production (no state exists) · P6.
+
+---
+
+## 7. Final candidate review (D-132)
+
+| Item | Result |
+|---|---|
+| Forms validation criterion | Task A `form_submission_flow` (Supporting, non-mandatory, human, `TBD`, no evidence path), from the registry indicators; distinct from the JS and accessibility criteria. All 12 skills are now measured (28 criteria: 25 skill + 3 gates). Pending SME S4 |
+| Browser visibility (11 of 12) | **Rule, proven:** `graduate_content_visible` (0024) never shows a superseded demo row. The career-data suite runs the real OPEN-040 promotion of the demo `skl_forms_validation`; completing it supersedes the demo row while the demo role still points at it. Reproduced on an own fixture (`track-visibility.e2e.ts`) and made loud by **Q25**. Isolated browser run on a freshly built database: **12 of 12** visible, Forms included (B14, 14/14). Post-e2e database: 11 of 12, the hidden one exactly as the rule predicts (91/91) |
+| J-7 | Task A and Task B keep their identity and codes; **INT materially changed** → PO decision requested (PO-3). New versions only; links and history checked |
+| Advisory | `lr_html_forms_mdn` practises in INT, which no longer measures Forms → repoint at publication (PO-4) |
+| Governance | `PO-APPROVAL-SUMMARY-CHG-017-EXT-3.md` is now the approval package; CR-14 added to the CHG-017 proposal; EXT-3 row covers pack format 2 and the unresolved-value rule. Nothing approved |
+
+Focused tests: candidate suite 12/12 · visibility 2/2 · browser B14 isolated 14/14 · full browser on the post-e2e database 91/91 · targeted API suites on a freshly built database 80/80 (career-data, pack-constraints, DM-7b, candidate, alias, visibility, readiness, track-admin) · `npm run verify` pass.

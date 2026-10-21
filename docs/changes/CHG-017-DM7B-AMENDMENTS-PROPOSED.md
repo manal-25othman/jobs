@@ -15,6 +15,7 @@
 | **CR-8** (amended) | The P1 Frontend track's counts follow a governed, track-scoped pack-constraint version under **constraint schema 2 (class-based)**: Must / Core / Supporting counts and "an activity measures 2–3 Must or Core skills deeply". The legacy `is_core` constraints stay in force, unchanged, for format-1 packs. **3 activities kept.** Amends §3.1 and OD-2. | Names the constraint schema; keeps the legacy set for v1 | D-2, D-7 |
 | **CR-12** (new) | A professional class is shown to a learner, or used to generate gaps, only when its classification version is approved by a named SME (plus the Product Owner where it carries PO defaults) and activated. A Supporting skill is never a readiness blocker. A Product Owner default is never presented as an expert decision. | New | D-3, D-4 |
 | **CR-13** (new) | The Junior Frontend v2 classification is **6 Must · 3 Core · 3 Supporting**. These are the numbers of this track's constraint version, not a rule for other tracks. | New | D-5 |
+| **CR-14** (new) | In a pack of format 2, an expert value that is not yet decided (criterion weight, skill threshold, level descriptors, pass threshold and pass rule, activity duration) is recorded as **undecided** — empty, with status `TBD`, and for a duration listed with the decision it waits for — **never as a number**. A pack never declares such a value approved; approval is a named SME's act recorded in the database (OPEN-043). | New (review finding R-2, D-131) | D-037, OPEN-043 |
 
 ## 2. SRS amendments at publication (proposed text, not applied)
 

@@ -19,7 +19,7 @@ export interface CoverageRow {
   skill: string; cls: string; source: string; sourceRef: string; minDistinctTasks: number | null;
   measuredBy: { activity: string; criteria: string[]; primary: boolean; validation: boolean }[]; path: string | null;
 }
-export interface CandidateReport { packId: string; packVersion: string; format: 1 | 2; problems: string[]; coverage: CoverageRow[]; importable: false }
+export interface CandidateReport { packId: string; packVersion: string; format: 1 | 2; problems: string[]; advisories: string[]; coverage: CoverageRow[]; importable: false }
 
 export function loadCandidate(candidateDir: string, canonicalRoot: string, packId = 'trk_frontend_junior'): CandidateBundle {
   const { pack, files } = loadPack(candidateDir, packId, canonicalRoot);
@@ -83,6 +83,17 @@ export function candidateCoverage(pack: Pack, paths: readonly CandidatePath[]): 
   }));
 }
 
+/**
+ * Advisories (not problems): a global learning resource whose practice activity no longer measures the resource's skill
+ * in the candidate. The link still resolves (the code is kept, J-7), but its meaning is stale; repointing it is a change
+ * to the global registry, decided at publication — never made by a candidate.
+ */
+export function candidateAdvisories(pack: Pack): string[] {
+  const measures = (activity: string, skill: string) => pack.track.rubrics.some((r) => r.activity === activity && r.criteria.some((c) => c.linked_skill === skill));
+  return pack.global.resources.filter((r) => pack.track.activities.some((a) => a.code === r.practice_activity) && !measures(r.practice_activity, r.skill))
+    .map((r) => `learning resource '${r.code}' (${r.skill}) practises in ${r.practice_activity}, which no longer measures that skill; ${pack.track.activities.filter((a) => measures(a.code, r.skill)).map((a) => a.code).join(' or ') || 'no activity'} does (global registry change at publication)`);
+}
+
 /** Validation only. Never imports, never writes, never resolves anything from a database. */
 export function validateCandidate(b: CandidateBundle): CandidateReport {
   const problems: string[] = [];
@@ -92,5 +103,5 @@ export function validateCandidate(b: CandidateBundle): CandidateReport {
   try { assertPackConstraintsSaneV2(b.constraints.constraintsV2); } catch (e) { problems.push(`candidate constraints: ${(e as Error).message}`); }
   try { validatePack(b.pack, b.constraints); } catch (e) { if (e instanceof PackValidationError) problems.push(...e.problems); else throw e; }
   problems.push(...validateCandidatePaths(b.pack, b.paths));
-  return { packId: m.pack_id, packVersion: m.pack_version, format: packFormatVersion(b.pack), problems, coverage: candidateCoverage(b.pack, b.paths), importable: false };
+  return { packId: m.pack_id, packVersion: m.pack_version, format: packFormatVersion(b.pack), problems, advisories: candidateAdvisories(b.pack), coverage: candidateCoverage(b.pack, b.paths), importable: false };
 }

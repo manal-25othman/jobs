@@ -916,6 +916,56 @@
           "mandatory_status": "proposed"
         },
         {
+          "key": "form_submission_flow",
+          "name_ar": "سلوك النموذج عند الإرسال والتصحيح",
+          "name_en": "Form submission and correction flow",
+          "dimension": "correctness",
+          "linked_skill": "skl_forms_validation",
+          "source": "activity",
+          "weight": null,
+          "weight_status": "TBD",
+          "max_score": 2,
+          "mandatory": false,
+          "mandatory_status": "proposed",
+          "threshold_for_skill": null,
+          "threshold_status": "TBD",
+          "evaluator_type": "human",
+          "human_review_required": true,
+          "description_ar": "النموذج كله: لا يُرسَل وفيه حقل غير صالح أو مطلوب فارغ؛ لكل حقل رسالته (لا رسالة عامة واحدة ولا alert())؛ تبقى القيم المدخلة بعد إرسال فاشل ويختفي خطأ الحقل عند تصحيحه؛ لا زر إرسال معطَّل بلا سبب ظاهر. لا يحجب أي مهارة أخرى",
+          "description_en": "The form as a whole: it is not submitted while a field is invalid or a required field is empty; each field gets its own message (not one generic message, not alert()); entered values survive a failed submit and a field's error clears once corrected; no submit button disabled without a visible reason. Never blocks another skill",
+          "expected_evidence_ar": "ملفا HTML وJavaScript",
+          "expected_evidence_en": "file.index_html, file.app_js",
+          "excerpt_guidance_en": "quote the submit handler and one per-field message; state what happened on a failed submit and on correction",
+          "rationale_when_met_ar": "النموذج يمنع الإرسال غير الصالح ويتيح التصحيح بسهولة.",
+          "rationale_when_unmet_ar": "إرسال غير صالح، أو رسالة عامة، أو ضياع المدخلات، أو منع التصحيح.",
+          "levels": [
+            {
+              "level_key": "missing",
+              "score": 0,
+              "descriptor_ar": "يُرسَل غير الصالح أو رسالة عامة/alert()",
+              "descriptor_en": "invalid data submitted, or one generic message / alert()",
+              "observable_evidence_en": "invalid data submitted, or one generic message / alert()"
+            },
+            {
+              "level_key": "partial",
+              "score": 1,
+              "descriptor_ar": "يمنع الإرسال لكن تضيع المدخلات أو يبقى الخطأ بعد التصحيح",
+              "descriptor_en": "submission blocked, but values are lost or errors persist after correction",
+              "observable_evidence_en": "submission blocked, but values are lost or errors persist after correction"
+            },
+            {
+              "level_key": "solid",
+              "score": 2,
+              "descriptor_ar": "منع الإرسال برسالة لكل حقل مع حفظ المدخلات وتصحيح سلس",
+              "descriptor_en": "submission blocked with a message per field; values kept; errors clear on correction",
+              "observable_evidence_en": "submission blocked with a message per field; values kept; errors clear on correction"
+            }
+          ],
+          "levels_status": "TBD",
+          "criterion_kind": "skill_evidence",
+          "_basis": "Registry indicators of skl_forms_validation (\"invalid data is not submitted\", \"validation never blocks correction\") and failure modes (\"one generic error message\", \"a disabled submit with no visible reason\", \"validation via alert()\"); adapted from the 0.2.1 INT criterion form_validation. Proposed content (PO proposal) pending SME S4; Supporting, non-mandatory, no evidence path."
+        },
+        {
           "key": "deliverables_complete",
           "name_ar": "اكتمال المخرجات",
           "name_en": "Deliverables complete",

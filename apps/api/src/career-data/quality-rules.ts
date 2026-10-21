@@ -113,6 +113,16 @@ export const QUALITY_RULES: readonly QualityRule[] = [
             union all select 'rubric_criterion ' || rc.key from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id join skill s on s.id = rc.linked_skill_id where not rv.is_demo_fixture and s.is_demo_fixture
             union all select 'task_skill ' || t.code || '/' || s.slug from task_skill tk join task t on t.id = tk.task_id join skill s on s.id = tk.skill_id where not t.is_demo_fixture and s.is_demo_fixture
             union all select 'learning_resource ' || coalesce(lr.code, lr.id::text) from learning_resource lr join skill s on s.id = lr.skill_id where not lr.is_demo_fixture and s.is_demo_fixture`, (r) => String(r.label ?? Object.values(r)[0])) },
+  // A graduate sees a role's skills only through graduate_content_visible (0024): a superseded DEMO skill is never shown.
+  // When only the skill was promoted (OPEN-040) and the role still points at the superseded demo row, the track would
+  // silently show one skill fewer than the role requires. Named here (with the successor) so it is never silent.
+  { id: 'Q25', title: 'graduate-visible role requirement whose skill graduates cannot see (e.g. a DEMO skill superseded by promotion while its role was not promoted): the track would silently omit a required skill', severity: 'fail',
+    run: q(`select tr.slug || ' → ' || s.slug || ' (' || s.review_status || coalesce(', successor ' || c.id || ' ' || c.review_status, ', no successor') || ')' as label
+              from role_requirement rr join target_role tr on tr.id = rr.target_role_id join skill s on s.id = rr.skill_id
+              left join skill c on c.promoted_from_id = s.id and not c.is_demo_fixture
+             where s.status = 'active' and graduate_content_visible(rr.review_status, rr.is_demo_fixture) and graduate_content_visible(tr.review_status, tr.is_demo_fixture)
+               and not graduate_content_visible(s.review_status, s.is_demo_fixture)
+             order by 1`, (r) => String(r.label)) },
   { id: 'Q20', title: 'published non-demo rubric with weights or thresholds not SME-approved (OPEN-043)', severity: 'fail',
     run: q(`select rv.version || ': pass_threshold ' || rv.pass_threshold_status as label from rubric_version rv where rv.status = 'published' and not rv.is_demo_fixture and rv.pass_threshold_status <> 'approved'
             union all select rv.version || '/' || rc.key || ': weight ' || rc.weight_status || ', threshold ' || rc.threshold_status from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id

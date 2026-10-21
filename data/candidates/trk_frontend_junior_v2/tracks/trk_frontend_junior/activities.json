@@ -548,7 +548,8 @@
         "estimated_minutes — SME value S10 (draft 60 min; not applied)",
         "all criterion weights, skill thresholds and level descriptors — S11 (calibration session)",
         "planted faults — S2",
-        "distinctness from INT and B — S6"
+        "distinctness from INT and B — S6",
+        "form_submission_flow (Forms validation, Supporting) — proposed criterion, SME S4"
       ],
       "git_assessed": false
     },

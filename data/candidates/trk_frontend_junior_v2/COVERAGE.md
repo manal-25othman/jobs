@@ -10,10 +10,14 @@
 | `skl_js_fundamentals` | must | sme | P-JS (2) | code_understanding | validation_fixed **(primary)** | js_correctness **(primary)** |
 | `skl_ui_state_interaction` | core | sme | P-UI (2) | state_transitions |  | filter_in_state |
 | `skl_api_data_states` | core | sme | P-API (2) | data_states **(primary)** |  | empty_state_correct |
-| `skl_forms_validation` | supporting | **PO default** | — (never blocks) |  |  |  |
+| `skl_forms_validation` | supporting | **PO default** | — (never blocks) |  | form_submission_flow |  |
 | `skl_frontend_debugging` | must | sme | P-DBG (2) | root_cause_fixed **(primary)** | root_cause_note | root_cause_fixed **(primary)** |
 | `skl_accessibility_basics` | core | sme | P-A11Y (1) | a11y_basics | a11y_keyboard_forms |  |
 | `skl_code_reading` | must | sme | P-READ (2) | problem_traced | scope_discipline | component_explained, problem_traced **(primary)** |
 | `skl_version_control_basics` | must | sme | P-GIT (1) | git_workflow |  |  |
 | `skl_technical_explanation` | supporting | sme | — (never blocks) | decision_clarity |  | decision_explained |
 | `skl_requirements_reading` | supporting | **PO default** | — (never blocks) | judgment_assumption_check |  |  |
+
+## Advisories (not problems)
+
+- learning resource 'lr_html_forms_mdn' (skl_forms_validation) practises in act_fe_build_interface, which no longer measures that skill; act_fe_debug_improve does (global registry change at publication)

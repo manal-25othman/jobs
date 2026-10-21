@@ -59,7 +59,7 @@ Supporting skills have no path: they never block (SME-20).
 | Item | Where in the data | Decided by |
 |---|---|---|
 | S1–S3 task texts, planted faults, the brief/API conflict | `activities.json → unresolved` | SME |
-| S4 criteria and mandatory flags (proposed, SME-25 basis) | `mandatory_status: proposed` | SME |
+| S4 criteria and mandatory flags (proposed, SME-25 basis), incl. the proposed Forms criterion | `mandatory_status: proposed`; Task A `unresolved` | SME |
 | S5 path wording · S6 variant distinctness | `evidence_paths.candidate.json` | SME |
 | S7 Git: minimum described commits and PR description | INT `unresolved`; no minimum applied | SME |
 | S8 integrated pass rule (PR-1 / PR-2) · S9 borderline band | INT rubric `pass_rule.status: TBD`, `pass_threshold: null` | SME + PO |
@@ -67,11 +67,13 @@ Supporting skills have no path: they never block (SME-20).
 | S11 weights, thresholds, level descriptors | `weight`, `threshold_for_skill: null`; `*_status: TBD`; `levels_status: TBD` | SME (calibration session) |
 | S12 calibration method (anchors, agreement, double-review sample) | — (outside the pack) | SME |
 | S13 verification level read by readiness (V-a / V-b / V-c) | — (readiness rule set not created) | PO with SME |
-| J-7 new activity codes vs new versions | candidate uses new **versions** of the 0.2.1 codes | PO |
+| J-7 activity codes | A and B keep their codes (identity retained); **INT changed materially — PO decision PO-3** | PO |
 
 ## Findings
 
-1. **Git is now covered** (P-GIT, INT `git_workflow`); before, no activity measured it.
-2. **`skl_forms_validation` (Supporting, PO default) has no criterion of its own.** The INT no longer has a form (its 0.2.1 `form_validation` criterion went with the form); Task A exercises forms only through `validation_fixed` (JavaScript) and `a11y_keyboard_forms` (accessibility). Supporting never blocks, so the candidate validates; whether a forms criterion is wanted is a content decision (SME S4 / PO), not added here.
-3. **Activity codes:** keeping the 0.2.1 codes (new versions) leaves the global learning-resource registry valid (`practice_activity` references) and keeps history on the same codes. New codes (the `07` names) would require remapping those global resources at publication (J-7).
-4. `importance` is unchanged from 0.2.1 (Git and Accessibility keep `medium`); it is a display field, not the class.
+1. **Git is covered** (P-GIT, INT `git_workflow`); before v2, no activity measured it.
+2. **Forms validation now has its own criterion:** Task A `form_submission_flow` (the registration form's submission and correction flow: no submission while invalid, one message per field, values kept, errors clear on correction, no unexplained disabled submit). It is built from the registry's indicators and failure modes for the skill and adapted from the 0.2.1 `form_validation` criterion. It is distinct from `validation_fixed` (the JavaScript e-mail rule) and `a11y_keyboard_forms` (labels, association, keyboard). Supporting, **non-mandatory**, no evidence path, values `TBD`; a proposal reviewed by the SME under S4.
+3. **Activity codes (J-7):** Task A and Task B keep their identity and their codes (new version 0.2.0). **INT has materially changed** (form removed, starter with a planted bug, Git/PR delivery, now the integrated assessment): its code is kept *pending* the PO's decision (approval package PO-3). No existing version is overwritten.
+4. **Advisory:** `lr_html_forms_mdn` (Forms validation) practises in INT, which no longer has a form; Task A now measures Forms. Repointing is a global-registry change at publication (PO-4), reported by `candidate-validate`, not made here.
+5. **Visibility (learner track):** a skill is shown only if `graduate_content_visible` (0024) allows it; a **superseded** demo skill never is. A skill-only OPEN-040 promotion leaves the demo role pointing at the superseded row, so its track shows one skill fewer — quality rule **Q25** now names that state. On a clean fixture all 12 skills are visible (browser B14, isolated run).
+6. `importance` is unchanged from 0.2.1 (a display field, not the class).
