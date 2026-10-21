@@ -243,7 +243,7 @@ export const CANDIDATE_FIXTURE_PO = 'Product Owner (TEST FIXTURE approval — no
 export async function useCandidateClassification(pool: import('pg').Pool, roleId: string): Promise<{ id: string; off: () => Promise<void> }> {
   const { join } = await import('node:path');
   const { loadCandidate } = await import('../src/career-data/candidate');
-  const { createClassificationSet, approveClassificationSet } = await import('../src/configuration/professional-classification');
+  const { createClassificationSet, approveClassificationSet, activateClassificationForDevelopment } = await import('../src/configuration/professional-classification');
   const root = join(__dirname, '..', '..', '..', '..');
   const { pack } = loadCandidate(join(root, 'data', 'candidates', 'trk_frontend_junior_v2'), join(root, 'data', 'career'));
   const c = await pool.connect();
@@ -258,8 +258,7 @@ export async function useCandidateClassification(pool: import('pg').Pool, roleId
     const { id } = await createClassificationSet(c, { key: 'jfe_v2_candidate_fixture', targetRoleId: roleId, labelAr: 'تصنيف مرشّح (اختبار)', labelEn: 'v2 candidate classification (test fixture)',
       description: 'TEST FIXTURE from data/candidates/trk_frontend_junior_v2 — development only, never production', createdBy: 'candidate fixture author', entries });
     await approveClassificationSet(c, { id, smeApprovedBy: CANDIDATE_FIXTURE_SME, poApprovedBy: CANDIDATE_FIXTURE_PO });
-    await c.query("select set_config('naqla.classification_dev_activation', 'on', true)");
-    await c.query(`update skill_classification_set set activation = 'development_only' where id = $1`, [id]);
+    await activateClassificationForDevelopment(c, id);
     await c.query('commit');
     return { id, off: async () => { await pool.query(`update skill_classification_set set activation = 'inactive' where id = $1`, [id]); } };
   } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }

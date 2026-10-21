@@ -5,6 +5,7 @@ import {
   type SkillClassificationEntry, type SkillClassificationSet, type ProfessionalClass, type ClassSource,
 } from '@naqla/domain';
 import { isProduction } from './configuration.service';
+import { assertRoleSkillsPublishable } from '../career-data/publication-safety';
 
 /**
  * DM-7b / P-3 (D-130) — the database side of the professional skill classification.
@@ -78,6 +79,20 @@ export async function createClassificationSet(c: PoolClient, p: { key: string; t
 
 /** Approval: a named SME, plus the Product Owner when PO defaults are present (D-4). Four eyes and finality are enforced by the database. */
 export async function approveClassificationSet(c: PoolClient, p: { id: string; smeApprovedBy: string; poApprovedBy?: string | null }): Promise<void> {
+  await assertClassificationRoleUsable(c, p.id, 'approving this classification');
   await c.query(`update skill_classification_set set review_status = 'approved', sme_approved_by = $2, sme_approved_at = now(),
                    po_approved_by = $3, po_approved_at = case when $3::text is null then null else now() end where id = $1`, [p.id, p.smeApprovedBy, p.poApprovedBy ?? null]);
+}
+
+/** Publication safety: a classification is never approved or activated for a role whose requirements reference a superseded or learner-invisible skill (Q25). */
+async function assertClassificationRoleUsable(c: PoolClient, setId: string, action: string): Promise<void> {
+  const role = (await c.query('select target_role_id from skill_classification_set where id = $1', [setId])).rows[0]?.target_role_id as string | undefined;
+  if (role) await assertRoleSkillsPublishable(c, role, action);
+}
+
+/** development_only activation (never production): the publication-safety check, then the transaction-local opt-in the database requires. */
+export async function activateClassificationForDevelopment(c: PoolClient, id: string): Promise<void> {
+  await assertClassificationRoleUsable(c, id, 'activating this classification');
+  await c.query("select set_config('naqla.classification_dev_activation', 'on', true)");
+  await c.query(`update skill_classification_set set activation = 'development_only' where id = $1`, [id]);
 }

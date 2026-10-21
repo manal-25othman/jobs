@@ -3,8 +3,8 @@
   "_note": "Every weight, skill threshold, level descriptor and pass rule is TBD (null): set only by a named SME in the calibration session (S8, S9, S11), recorded in the database (OPEN-043). Mandatory flags are proposals (SME-25 basis).",
   "records": [
     {
-      "code": "rub_fe_build_interface@0.2.0",
-      "activity": "act_fe_build_interface",
+      "code": "rub_fe_integrated_leave_requests@0.1.0",
+      "activity": "act_fe_integrated_leave_requests",
       "pass_threshold": null,
       "pass_threshold_status": "TBD",
       "proposes_state": "demonstrated",

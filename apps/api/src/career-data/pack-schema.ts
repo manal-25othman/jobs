@@ -22,6 +22,7 @@ export interface PackSynonym { skill: string; relation: SynonymRelation; surface
 export interface PackCriterionLib { key: string; name_ar: string; name_en: string; dimension: string; description_ar: string; description_en: string; default_evaluator: string; }
 export interface PackPresentationRule { asset_type: PresentationAssetType; evidence_level: EvidenceState; allowed: boolean; minimum_source_strength: string | null; minimum_evidence_count: number; requires_verified: boolean; allowed_claim_verbs_ar: string[]; allowed_claim_verbs_en: string[]; forbidden_phrases_ar: string[]; forbidden_phrases_en: string[]; template_pattern_en?: string; numeric_claims_policy_en?: string; ai_disclosure_handling_en?: string; recency_handling_en?: string; language_target?: 'ar' | 'en'; on_user_edit_en?: string; source_refs: string[]; }
 export interface PackResource { code: string; skill: string; title_ar: string; title_en: string; provider: string; resource_type: string; language: 'ar' | 'en'; level: string; duration_minutes: number; free_or_paid: string; url: string | null; why_recommended_ar: string; why_recommended_en: string; covers_target_level: boolean; practice_activity: string; quality_status: string; last_checked: string | null; access_notes_en?: string; source_refs: string[]; }
+export interface PackResourceLink { resource: string; practice_activity: string; reason: string }
 export interface PackManifest { pack_id: string; track_id: string; pack_version: string; status: string; dataset_label: string; is_demo_fixture: boolean; drafting_aid: 'none' | 'ai_assisted'; levels_included: string[]; language_coverage: string[]; region_scope?: string; primary_source: string; sources: string[]; global_registry_versions: Record<string, string>; framework_policy?: string; duplicate_resolutions?: DuplicateResolution[]; changelog_ref?: string; contents?: Record<string, number>;
   /** DM-7b / P-3: 1 (absent) = legacy is_core_for_role; 2 = professionally classified (professional_class per role skill). */
   pack_format_version?: 1 | 2; }
@@ -48,7 +49,9 @@ export interface PackRubric { pass_threshold_status?: 'approved' | 'proposed' | 
 
 export interface Pack {
   readonly global: { sources: PackSource[]; families: PackFamily[]; scale: PackScale; recency: PackRecency[]; skills: PackSkill[]; synonyms: PackSynonym[]; criteriaLibrary: PackCriterionLib[]; presentationRules: PackPresentationRule[]; resources: PackResource[] };
-  readonly track: { manifest: PackManifest; role: PackRole; roleSkills: PackRoleSkill[]; tasks: PackTask[]; activities: PackActivity[]; rubrics: PackRubric[] };
+  readonly track: { manifest: PackManifest; role: PackRole; roleSkills: PackRoleSkill[]; tasks: PackTask[]; activities: PackActivity[]; rubrics: PackRubric[];
+    /** Pack format 2: where a global learning resource is practised in THIS pack. The global registry (and every legacy pack's link) is unchanged. */
+    resourceLinks?: PackResourceLink[] };
 }
 
 export class PackValidationError extends Error {
@@ -182,14 +185,25 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
     refsOk(o, r.source_refs);
   }
   for (const a of PRESENTATION_ASSET_TYPES) for (const l of ['practiced', 'demonstrated', 'verified']) need(ruleKeys.has(`${a}@${l}`), `presentation rules: missing ${a}@${l} (G-14)`);
+  const links = new Map((p.track.resourceLinks ?? []).map((l) => [l.resource, l]));
+  if (format === 1) need(!p.track.resourceLinks, 'a format-1 pack uses the global practice links as they are (resource_links is pack format 2 only)');
+  for (const l of p.track.resourceLinks ?? []) {
+    const r = p.global.resources.find((x) => x.code === l.resource);
+    need(!!r, `resource link: unknown learning resource '${l.resource}'`);
+    need(activityCodes.has(l.practice_activity), `resource link ${l.resource}: '${l.practice_activity}' is not an activity in this pack`);
+    need(isStr(l.reason), `resource link ${l.resource}: a reason is required`);
+    if (r) need(p.track.rubrics.some((rb) => rb.activity === l.practice_activity && rb.criteria.some((c) => c.linked_skill === r.skill)), `resource link ${l.resource}: ${l.practice_activity} does not measure ${r.skill}, so it is not where the skill is practised`);
+  }
   for (const r of p.global.resources) {
     const o = `resource '${r.code}'`; uniq('resource', r.code);
     need(skillCodes.has(r.skill) || /^[a-z-]+$/.test(r.skill), `${o}: unknown skill '${r.skill}'`);
     bilingual(o, r as never, 'title'); bilingual(o, r as never, 'why_recommended');
-    need(activityCodes.has(r.practice_activity), `${o}: practice_activity '${r.practice_activity}' is not an activity in this pack (a recommendation without practice is refused)`);
+    // Format 2 may name this pack's practice activity for a global resource (resource_links); the registry is never edited.
+    const practice = links.get(r.code)?.practice_activity ?? r.practice_activity;
+    need(activityCodes.has(practice), `${o}: practice_activity '${practice}' is not an activity in this pack (a recommendation without practice is refused)`);
     need((RESOURCE_QUALITY as readonly string[]).includes(r.quality_status), `${o}: bad quality_status`);
     need(levelKeys.has(r.level), `${o}: level '${r.level}' is not on the proficiency scale`);
-    try { assertLearningResourceHonest({ url: r.url, qualityStatus: r.quality_status, practiceActivityRef: r.practice_activity }); } catch (e) { problems.push(`${o}: ${(e as Error).message}`); }
+    try { assertLearningResourceHonest({ url: r.url, qualityStatus: r.quality_status, practiceActivityRef: practice }); } catch (e) { problems.push(`${o}: ${(e as Error).message}`); }
     refsOk(o, r.source_refs);
   }
 

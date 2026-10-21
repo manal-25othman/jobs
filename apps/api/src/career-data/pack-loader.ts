@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { Pack } from './pack-schema';
@@ -40,6 +40,8 @@ export function loadPack(root: string, packId: string, globalRoot: string = root
       tasks: recs(t('tasks.json')) as Pack['track']['tasks'],
       activities: recs(t('activities.json')) as Pack['track']['activities'],
       rubrics: recs(t('rubrics.json')) as Pack['track']['rubrics'],
+      // Optional, pack format 2 only: this pack's practice links for global learning resources (the registry is not changed).
+      ...(existsSync(join(root, 'tracks', packId, 'resource_links.json')) ? { resourceLinks: recs(t('resource_links.json')) as NonNullable<Pack['track']['resourceLinks']> } : {}),
     },
   };
   return { pack, files };

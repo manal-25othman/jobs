@@ -39,7 +39,8 @@
     "role_skill_map": 12,
     "tasks": 12,
     "activities": 3,
-    "rubrics": 3
+    "rubrics": 3,
+    "resource_links": 3
   },
   "duplicate_resolutions": [
     {

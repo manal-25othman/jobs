@@ -6,6 +6,7 @@ import type { Pool, PoolClient } from 'pg';
 import { isExactDuplicate, evidencePathStatus, artifactKeysOf, artifactHasProducer, resolvePackConstraints } from '@naqla/domain';
 import { loadPackConstraintSets } from './pack-constraints';
 import { isProduction } from '../configuration/configuration.service';
+import { roleSkillVisibility, visibilityLabel } from './publication-safety';
 
 export interface QualityRule { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; run(c: PoolClient): Promise<string[]>; }
 export interface QualityResult { readonly id: string; readonly title: string; readonly severity: 'fail' | 'warn'; readonly offenders: readonly string[]; readonly passed: boolean; }
@@ -117,12 +118,7 @@ export const QUALITY_RULES: readonly QualityRule[] = [
   // When only the skill was promoted (OPEN-040) and the role still points at the superseded demo row, the track would
   // silently show one skill fewer than the role requires. Named here (with the successor) so it is never silent.
   { id: 'Q25', title: 'graduate-visible role requirement whose skill graduates cannot see (e.g. a DEMO skill superseded by promotion while its role was not promoted): the track would silently omit a required skill', severity: 'fail',
-    run: q(`select tr.slug || ' → ' || s.slug || ' (' || s.review_status || coalesce(', successor ' || c.id || ' ' || c.review_status, ', no successor') || ')' as label
-              from role_requirement rr join target_role tr on tr.id = rr.target_role_id join skill s on s.id = rr.skill_id
-              left join skill c on c.promoted_from_id = s.id and not c.is_demo_fixture
-             where s.status = 'active' and graduate_content_visible(rr.review_status, rr.is_demo_fixture) and graduate_content_visible(tr.review_status, tr.is_demo_fixture)
-               and not graduate_content_visible(s.review_status, s.is_demo_fixture)
-             order by 1`, (r) => String(r.label)) },
+    async run(c) { return (await roleSkillVisibility(c)).filter((r) => r.hidden).map(visibilityLabel); } },
   { id: 'Q20', title: 'published non-demo rubric with weights or thresholds not SME-approved (OPEN-043)', severity: 'fail',
     run: q(`select rv.version || ': pass_threshold ' || rv.pass_threshold_status as label from rubric_version rv where rv.status = 'published' and not rv.is_demo_fixture and rv.pass_threshold_status <> 'approved'
             union all select rv.version || '/' || rc.key || ': weight ' || rc.weight_status || ', threshold ' || rc.threshold_status from rubric_criterion rc join rubric_version rv on rv.id = rc.rubric_version_id

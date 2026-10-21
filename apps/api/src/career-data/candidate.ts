@@ -90,8 +90,10 @@ export function candidateCoverage(pack: Pack, paths: readonly CandidatePath[]): 
  */
 export function candidateAdvisories(pack: Pack): string[] {
   const measures = (activity: string, skill: string) => pack.track.rubrics.some((r) => r.activity === activity && r.criteria.some((c) => c.linked_skill === skill));
-  return pack.global.resources.filter((r) => pack.track.activities.some((a) => a.code === r.practice_activity) && !measures(r.practice_activity, r.skill))
-    .map((r) => `learning resource '${r.code}' (${r.skill}) practises in ${r.practice_activity}, which no longer measures that skill; ${pack.track.activities.filter((a) => measures(a.code, r.skill)).map((a) => a.code).join(' or ') || 'no activity'} does (global registry change at publication)`);
+  const links = new Map((pack.track.resourceLinks ?? []).map((l) => [l.resource, l.practice_activity]));
+  return pack.global.resources.map((r) => ({ r, practice: links.get(r.code) ?? r.practice_activity }))
+    .filter(({ r, practice }) => pack.track.activities.some((a) => a.code === practice) && !measures(practice, r.skill))
+    .map(({ r, practice }) => `learning resource '${r.code}' (${r.skill}) practises in ${practice}, which does not measure that skill; ${pack.track.activities.filter((a) => measures(a.code, r.skill)).map((a) => a.code).join(' or ') || 'no activity'} does (name it in resource_links.json)`);
 }
 
 /** Validation only. Never imports, never writes, never resolves anything from a database. */

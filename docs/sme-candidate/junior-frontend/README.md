@@ -27,6 +27,7 @@ The three activities are **adapted from the 0.2.1 activities**, not written from
 | `09-sme-validation-package.md` | **Ready to send to the SME:** the three briefs, rubrics, evidence paths, answer sheet (Arabic) | L |
 | `10-sme-calibration-and-p6-decision-package.md` | **Pre-P6 (2026-10-18):** per-skill thresholds, level-vs-readiness evidence question (SME-Q1), integrated pass rule, Git/A11Y exceptions, final coverage matrix, anchor submissions and reviewer calibration, remaining decisions (Arabic; values blank) | — |
 | `11-sme-review-package-final.md` | **The one package to send (final):** established decisions as context, the three briefs, rubrics, per-skill paths, calibration method and the approval sheet S1–S13 (Arabic; values blank). Supersedes 09 and 10 for sending | L |
+| `12-sme-signoff-package.md` | **The one sign-off package for the v2 candidate (not sent):** answered decisions (not asked again), proposals to validate S1–S13 with unapproved starting values, PO decisions for information; includes the new Forms criterion and the integrated assessment's new code. Builds on 11 (kept as record) | L |
 
 ## Before any of this becomes content
 

@@ -1,12 +1,12 @@
 {
   "_label": "DRAFT / NOT SME APPROVED / v2 CANDIDATE — NOT IMPORTED",
-  "_note": "Three activities (F5), each a new version 0.2.0 of its 0.2.1 code (J-7: new codes are the alternative). estimated_minutes is null until S10.",
+  "_note": "Three activities (F5). INT is a NEW code act_fe_integrated_leave_requests@0.1.0 (J-7: identity changed); Task A and Task B keep their codes with new versions 0.2.0 (identity retained). No existing version is overwritten. estimated_minutes is null until S10.",
   "records": [
     {
-      "code": "act_fe_build_interface",
-      "version": "0.2.0",
+      "code": "act_fe_integrated_leave_requests",
+      "version": "0.1.0",
       "level": "junior",
-      "candidate_name": "INT — integrated practical assessment (C5 condition 3); 07 calls it act_fe_integrated_leave_requests (J-7)",
+      "candidate_name": "INT — integrated practical assessment (C5 condition 3). New code by PO direction J-7: identity changed materially (form removed, starter with a planted bug, Git/PR delivery, readiness assessment).",
       "variant_family": "leave_requests_list",
       "title_ar": "صفحة طلبات الإجازة: بناء وإصلاح وتسليم عبر Pull Request",
       "title_en": "Leave-requests page: build, fix and deliver through a pull request",
@@ -315,7 +315,7 @@
           "evaluation_mode": "deterministic"
         }
       ],
-      "rubric": "rub_fe_build_interface@0.2.0",
+      "rubric": "rub_fe_integrated_leave_requests@0.1.0",
       "unresolved": [
         "estimated_minutes — SME value S10 (draft 150 min; not applied)",
         "all criterion weights, skill thresholds and level descriptors — S11 (calibration session)",
@@ -326,7 +326,8 @@
       ],
       "source_refs": [
         "src_naqla_frontend_pack_v0_1"
-      ]
+      ],
+      "derived_from": "act_fe_build_interface@0.1.0 (the 0.2.1 activity; preserved unchanged, with its history, evidence and learning-resource links)"
     },
     {
       "code": "act_fe_debug_improve",
@@ -336,8 +337,8 @@
       "title_en": "Workshop registration page: accessible form and responsive repair",
       "business_context_ar": "صفحة «تسجيل في ورشة» قائمة تلقّت شكاوى: تنكسر على الجوال، لا تعمل بلوحة المفاتيح، وتقبل بريدًا غير صالح. مسؤولة التسويق تريد إطلاقها خلال يومين.",
       "business_context_en": "An existing 'workshop registration' page has complaints: it breaks on mobile, cannot be used by keyboard, and accepts an invalid email. Marketing wants it live in two days.",
-      "objective_ar": "أصلحي البنية الدلالية وإتاحة النموذج (تسميات واضحة، ورسائل خطأ مرتبطة بحقولها، واستخدام كامل بلوحة المفاتيح مع تركيز ظاهر)، والسلوك المتجاوب، والتحقق من البريد، دون إعادة كتابة الصفحة؛ واكتبي لكل عطل سطرًا يسمّي سببه لا عَرَضه.",
-      "objective_en": "Fix the semantic structure and form accessibility (clear labels, error messages tied to their fields, full keyboard use with visible focus), the responsive behaviour and the e-mail validation without rewriting the page; write one line per fault naming its cause, not its symptom.",
+      "objective_ar": "أصلحي البنية الدلالية وإتاحة النموذج (تسميات واضحة، ورسائل خطأ مرتبطة بحقولها، واستخدام كامل بلوحة المفاتيح مع تركيز ظاهر)، والسلوك المتجاوب، والتحقق من البريد، دون إعادة كتابة الصفحة؛ واجعلي النموذج لا يُرسَل وفيه حقل غير صالح، مع رسالة لكل حقل وبقاء ما أدخله المستخدم عند الخطأ؛ واكتبي لكل عطل سطرًا يسمّي سببه لا عَرَضه.",
+      "objective_en": "Fix the semantic structure and form accessibility (clear labels, error messages tied to their fields, full keyboard use with visible focus), the responsive behaviour and the e-mail validation without rewriting the page; make the form refuse to submit while a field is invalid, with a message per field and the user's input kept on error; write one line per fault naming its cause, not its symptom.",
       "ai_usage_mode": "ai_assisted",
       "estimated_minutes": null,
       "can_yield_demonstrated": true,

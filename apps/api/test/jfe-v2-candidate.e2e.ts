@@ -21,6 +21,7 @@ import { loadPack } from '../src/career-data/pack-loader';
 import { importPack } from '../src/career-data/pipeline';
 import { validatePack, PackValidationError, type Pack } from '../src/career-data/pack-schema';
 import { loadCandidate, validateCandidate, type CandidateBundle } from '../src/career-data/candidate';
+import { roleSkillVisibility } from '../src/career-data/publication-safety';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const ROOT = join(__dirname, '..', '..', '..', '..');
@@ -35,7 +36,7 @@ const tx = async <T>(fn: (c: PoolClient) => Promise<T>): Promise<T> => {
 const fresh = (): CandidateBundle => loadCandidate(DIR, CANON);
 const mutated = (fn: (p: Pack, b: CandidateBundle) => void): CandidateBundle => { const b = fresh(); fn(b.pack, b); return b; };
 const has = (b: CandidateBundle, re: RegExp) => validateCandidate(b).problems.some((x) => re.test(x));
-const INT = 'act_fe_build_interface'; const TA = 'act_fe_debug_improve'; const TB = 'act_fe_change_request';
+const INT = 'act_fe_integrated_leave_requests'; const LEGACY_INT = 'act_fe_build_interface'; const TA = 'act_fe_debug_improve'; const TB = 'act_fe_change_request';
 
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
 after(async () => { await pool?.end(); await app?.close(); });
@@ -72,9 +73,9 @@ describe('the candidate content', () => {
     assert.equal(inDb, named.size, 'every skill already exists in the database: nothing new would be created');
     assert.deepEqual(pack.track.roleSkills.map((x) => x.skill).sort(), canonical.track.roleSkills.map((x) => x.skill).sort(), 'the same twelve skills as 0.2.1');
   });
-  test('three activities (no fourth), each a new version of its 0.2.1 code; Task B measures three Must skills deeply', () => {
+  test('three activities (no fourth): a new code for the integrated assessment, new versions for Task A and Task B; Task B measures three Must skills deeply', () => {
     const { pack } = fresh();
-    assert.deepEqual(pack.track.activities.map((a) => `${a.code}@${a.version}`), [`${INT}@0.2.0`, `${TA}@0.2.0`, `${TB}@0.2.0`]);
+    assert.deepEqual(pack.track.activities.map((a) => `${a.code}@${a.version}`), [`${INT}@0.1.0`, `${TA}@0.2.0`, `${TB}@0.2.0`]);
     const prim = (code: string) => pack.track.activities.find((a) => a.code === code)!.related_skills.filter((s) => s.depth === 'primary').map((s) => s.skill).sort();
     assert.deepEqual(prim(TB), ['skl_code_reading', 'skl_frontend_debugging', 'skl_js_fundamentals']);
     assert.deepEqual(prim(INT), ['skl_api_data_states', 'skl_css_responsive', 'skl_frontend_debugging']);
@@ -96,7 +97,7 @@ describe('the candidate content', () => {
   test('Git: one inspected project (INT), branch + commits + pull request + explained changes, human-reviewed at a declared SHA, no invented commit minimum', () => {
     const { pack, paths } = fresh();
     const git = paths.find((p) => p.skill === 'skl_version_control_basics')!;
-    assert.deepEqual(git.params['counted_criteria'], { [INT]: { versions: ['0.2.0'], criteria: ['git_workflow'] } });
+    assert.deepEqual(git.params['counted_criteria'], { [INT]: { versions: ['0.1.0'], criteria: ['git_workflow'] } });
     assert.equal(git.params['min_distinct_tasks'], 1); assert.equal(git.params['require_validation_activity'], false);
     const int = pack.track.activities.find((a) => a.code === INT)!;
     assert.ok(int.tasks.includes('tsk_fe_version_control_flow'));
@@ -132,7 +133,7 @@ describe('the candidate content', () => {
     assert.ok(has(mutated((p) => { p.track.roleSkills.find((x) => x.skill === 'skl_requirements_reading')!.professional_class = 'core'; }), /Core skills must be exactly 3, found 4|Supporting skills must be exactly 3, found 2/), '6/3/3 enforced');
     assert.ok(has(mutated((p) => { p.track.activities.find((a) => a.code === TB)!.related_skills = [{ skill: 'skl_js_fundamentals', depth: 'primary' }, { skill: 'skl_technical_explanation', depth: 'primary' }, { skill: 'skl_forms_validation', depth: 'primary' }]; }), /act_fe_change_request.*Must\/Core skills deeply, found 1/), 'Task B bent to Supporting primaries');
     assert.ok(has(mutated((p) => { p.track.roleSkills.find((x) => x.skill === 'skl_version_control_basics')!.minimum_evidence_count = 2; }), /needs 2 distinct tasks but only 1 activity measures it/), 'a second Git activity would be required');
-    assert.ok(has(mutated((_p, b) => { b.paths.find((x) => x.skill === 'skl_html_semantic')!.params['counted_criteria'] = { [INT]: { versions: ['0.2.0'], criteria: ['responsive_layout'] }, [TA]: { versions: ['0.2.0'], criteria: ['semantic_fixed'] } }; }), /does not measure skl_html_semantic/), 'a path counting another skill\'s criterion');
+    assert.ok(has(mutated((_p, b) => { b.paths.find((x) => x.skill === 'skl_html_semantic')!.params['counted_criteria'] = { [INT]: { versions: ['0.1.0'], criteria: ['responsive_layout'] }, [TA]: { versions: ['0.2.0'], criteria: ['semantic_fixed'] } }; }), /does not measure skl_html_semantic/), 'a path counting another skill\'s criterion');
     assert.ok(has(mutated((_p, b) => { b.paths = b.paths.filter((x) => x.skill !== 'skl_code_reading'); }), /must skill 'skl_code_reading' has no explicit evidence path/), 'a Must skill without a path');
     assert.ok(has(mutated((_p, b) => { b.paths.push({ ...b.paths[0]!, path: 'P-X', skill: 'skl_forms_validation', class: 'must' }); }), /a Supporting skill never blocks|declared must/), 'a Supporting skill given a path');
     assert.ok(has(mutated((p) => { p.track.manifest.status = 'published'; }), /stays draft|draft or curated/), 'never anything but draft');
@@ -156,20 +157,37 @@ describe('final candidate review: Forms validation criterion and J-7 activity id
     for (const r of pack.track.rubrics) for (const x of r.criteria) if (x.linked_skill && supporting.has(x.linked_skill)) assert.equal(x.mandatory, false, `${r.code}/${x.key}: a Supporting criterion never decides an activity pass`);
     assert.ok(pack.track.activities.find((a) => a.code === TA)!.unresolved!.some((u) => /form_submission_flow.*S4/.test(u)), 'listed as a proposal pending SME S4');
   });
-  test('J-7: the three codes are kept; each is a new immutable version; learning-resource links hold; nothing existing is overwritten', async () => {
+  test('J-7: INT has a NEW code; Task A and Task B keep theirs with versions ordered above every existing one; the original activity is preserved', async () => {
     const { pack } = fresh();
     const canonical = loadPack(CANON, 'trk_frontend_junior').pack;
-    assert.deepEqual(pack.track.activities.map((a) => a.code).sort(), canonical.track.activities.map((a) => a.code).sort());
-    for (const a of pack.track.activities) {
-      const existing = (await pool.query('select version from activity_spec where slug = $1', [a.code])).rows.map((r) => String(r.version));
-      assert.ok(existing.length >= 1, `${a.code} exists today`);
-      assert.ok(!existing.includes(a.version), `${a.code}@${a.version} is a new version, never an overwrite of ${existing.join(', ')}`);
+    const semver = (v: string) => v.split('.').map(Number);
+    const newer = (a: string, b: string) => { const [x, y] = [semver(a), semver(b)]; for (let i = 0; i < 3; i++) if (x[i]! !== y[i]!) return x[i]! > y[i]!; return false; };
+    for (const code of [TA, TB]) {
+      const v = pack.track.activities.find((a) => a.code === code)!.version;
+      const existing = [...(await pool.query('select version from activity_spec where slug = $1', [code])).rows.map((r) => String(r.version)), canonical.track.activities.find((a) => a.code === code)!.version];
+      assert.ok(existing.every((e) => newer(v, e)), `${code}@${v} is ordered above every existing version (${[...new Set(existing)].join(', ')}); none is overwritten`);
     }
-    const codes = new Set(pack.track.activities.map((a) => a.code));
-    for (const r of canonical.global.resources) assert.ok(codes.has(r.practice_activity), `learning resource ${r.code} keeps its practice activity ${r.practice_activity}`);
-    // The one link whose meaning goes stale is reported, not changed (a global registry change at publication).
-    const adv = validateCandidate(fresh()).advisories;
-    assert.equal(adv.length, 1); assert.match(adv[0]!, /lr_html_forms_mdn.*act_fe_build_interface.*act_fe_debug_improve does/);
+    const int = pack.track.activities.find((a) => a.code === INT)!;
+    assert.equal(int.version, '0.1.0');
+    assert.equal(Number((await one('select count(*)::int n from activity_spec where slug = $1', [INT])).n), 0, 'a new, unused code');
+    assert.match(String((int as unknown as { derived_from: string }).derived_from), /^act_fe_build_interface@0\.1\.0/);
+    assert.ok(!pack.track.activities.some((a) => a.code === LEGACY_INT), 'the v2 pack keeps three activities');
+    // The original stays exactly as it was: in the canonical (v1) pack, in the database, and as the global resources' practice link.
+    assert.equal(canonical.track.activities.find((a) => a.code === LEGACY_INT)!.version, '0.1.0');
+    assert.ok(Number((await one('select count(*)::int n from activity_spec where slug = $1', [LEGACY_INT])).n) >= 1);
+    assert.ok(canonical.global.resources.filter((r) => r.practice_activity === LEGACY_INT).map((r) => r.code).includes('lr_html_forms_mdn'), 'legacy packs keep their link');
+  });
+  test('v2-only resource links: Forms practises in Task A; every link points where its skill is measured; nothing reported stale; format 1 cannot use them', () => {
+    const b = fresh();
+    const links = new Map(b.pack.track.resourceLinks!.map((l) => [l.resource, l.practice_activity]));
+    assert.equal(links.get('lr_html_forms_mdn'), TA);
+    assert.deepEqual([links.get('lr_fetch_states_mdn'), links.get('lr_ui_state_pattern')], [INT, INT]);
+    assert.deepEqual(validateCandidate(b).advisories, []);
+    assert.ok(has(mutated((p) => { p.track.resourceLinks!.find((l) => l.resource === 'lr_html_forms_mdn')!.practice_activity = INT; }), /lr_html_forms_mdn: act_fe_integrated_leave_requests does not measure skl_forms_validation/), 'a link to where the skill is not practised is refused');
+    assert.ok(has(mutated((p) => { p.track.resourceLinks = p.track.resourceLinks!.filter((l) => l.resource !== 'lr_ui_state_pattern'); }), /lr_ui_state_pattern.*act_fe_build_interface' is not an activity in this pack/), 'a resource whose global practice activity left the pack must be linked');
+    const v1 = structuredClone(loadPack(CANON, 'trk_frontend_junior').pack) as Pack;
+    (v1.track as { resourceLinks?: unknown }).resourceLinks = b.pack.track.resourceLinks;
+    assert.throws(() => validatePack(v1, { ref: 'legacy_pack_constraints@1', constraints: LEGACY_PACK_CONSTRAINTS }), /resource_links is pack format 2 only/);
   });
 });
 
@@ -177,7 +195,7 @@ describe('the real pipeline: dry run only', () => {
   test('under a development schema-2 set built from the candidate constraints the dry run passes; importing is refused; nothing is written', async () => {
     const b = fresh();
     const suffix = Math.random().toString(36).slice(2, 8);
-    const state = async () => one(`select (select count(*) from activity_spec where version = '0.2.0' and slug in ($1, $2, $3))::int as acts,
+    const state = async () => one(`select (select count(*) from activity_spec where (version = '0.2.0' and slug in ($2, $3)) or slug = $1)::int as acts,
       (select md5(string_agg(id::text || is_core::text || minimum_evidence_count::text, ',' order by id)) from role_requirement) as rr,
       (select count(*) from skill)::int as skills, (select count(*) from raw_snapshot)::int as snapshots`, [INT, TA, TB]);
     const before = await state();
@@ -201,10 +219,18 @@ describe('the real pipeline: dry run only', () => {
   });
 });
 
-describe('a development classification from the candidate drives the v2 learner labels', () => {
-  test('each visible skill carries its candidate class; PO defaults are labelled and never expert-approved; off again afterwards', async () => {
+describe('a development classification from the candidate drives the v2 learner labels — only for a role it is safe to classify', () => {
+  test('clean role: all twelve skills carry their candidate class; otherwise (a requirement on a superseded skill) the approval is refused by the publication gate', async () => {
     const roleId = (await one(`select id from target_role where slug = 'frontend-developer-junior' and is_demo_fixture`)).id as string;
     const cls = new Map(fresh().pack.track.roleSkills.map((r) => [r.skill, r]));
+    const offenders = (await roleSkillVisibility(pool, roleId)).filter((r) => r.hidden || r.unusable);
+    if (offenders.length) {
+      // E.g. after the OPEN-040 promotion suite superseded the demo Forms skill: the gate refuses, naming it, and leaves nothing behind.
+      const before = Number((await one('select count(*)::int n from skill_classification_set where target_role_id = $1', [roleId])).n);
+      await assert.rejects(() => useCandidateClassification(pool, roleId), (e: Error) => /superseded, retired or learner-invisible skill \(Q25\)/.test(e.message) && offenders.every((o) => e.message.includes(o.skill)));
+      assert.equal(Number((await one('select count(*)::int n from skill_classification_set where target_role_id = $1', [roleId])).n), before, 'nothing created');
+      return;
+    }
     const set = await useCandidateClassification(pool, roleId);
     try {
       const u: TestUser = await newUser();
@@ -212,7 +238,7 @@ describe('a development classification from the candidate drives the v2 learner 
       await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: roleId, confirmed: true }).expect(200);
       const items = (await http.get('/v1/me/track-skills').set(auth(u)).expect(200)).body.data.items as { skillId: string; readiness: { badge: string; professionalClass: string; classSource: string; expertApproved: boolean } }[];
       const slugs = new Map((await pool.query('select id::text, slug from skill where id = any($1)', [items.map((i) => i.skillId)])).rows.map((r) => [String(r.id), String(r.slug)]));
-      assert.ok(items.length >= 11);
+      assert.equal(items.length, 12, 'clean role: every required skill is visible');
       for (const i of items) {
         const c = cls.get(slugs.get(i.skillId)!)!;
         assert.deepEqual([i.readiness.badge, i.readiness.professionalClass, i.readiness.classSource, i.readiness.expertApproved], [c.professional_class, c.professional_class, c.class_source, c.class_source === 'sme'], c.skill);

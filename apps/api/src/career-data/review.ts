@@ -6,6 +6,8 @@
 import type { Pool } from 'pg';
 import { assertReviewTransition, type ReviewState, type ReviewerRole } from '@naqla/domain';
 
+import { roleIsClassified, assertRoleSkillsPublishable } from './publication-safety';
+
 const TABLE: Record<string, { table: string; status: string }> = {
   skill: { table: 'skill', status: 'review_status' }, target_role: { table: 'target_role', status: 'review_status' }, role_requirement: { table: 'role_requirement', status: 'review_status' },
   task: { table: 'task', status: 'review_status' }, activity_spec: { table: 'activity_spec', status: 'status' }, rubric_version: { table: 'rubric_version', status: 'status' },
@@ -30,6 +32,13 @@ export async function reviewTransition(pool: Pool, cmd: ReviewCommand): Promise<
     const from = cur.rows[0].status as ReviewState;
     assertReviewTransition({ from, to: cmd.to, decidedBy: cmd.decidedBy, rolePerformed: cmd.rolePerformed, reason: cmd.reason,
       isDemoFixture: cur.rows[0].is_demo_fixture, draftingAid: cur.rows[0].drafting_aid, production: cmd.production });
+    // Publication safety (v2): a professionally classified role, or one of its requirements, is never approved or
+    // published while a requirement references a superseded or learner-invisible skill (Q25). Unclassified (legacy)
+    // roles keep their behaviour; Q25 still names such states for them.
+    if ((cmd.to === 'approved' || cmd.to === 'published') && (cmd.entityKind === 'target_role' || cmd.entityKind === 'role_requirement')) {
+      const roleId = cmd.entityKind === 'target_role' ? cmd.entityId : (await c.query('select target_role_id from role_requirement where id = $1', [cmd.entityId])).rows[0].target_role_id as string;
+      if (await roleIsClassified(c, roleId)) await assertRoleSkillsPublishable(c, roleId, `${cmd.to === 'approved' ? 'approving' : 'publishing'} this ${cmd.entityKind.replace('_', ' ')}`, cmd.entityKind === 'role_requirement' ? cmd.entityId : undefined);
+    }
     const setsReviewer = cmd.rolePerformed === 'sme';
     await c.query(`update ${t.table} set ${t.status} = $2${setsReviewer ? ', reviewed_by = $3, reviewed_at = now()' : ''}${t.table === 'activity_spec' && cmd.to === 'approved' ? ', sme_approved_by = $3, sme_approved_at = now()' : ''} where id = $1`,
       setsReviewer || (t.table === 'activity_spec' && cmd.to === 'approved') ? [cmd.entityId, cmd.to, cmd.decidedBy] : [cmd.entityId, cmd.to]);

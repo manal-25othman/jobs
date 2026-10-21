@@ -45,7 +45,8 @@ const SME = '55555555-5555-4555-8555-555555555555';
 if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is required'); process.exit(2); }
 /** `--only B14`: the v2 scenario alone, intended for a freshly built database (a clean, deterministic fixture). */
 const ONLY = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
-const ISOLATED = ONLY === 'B14';
+/** `--only B14 --existing-db`: the same scenario on an existing (non-clean) database, e.g. after the API e2e suites. */
+const ISOLATED = ONLY === 'B14' && !process.argv.includes('--existing-db');
 mkdirSync(SHOTS, { recursive: true });
 
 const results = [];
@@ -65,6 +66,7 @@ const { DomainExceptionFilter } = apiRequire('./dist/src/infra/domain-exception.
 const { STORAGE_PORT } = apiRequire('./dist/src/storage/storage.port');
 const { useSafetyBaseline, useCandidateClassification } = apiRequire('./dist/test/helpers');
 const { loadCandidate } = apiRequire('./dist/src/career-data/candidate');
+const { roleSkillVisibility } = apiRequire('./dist/src/career-data/publication-safety');
 const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
 
@@ -252,6 +254,16 @@ async function scenarioB14(browser) {
     const admin = await newUser();
     await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'track_admin', 'UI acceptance operator')`, [admin.id]);
     const isCoreLabel = (await apiCall(admin, 'GET', `/admin/tracks/${jfeRole}`)).fieldHelp.is_core?.labelAr ?? 'is_core';
+    // Publication safety: a role whose requirement references a superseded / learner-invisible skill cannot be classified
+    // (Q25 gate). On a database where that state exists (e.g. after the OPEN-040 promotion suite) the scenario proves the
+    // refusal; on a clean fixture (--only B14) it proves the v2 labels.
+    const offenders = (await roleSkillVisibility(pool, jfeRole)).filter((r) => r.hidden || r.unusable);
+    if (offenders.length) {
+      const refusal = await useCandidateClassification(pool, jfeRole).then(() => null, (e) => e.message);
+      check('B14-gate', `the classification is refused while a requirement references a superseded or learner-invisible skill (${offenders.map((o) => o.skill).join(', ')})`,
+        !ISOLATED && /\(Q25\)/.test(refusal ?? '') && offenders.every((o) => refusal.includes(o.skill)), refusal ?? 'not refused');
+      return;
+    }
     const cls = await useCandidateClassification(pool, jfeRole);
     try {
       const page = await pageFor(browser, learner);

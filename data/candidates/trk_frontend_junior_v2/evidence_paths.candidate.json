@@ -10,14 +10,6 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "semantic_structure"
-            ]
-          },
           "act_fe_debug_improve": {
             "versions": [
               "0.2.0"
@@ -25,15 +17,23 @@
             "criteria": [
               "semantic_fixed"
             ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
+              "semantic_structure"
+            ]
           }
         },
         "require_validation_activity": true,
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"
@@ -49,14 +49,6 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "responsive_layout"
-            ]
-          },
           "act_fe_debug_improve": {
             "versions": [
               "0.2.0"
@@ -64,15 +56,23 @@
             "criteria": [
               "responsive_fixed"
             ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
+              "responsive_layout"
+            ]
           }
         },
         "require_validation_activity": true,
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"
@@ -109,9 +109,9 @@
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"
@@ -127,14 +127,6 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "root_cause_fixed"
-            ]
-          },
           "act_fe_change_request": {
             "versions": [
               "0.2.0"
@@ -149,6 +141,14 @@
             ],
             "criteria": [
               "root_cause_note"
+            ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
+              "root_cause_fixed"
             ]
           }
         },
@@ -165,20 +165,20 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "problem_traced"
-            ]
-          },
           "act_fe_change_request": {
             "versions": [
               "0.2.0"
             ],
             "criteria": [
               "component_explained",
+              "problem_traced"
+            ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
               "problem_traced"
             ]
           }
@@ -196,9 +196,9 @@
       "params": {
         "min_distinct_tasks": 1,
         "counted_criteria": {
-          "act_fe_build_interface": {
+          "act_fe_integrated_leave_requests": {
             "versions": [
-              "0.2.0"
+              "0.1.0"
             ],
             "criteria": [
               "git_workflow"
@@ -218,14 +218,6 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "state_transitions"
-            ]
-          },
           "act_fe_change_request": {
             "versions": [
               "0.2.0"
@@ -233,15 +225,23 @@
             "criteria": [
               "filter_in_state"
             ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
+              "state_transitions"
+            ]
           }
         },
         "require_validation_activity": true,
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"
@@ -257,14 +257,6 @@
       "params": {
         "min_distinct_tasks": 2,
         "counted_criteria": {
-          "act_fe_build_interface": {
-            "versions": [
-              "0.2.0"
-            ],
-            "criteria": [
-              "data_states"
-            ]
-          },
           "act_fe_change_request": {
             "versions": [
               "0.2.0"
@@ -272,15 +264,23 @@
             "criteria": [
               "empty_state_correct"
             ]
+          },
+          "act_fe_integrated_leave_requests": {
+            "versions": [
+              "0.1.0"
+            ],
+            "criteria": [
+              "data_states"
+            ]
           }
         },
         "require_validation_activity": true,
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"
@@ -304,9 +304,9 @@
               "a11y_keyboard_forms"
             ]
           },
-          "act_fe_build_interface": {
+          "act_fe_integrated_leave_requests": {
             "versions": [
-              "0.2.0"
+              "0.1.0"
             ],
             "criteria": [
               "a11y_basics"
@@ -317,9 +317,9 @@
         "understanding": "integrated_code_understanding",
         "legacy_results": "exclude",
         "understanding_source": {
-          "activity": "act_fe_build_interface",
+          "activity": "act_fe_integrated_leave_requests",
           "versions": [
-            "0.2.0"
+            "0.1.0"
           ],
           "criteria": [
             "code_understanding"

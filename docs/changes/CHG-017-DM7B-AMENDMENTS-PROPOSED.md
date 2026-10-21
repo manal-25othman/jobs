@@ -1,6 +1,6 @@
 # `CHG-017` — DM-7b amendments (P-3 professional classification)
 
-> **Status:** 🟡 **PROPOSED — not approved, not applied** (D-130, decision D-6).
+> **Status:** 🟡 **PROPOSED — not approved, not applied** (D-130, decision D-6). **The consolidated text for review is `CHG-017-PROPOSED.md` (D-133);** this file stays as the record of the DM-7b amendments.
 > **Base text:** CHG-017 CR-1…CR-10 in `docs/architecture/NAQLA-JUNIOR-FRONTEND-SME-REVISED-DECISION-PACK.md` §I.3 (itself proposed).
 > **Approver:** Product Owner. Nothing here changes the canonical SRS, the shipped pack, `scripts/verify-docs.mjs` or any live policy until the PO approves CHG-017 and the Junior Frontend v2 pack is published (both outside this change).
 > **Source of the design:** `docs/architecture/DM-7B-P3-ARCHITECTURE-ANALYSIS.md` §10.1; the PO decision D-1…D-7 (D-130).

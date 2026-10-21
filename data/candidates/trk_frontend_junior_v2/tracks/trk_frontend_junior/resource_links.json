@@ -1,0 +1,21 @@
+{
+  "_label": "DRAFT / v2 CANDIDATE — practice links for THIS pack only",
+  "_note": "Where each global learning resource is practised in the Junior Frontend v2 pack. The global registry (data/career/global/learning_resources.json) and the links legacy (v1) packs use are unchanged; a format-2 pack names here every resource whose global practice activity is not part of it, and any link it wants to move (J-7, PO direction 3). Read only for pack format 2.",
+  "records": [
+    {
+      "resource": "lr_html_forms_mdn",
+      "practice_activity": "act_fe_debug_improve",
+      "reason": "PO direction (J-7 / PO-4): Forms validation is practised and measured in Task A (form_submission_flow); the integrated assessment has no form"
+    },
+    {
+      "resource": "lr_fetch_states_mdn",
+      "practice_activity": "act_fe_integrated_leave_requests",
+      "reason": "the integrated assessment carries the API-states criterion (data_states) under its new code"
+    },
+    {
+      "resource": "lr_ui_state_pattern",
+      "practice_activity": "act_fe_integrated_leave_requests",
+      "reason": "the integrated assessment carries the UI-state criterion (state_transitions) under its new code"
+    }
+  ]
+}
