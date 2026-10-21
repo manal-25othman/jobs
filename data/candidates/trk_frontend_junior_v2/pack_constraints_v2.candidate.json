@@ -1,0 +1,64 @@
+{
+  "_label": "DRAFT / TEXT CANDIDATE — NOT A DATABASE ROW",
+  "_note": "Schema-2 pack constraints for the Junior Frontend v2 candidate. Becomes a governed pack_constraint_set (schema_version 2, track trk_frontend_junior) only through draft → four eyes → activator, after CHG-017. The global legacy set is untouched.",
+  "key": "trk_frontend_junior_constraints",
+  "version": 1,
+  "schema_version": 2,
+  "track_id": "trk_frontend_junior",
+  "constraints": [
+    {
+      "type": "must_skill_count",
+      "min": 6,
+      "max": 6,
+      "basis": "D-5 (PO): Junior Frontend v2 is 6 Must; track-specific"
+    },
+    {
+      "type": "core_class_skill_count",
+      "min": 3,
+      "max": 3,
+      "basis": "D-5 (PO): 3 Core"
+    },
+    {
+      "type": "supporting_skill_count",
+      "min": 3,
+      "max": 3,
+      "basis": "D-5 (PO): 3 Supporting (two are PO defaults)"
+    },
+    {
+      "type": "task_count",
+      "min": 10,
+      "max": 12,
+      "basis": "copied from legacy_pack_constraints@1 (unchanged)"
+    },
+    {
+      "type": "activity_count",
+      "min": 3,
+      "max": 3,
+      "basis": "SME F5: three activities kept"
+    },
+    {
+      "type": "activity_primary_skill_count",
+      "min": 2,
+      "max": 3,
+      "basis": "copied from legacy_pack_constraints@1"
+    },
+    {
+      "type": "activity_required_primary_skill_count",
+      "min": 2,
+      "max": 3,
+      "basis": "legacy activity_core_primary_skill_count 2–3, read as Must ∪ Core (P-3, CR-8 proposed)"
+    },
+    {
+      "type": "rubric_min_criteria",
+      "min": 5,
+      "max": null,
+      "basis": "copied from legacy_pack_constraints@1"
+    },
+    {
+      "type": "resources_per_skill_max",
+      "min": null,
+      "max": 3,
+      "basis": "copied from legacy_pack_constraints@1"
+    }
+  ]
+}

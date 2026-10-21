@@ -12,6 +12,8 @@
  * Authentication: a session signed with the API's test secret is placed where supabase-js keeps it; the API
  * verifies the signature exactly as in production. No Supabase project is contacted.
  *
+ * B14 covers the Junior Frontend v2 candidate's classification labels (learner + admin), development only.
+ *
  * Every scenario checks what the graduate SEES and, where it matters, what the DATABASE holds (no second
  * evaluation, explicit file mapping, no level).
  */
@@ -58,7 +60,8 @@ const { Pool } = apiRequire('pg');
 const { AppModule } = apiRequire('./dist/src/app.module');
 const { DomainExceptionFilter } = apiRequire('./dist/src/infra/domain-exception.filter');
 const { STORAGE_PORT } = apiRequire('./dist/src/storage/storage.port');
-const { useSafetyBaseline } = apiRequire('./dist/test/helpers');
+const { useSafetyBaseline, useCandidateClassification } = apiRequire('./dist/test/helpers');
+const { loadCandidate } = apiRequire('./dist/src/career-data/candidate');
 const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
 
@@ -515,6 +518,82 @@ async function run(browser) {
   }
   // B13j · after the development scenarios, a legacy evaluation again carries no per-skill section (the pathway is off at rest).
   check('B13j', 'the per-skill policy is inactive again after the scenarios', await count(`select count(*)::int n from verification_policy where assessment_scope = 'per_skill' and activation <> 'inactive'`) === 0);
+
+  // B14 · Junior Frontend v2 CANDIDATE (DEVELOPMENT ONLY). A classification built from data/candidates/trk_frontend_junior_v2
+  // (TEST FIXTURE approvals) is made development_only for the Junior Frontend role, then switched off again. What the
+  // learner and the track admin SEE: «إلزامية / أساسية / مساندة», the PO-default provenance, the read-only class in the
+  // Track Builder with no is_core edit, and the legacy labels back once the classification is off.
+  {
+    const jfeRole = (await one(`select id from target_role where slug = 'frontend-developer-junior' and is_demo_fixture`)).id;
+    const { pack } = loadCandidate(join(ROOT, 'data/candidates/trk_frontend_junior_v2'), join(ROOT, 'data/career'));
+    const classOf = new Map(pack.track.roleSkills.map((r) => [r.skill, r]));
+    const BADGE = { must: 'إلزامية', core: 'أساسية', supporting: 'مساندة' };
+    const PO_NOTE = 'تصنيف افتراضي من مالك المنتج، غير معتمد من الخبراء';
+    const learner = await newUser();
+    await apiCall(learner, 'PUT', '/me/career-goal', { targetRoleId: jfeRole, confirmed: true });
+    const admin = await newUser();
+    await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'track_admin', 'UI acceptance operator')`, [admin.id]);
+    const isCoreLabel = (await apiCall(admin, 'GET', `/admin/tracks/${jfeRole}`)).fieldHelp.is_core?.labelAr ?? 'is_core';
+    const cls = await useCandidateClassification(pool, jfeRole);
+    try {
+      const page = await pageFor(browser, learner);
+      await page.goto(`${APP}/skills`); await page.getByRole('heading', { name: 'المهارات' }).waitFor(); await page.waitForLoadState('networkidle');
+      const rows = await page.locator('a.row[href^="/skills/"]').evaluateAll((as) => as.map((a) => ({ id: a.getAttribute('href').split('/').pop(), text: a.innerText })));
+      const slug = new Map((await pool.query('select id::text, slug from skill where id = any($1)', [rows.map((r) => r.id)])).rows.map((r) => [r.id, r.slug]));
+      const wrong = rows.filter((r) => { const c = classOf.get(slug.get(r.id)); return !c || !r.text.includes(BADGE[c.professional_class]); });
+      check('B14a', 'v2 learner labels: every skill shows its candidate class in Arabic (إلزامية / أساسية / مساندة); six are Must',
+        rows.length >= 11 && wrong.length === 0 && rows.filter((r) => r.text.includes('إلزامية')).length === 6, `${rows.length} rows; wrong: ${wrong.map((r) => slug.get(r.id)).join(',')}`);
+      const provenanceWrong = rows.filter((r) => (classOf.get(slug.get(r.id))?.class_source === 'po_default') !== r.text.includes(PO_NOTE));
+      check('B14b', 'provenance: exactly the PO-default classes carry «افتراضي من مالك المنتج، غير معتمد من الخبراء»; expert classes do not',
+        provenanceWrong.length === 0 && rows.some((r) => r.text.includes(PO_NOTE)), provenanceWrong.map((r) => slug.get(r.id)).join(','));
+      await shot(page, 'B14-skills-v2');
+      const idOf = (s) => [...slug].find(([, v]) => v === s)?.[0];
+      await page.goto(`${APP}/skills/${idOf('skl_version_control_basics')}`); await page.locator('h1').first().waitFor(); await page.waitForLoadState('networkidle');
+      const git = await bodyText(page);
+      await page.goto(`${APP}/skills/${idOf('skl_requirements_reading')}`); await page.locator('h1').first().waitFor(); await page.waitForLoadState('networkidle');
+      const reqs = await bodyText(page);
+      check('B14c', 'skill detail: Git reads «إلزامية» with no PO note; Requirements reading reads «مساندة» with the PO-default note',
+        git.includes('إلزامية') && !git.includes(PO_NOTE) && reqs.includes('مساندة') && reqs.includes(PO_NOTE));
+      check('B14d', 'no Verified, no percentage and no readiness verdict is implied by a class', !/موثّقة|%|جاهز للعمل/.test(git + reqs));
+      await shot(page, 'B14-skill-detail-po-default');
+      await page.context().close();
+      for (const viewport of [{ width: 375, height: 812 }, { width: 1280, height: 900 }]) {
+        const p2 = await pageFor(browser, learner, viewport);
+        await p2.goto(`${APP}/skills`); await p2.locator('h1').first().waitFor(); await p2.waitForLoadState('networkidle');
+        const issues = await a11yBasics(p2);
+        check(`B14-a11y-${viewport.width}`, `v2 skills page at ${viewport.width}px: RTL, Arabic, labelled controls, named links, no horizontal scroll`, issues.length === 0, issues.join('; '));
+        await p2.context().close();
+      }
+      const ap = await pageFor(browser, admin);
+      await ap.goto(`${APP}/admin/tracks/${jfeRole}`); await ap.getByRole('heading', { name: 'مهارات المسار' }).waitFor(); await ap.waitForLoadState('networkidle');
+      const at = await bodyText(ap);
+      check('B14e', 'admin Track Builder: the classification-in-effect notice is shown; classes are read-only with their source (6 expert Must, 2 PO defaults)',
+        await ap.locator('[data-testid="classification-in-effect"]').count() === 1 && (at.match(/إلزامية · قرار خبير \(للتطوير فقط\)/g) ?? []).length === 6
+          && (at.match(/افتراضي من مالك المنتج، غير معتمد من الخبراء \(للتطوير فقط\)/g) ?? []).length === 2, `${(at.match(/إلزامية · قرار خبير/g) ?? []).length} Must chips`);
+      await ap.getByRole('button', { name: 'اقتراح تغيير' }).first().click();
+      const offered = await ap.getByText('اقتراح تغيير هذا الحقل').count();
+      check('B14f', `admin: the proposal editor of a classified track offers 7 of the 8 fields — no «${isCoreLabel}» (is_core); the class changes only by a new classification version`, offered === 7, `${offered} fields offered`);
+      const issues = await a11yBasics(ap);
+      check('B14-admin-a11y', 'admin track page: RTL, Arabic, labelled controls, named buttons, no horizontal scroll', issues.length === 0, issues.join('; '));
+      await shot(ap, 'B14-admin-track-v2');
+      await ap.context().close();
+    } finally {
+      await cls.off();
+    }
+    {
+      const page = await pageFor(browser, learner);
+      await page.goto(`${APP}/skills`); await page.getByRole('heading', { name: 'المهارات' }).waitFor(); await page.waitForLoadState('networkidle');
+      const after = (await page.locator('a.row[href^="/skills/"]').allInnerTexts()).join('\n');
+      check('B14g', 'classification off ⇒ the legacy labels are back on every skill row: no «إلزامية», no PO-default note', after.length > 0 && !after.includes('إلزامية') && !after.includes(PO_NOTE));
+      await page.context().close();
+      const ap = await pageFor(browser, admin);
+      await ap.goto(`${APP}/admin/tracks/${jfeRole}`); await ap.getByRole('heading', { name: 'مهارات المسار' }).waitFor(); await ap.waitForLoadState('networkidle');
+      check('B14h', 'classification off ⇒ no notice and no class chips in the Track Builder',
+        await ap.locator('[data-testid="classification-in-effect"]').count() === 0 && !(await bodyText(ap)).includes('(للتطوير فقط)'));
+      await ap.context().close();
+    }
+    check('B14i', 'nothing stays in effect: no active classification for the role', await count(`select count(*)::int n from skill_classification_set where target_role_id = $1 and activation <> 'inactive'`, [jfeRole]) === 0);
+  }
 
   // B8 · unauthorized navigation: other users' work, unpublished activities, unknown ids; the old URL redirects.
   {

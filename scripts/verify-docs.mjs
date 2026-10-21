@@ -12,6 +12,7 @@
  *     Verified, and the OPEN-039 resolution declared.
  *  4. Every "PENDING-DATA-APPLICATION" item the SRS lists is STILL pending in the
  *     data (and vice versa): the day the data changes, the SRS must change too.
+ *  6. A track candidate under data/candidates stays a draft, format-2, NOT SME APPROVED proposal with no copied registry.
  *
  * Exits non-zero on any mismatch. Intended for CI (`npm run verify`).
  */
@@ -77,6 +78,17 @@ need(pendingOD3 === hasUiTesting, pendingOD3 ? 'SRS says OD-3 is pending but ui-
 const pendingOD10 = srs.includes('OD-10 حذف توقُّع الدفاع الحي من P1 | **كانوني** | **PENDING-DATA-APPLICATION**');
 const hasLiveDefense = roleMap.some((r) => (r.evidence_type_expected ?? []).includes('live_defense'));
 need(pendingOD10 === hasLiveDefense, pendingOD10 ? 'SRS says OD-10 is pending but live_defense is already gone: update SRS §20' : 'live_defense still expected in the role map but the SRS no longer marks OD-10 pending');
+
+/* 6. a track CANDIDATE (data/candidates) is a draft, format-2, non-demo proposal: never canonical, never approved */
+for (const cand of ['data/candidates/trk_frontend_junior_v2']) {
+  const mf = join(ROOT, cand, 'tracks/trk_frontend_junior/manifest.json');
+  if (!existsSync(mf)) continue;
+  const cm = JSON.parse(readFileSync(mf, 'utf8'));
+  need(cm.status === 'draft' && cm.pack_format_version === 2 && /NOT SME APPROVED/.test(cm.dataset_label ?? ''), `${cand}: a candidate stays draft, pack format 2, labelled NOT SME APPROVED`);
+  need(!existsSync(join(ROOT, cand, 'global')), `${cand}: a candidate reuses the canonical global registry; it carries no copy`);
+  const text = readFileSync(join(ROOT, cand, 'tracks/trk_frontend_junior/rubrics.json'), 'utf8');
+  need(!/"(weight_status|threshold_status|pass_threshold_status|levels_status)":\s*"approved"/.test(text), `${cand}: a candidate never declares SME values approved`);
+}
 
 /* 5. the stale pack must not be the one the importer reads */
 need(!existsSync(join(ROOT, 'data/tracks/trk_frontend_junior/manifest.json')), 'data/tracks carries an importable manifest; only data/career is canonical');

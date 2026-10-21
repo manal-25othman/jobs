@@ -50,6 +50,14 @@ export default function TrackPage() {
             <p className="body-sm muted">التصنيف «أساسية/داعمة» والأهمية لا يصيران «معتمدين» إلا إذا اعتمد خبير مسمّى التغيير. عتبات الجاهزية غير معتمدة بعد.</p>
           </section>
 
+          {data.classification?.inEffect ? (
+            <section className="card" data-testid="classification-in-effect">
+              <h2>التصنيف المهني (للتطوير فقط)</h2>
+              <p className="body-sm">لهذا المسار إصدار تصنيف مهني ساري في بيئة التطوير: «إلزامية» و«أساسية» و«مساندة» لكل مهارة، مع مصدر كل تصنيف. يُعرض هنا للاطّلاع فقط؛ ولا يتغيّر إلا بإصدار تصنيف جديد يعتمده خبير مسمّى (ومالك المنتج عند وجود قيم افتراضية).</p>
+              <p className="body-sm muted">حقل «أساسية للدور» (is_core) لا يحمل التصنيف في هذا المسار، فلا يُقترح تعديله هنا.</p>
+            </section>
+          ) : null}
+
           <section className="card">
             <h2>مهارات المسار</h2>
             <ul className="rows" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -58,7 +66,7 @@ export default function TrackPage() {
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     <strong className="grow" style={{ fontWeight: 500 }}>{s.labelAr} <span className="term">{s.labelEn}</span></strong>
                     {s.classificationPending ? <PendingExpert /> : <span className="chip chip--info">تصنيف معتمد</span>}
-                    {s.professionalClass ? <span className="chip">{CLASS_AR[s.professionalClass]}{s.classSource === 'po_default' ? ' · افتراضي من مالك المنتج' : ' · خبير'} (للتطوير فقط)</span> : null}
+                    {s.professionalClass ? <span className="chip">{CLASS_AR[s.professionalClass]}{s.classSource === 'po_default' ? ' · افتراضي من مالك المنتج، غير معتمد من الخبراء' : ' · قرار خبير'} (للتطوير فقط)</span> : null}
                   </div>
                   <span className="body-sm muted">
                     {FIELDS.map((f) => `${data.fieldHelp[f]?.labelAr ?? f}: ${show(s.values[f])}`).join(' · ')}
@@ -66,7 +74,7 @@ export default function TrackPage() {
                   {has('track_admin') ? <button className="btn btn--ghost btn--sm" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing({ rr: s.roleRequirementId, proposed: {} })}>اقتراح تغيير</button> : null}
                   {editing?.rr === s.roleRequirementId ? (
                     <div className="stack" style={{ gap: 10 }}>
-                      {FIELDS.map((f) => (
+                      {FIELDS.filter((f) => !(f === 'is_core' && data.classification?.inEffect)).map((f) => (
                         <div key={f} className="field">
                           <Help help={data.fieldHelp[f]} />
                           <label className="check-row"><input type="checkbox" checked={f in editing.proposed} onChange={(e) => {

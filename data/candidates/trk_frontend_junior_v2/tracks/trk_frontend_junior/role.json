@@ -1,0 +1,110 @@
+{
+  "_label": "DRAFT / NOT SME APPROVED / v2 CANDIDATE — NOT IMPORTED",
+  "code": "frontend-developer-junior",
+  "name_ar": "مطوّر/ة واجهات ويب — مبتدئ",
+  "name_en": "Junior Web / Frontend Developer",
+  "family": "software_engineering",
+  "level": "junior",
+  "description_ar": "يبني ويصلح واجهات ويب صغيرة إلى متوسطة من وصف قصير، باستخدام HTML وCSS وJavaScript كما تعرّفها المعايير؛ يقرأ كودًا قائمًا ويتتبّع الأعطال ويصلحها، ويتعامل مع بيانات API وحالاتها، ويعمل بـGit ضمن فريق، ويشرح قراراته لفريقه. لا يُفترض إطار عمل معيّن؛ الأطر تُتعلَّم في سياق الفريق.",
+  "description_en": "Builds and fixes small-to-medium web interfaces from a short brief using standards-based HTML, CSS and JavaScript; reads existing code, traces and fixes defects, handles API data and its states, and works with Git in a team; explains decisions to the team. No specific framework is assumed; frameworks are learned in the team's context.",
+  "mission_statement_ar": "تحويل متطلب منتج إلى واجهة تعمل، يمكن للمستخدم استخدامها وللفريق صيانتها.",
+  "mission_statement_en": "Turn a product requirement into a working interface a user can use and the team can maintain.",
+  "typical_responsibilities_ar": [
+    "بناء صفحات ومكوّنات من وصف قصير",
+    "إصلاح أعطال واجهة مُبلَّغ عنها",
+    "ربط الواجهة ببيانات من API ومعالجة حالات التحميل والخطأ والفراغ",
+    "التحقق من مدخلات النماذج",
+    "جعل الصفحة متجاوبة وقابلة للوصول",
+    "قراءة كود قائم وتعديله",
+    "العمل على فرع وتقديم Pull Request بوصف واضح",
+    "شرح ما تغيّر ولماذا"
+  ],
+  "typical_responsibilities_en": [
+    "build pages and components from a short brief",
+    "fix reported UI defects",
+    "connect the interface to API data and handle loading, error and empty states",
+    "validate form input",
+    "make a page responsive and accessible",
+    "read and modify existing code",
+    "work on a branch and open a pull request with a clear description",
+    "explain what changed and why"
+  ],
+  "expected_outputs_ar": [
+    "صفحة/مكوّن يعمل في المتصفح",
+    "إصلاح مع شرح للسبب الجذري",
+    "نموذج مع تحقق ورسائل خطأ",
+    "ملاحظة قرار قصيرة"
+  ],
+  "expected_outputs_en": [
+    "a page/component that works in the browser",
+    "a fix with a root-cause explanation",
+    "a form with validation and error messages",
+    "a short decision note"
+  ],
+  "expected_from_junior_ar": [
+    "إنجاز مهمة محدودة النطاق باستقلالية",
+    "طرح سؤال عند نقص المعلومة بدل الافتراض",
+    "اختبار عمله يدويًا في متصفحين على الأقل",
+    "شرح تدفق البيانات في ما بناه",
+    "قراءة مكوّن بسيط وشرح سلوكه وتتبّع مشكلة أساسية فيه",
+    "إصلاح خطأ بسيط في كود لم يكتبه بنفسه من سببه",
+    "فهم ما يسلّمه وشرح ما غيّره في كوده"
+  ],
+  "expected_from_junior_en": [
+    "complete a bounded task independently",
+    "ask when information is missing instead of assuming",
+    "test own work manually in at least two browsers",
+    "explain the data flow of what was built",
+    "read a simple component, explain its behaviour and trace a basic problem in it",
+    "fix a simple defect in code they did not write, at its cause",
+    "understand what they submit and explain what they changed in their code"
+  ],
+  "not_expected_from_junior_ar": [
+    "تصميم معمارية النظام كاملة أو قيادة القرارات التقنية والتخطيط للمشروع",
+    "اختيار إطار العمل للفريق",
+    "تحسين الأداء المتقدم",
+    "قيادة مراجعة الكود",
+    "إتقان إطار عمل معيّن قبل الانضمام"
+  ],
+  "not_expected_from_junior_en": [
+    "designing the whole system architecture, or leading technical decisions and project planning",
+    "choosing the team's framework",
+    "advanced performance work",
+    "leading code review",
+    "mastery of a specific framework before joining"
+  ],
+  "common_tools": [
+    {
+      "name": "browser developer tools",
+      "criticality": "essential",
+      "skill": "skl_frontend_debugging"
+    },
+    {
+      "name": "code editor",
+      "criticality": "essential"
+    },
+    {
+      "name": "Git",
+      "criticality": "essential",
+      "skill": "skl_version_control_basics"
+    },
+    {
+      "name": "HTTP client / API explorer",
+      "criticality": "common",
+      "skill": "skl_api_data_states"
+    },
+    {
+      "name": "accessibility checker",
+      "criticality": "common",
+      "skill": "skl_accessibility_basics"
+    },
+    {
+      "name": "issue tracker",
+      "criticality": "common"
+    }
+  ],
+  "region_scope": "sa",
+  "source_refs": [
+    "src_naqla_frontend_pack_v0_1"
+  ]
+}

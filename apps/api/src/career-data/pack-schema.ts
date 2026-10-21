@@ -36,9 +36,15 @@ export interface PackTask { code: string; title_ar: string; title_en: string; de
 export interface PackCheckDef { type: 'artifact_present' | 'artifact_at_least' | 'artifact_text' | 'all_of'; artifactKey?: string; artifactKeys?: string[]; min?: number; minLength?: number; }
 export interface PackHumanObservation { type: 'human_observation'; criterionKey: string; reviewerPromptAr: string; reviewerPromptEn: string; passWhenEn: string; failWhenEn: string; affectsEvidence: boolean; }
 export interface PackIntegrityCheck { key: string; check_type: string; evaluation_mode: IntegrityEvaluationMode; active?: boolean; required_producer_en?: string; previous_signal_dependency?: string; blocking: boolean; location_en: string; expected_user_behavior_en: string; raw_ai_output_behavior_en?: string; user_facing_message_ar?: string; linked_criterion_key?: string; check_definition: PackCheckDef | PackHumanObservation; }
-export interface PackActivity { code: string; version: string; level: 'junior' | 'mid' | 'senior'; title_ar: string; title_en: string; business_context_ar: string; business_context_en: string; objective_ar: string; objective_en: string; ai_usage_mode: 'ai_prohibited' | 'ai_assisted' | 'ai_expected'; estimated_minutes: number; can_yield_demonstrated: boolean; can_yield_verified: boolean; is_validation_activity: boolean; inputs: { key: string; description_ar: string; description_en: string; is_platform_private: boolean; contains_planted_issue: boolean }[]; deliverables: { key: string; format: string; mandatory: boolean; description_ar: string; description_en: string }[]; related_skills: { skill: string; depth: 'primary' | 'secondary' }[]; tasks: string[]; integrity_checks: PackIntegrityCheck[]; rubric: string; source_refs: string[]; }
-export interface PackCriterion { criterion_kind?: CriterionKind; weight_status?: 'approved' | 'proposed' | 'TBD'; threshold_status?: 'approved' | 'proposed' | 'TBD'; key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string | null; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
-export interface PackRubric { pass_threshold_status?: 'approved' | 'proposed' | 'TBD'; code: string; activity: string; pass_threshold: number; proposes_state: EvidenceState; scoring_policy_version: string; criteria: PackCriterion[]; source_refs: string[]; }
+export interface PackActivity { code: string; version: string; level: 'junior' | 'mid' | 'senior'; title_ar: string; title_en: string; business_context_ar: string; business_context_en: string; objective_ar: string; objective_en: string; ai_usage_mode: 'ai_prohibited' | 'ai_assisted' | 'ai_expected'; estimated_minutes: number | null;
+  /** Format 2: values still to be decided, each naming the decision it waits for. */
+  unresolved?: string[]; variant_family?: string; can_yield_demonstrated: boolean; can_yield_verified: boolean; is_validation_activity: boolean; inputs: { key: string; description_ar: string; description_en: string; is_platform_private: boolean; contains_planted_issue: boolean }[]; deliverables: { key: string; format: string; mandatory: boolean; description_ar: string; description_en: string }[]; related_skills: { skill: string; depth: 'primary' | 'secondary' }[]; tasks: string[]; integrity_checks: PackIntegrityCheck[]; rubric: string; source_refs: string[]; }
+export interface PackCriterion { criterion_kind?: CriterionKind; weight_status?: 'approved' | 'proposed' | 'TBD'; threshold_status?: 'approved' | 'proposed' | 'TBD';
+  /** Format 2: SME values not yet set are null with status TBD (never a number); level descriptors and mandatory flags carry their own status. */
+  levels_status?: 'proposed' | 'TBD'; mandatory_status?: 'proposed'; key: string; name_ar: string; name_en: string; dimension: string; linked_skill: string | null; library_criterion?: string; source: 'core' | 'track' | 'activity'; weight: number | null; max_score: number; mandatory: boolean; threshold_for_skill: number | null; evaluator_type: string; human_review_required: boolean; check?: PackCheckDef; description_ar: string; description_en: string; expected_evidence_ar: string; expected_evidence_en: string; excerpt_guidance_en?: string; rationale_when_met_ar: string; rationale_when_unmet_ar: string; levels: { level_key: string; score: number; descriptor_ar: string; descriptor_en: string; observable_evidence_en: string }[]; }
+export interface PackRubric { pass_threshold_status?: 'approved' | 'proposed' | 'TBD'; code: string; activity: string; pass_threshold: number | null;
+  /** Format 2: an undecided pass rule is stated, not guessed. */
+  pass_rule?: { status: 'TBD'; decided_by: string; options: string[]; borderline?: string; readiness_use?: string }; proposes_state: EvidenceState; scoring_policy_version: string; criteria: PackCriterion[]; source_refs: string[]; }
 
 export interface Pack {
   readonly global: { sources: PackSource[]; families: PackFamily[]; scale: PackScale; recency: PackRecency[]; skills: PackSkill[]; synonyms: PackSynonym[]; criteriaLibrary: PackCriterionLib[]; presentationRules: PackPresentationRule[]; resources: PackResource[] };
@@ -233,6 +239,8 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
     const o = `activity '${a.code}'`; uniq('activity', a.code);
     bilingual(o, a as never, 'title'); bilingual(o, a as never, 'business_context'); bilingual(o, a as never, 'objective');
     need(a.can_yield_verified === false, `${o}: can_yield_verified must stay false until SME approval and a verification policy exist`);
+    if (format === 2 && a.estimated_minutes === null) need((a.unresolved ?? []).some((u) => u.startsWith('estimated_minutes')), `${o}: estimated_minutes is null but not listed as unresolved`);
+    else need(typeof a.estimated_minutes === 'number' && a.estimated_minutes > 0, `${o}: estimated_minutes must be a positive number`);
     need(rubricCodes.has(a.rubric), `${o}: rubric '${a.rubric}' not in pack`);
     for (const s of a.related_skills) need(skillCodes.has(s.skill) || mapped.has(s.skill), `${o}: unknown skill '${s.skill}'`);
     for (const t of a.tasks) need(taskCodes.has(t), `${o}: unknown task '${t}'`);
@@ -272,7 +280,9 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
     const o = `rubric '${r.code}'`; uniq('rubric', r.code);
     need(activityCodes.has(r.activity), `${o}: unknown activity`);
     need(r.proposes_state !== 'verified', `${o}: a rubric never proposes verified (D-059)`);
-    need(r.pass_threshold > 0 && r.pass_threshold <= 1, `${o}: pass_threshold in (0,1]`);
+    // Format 2: a TBD value is null, never a number (a TBD rendered as a number is a fabricated claim, D-037); format 1 unchanged.
+    if (format === 2 && r.pass_threshold_status === 'TBD') need(r.pass_threshold === null, `${o}: pass_threshold is TBD, so it must be null (not a number)`);
+    else need(typeof r.pass_threshold === 'number' && r.pass_threshold > 0 && r.pass_threshold <= 1, `${o}: pass_threshold in (0,1]`);
     need(r.pass_threshold_status !== 'approved', `${o}: a pack cannot declare its pass threshold approved (OPEN-043)`);
     const keys = new Set<string>();
     for (const c of r.criteria) {
@@ -287,6 +297,11 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
       need((EVALUATOR_TYPES as readonly string[]).includes(c.evaluator_type), `${co}: bad evaluator_type`);
       need(c.evaluator_type !== 'rule' || !!c.check, `${co}: a rule-evaluated criterion needs a deterministic check`);
       need(c.weight_status !== 'approved' && c.threshold_status !== 'approved', `${co}: a pack cannot declare its own values approved; approval is an SME decision recorded in the database (OPEN-043)`);
+      if (format === 2) {
+        need((c.weight_status === 'TBD') === (c.weight === null), `${co}: weight is null exactly when weight_status is TBD`);
+        need(kind !== 'skill_evidence' || (c.threshold_status === 'TBD') === (c.threshold_for_skill === null), `${co}: threshold_for_skill is null exactly when threshold_status is TBD`);
+        need((c.levels_status as string | undefined) !== 'approved' && (c.mandatory_status as string | undefined) !== 'approved', `${co}: level descriptors and mandatory flags are never approved by a pack`);
+      } else need(typeof c.weight === 'number', `${co}: weight is required`);
       need(c.evaluator_type === 'rule' || !c.check, `${co}: a human/llm criterion carries no deterministic check`);
       need(c.evaluator_type !== 'human' || c.human_review_required, `${co}: a human criterion requires human review`);
       need(c.levels.length >= 2, `${co}: level definitions are required (a criterion without descriptors is rejected, G-8)`);
@@ -315,6 +330,8 @@ export function validatePack(p: Pack, constraints: Pick<ResolvedPackConstraints,
     const acts = new Set<string>();
     for (const r of p.track.rubrics) if (r.criteria.some((c) => (c.criterion_kind ?? 'skill_evidence') === 'skill_evidence' && c.linked_skill === rs.skill)) acts.add(r.activity);
     need(acts.size >= 1, `${format === 2 ? `${rs.professional_class} skill` : 'core skill'} '${rs.skill}' has no evidence path: no activity measures it through a linked criterion`);
+    // Format 2: the path is explicit — a skill whose path needs n distinct tasks is measured by at least n activities (05 §2; Git needs one, F4).
+    if (format === 2 && acts.size >= 1) need(acts.size >= rs.minimum_evidence_count, `${rs.professional_class} skill '${rs.skill}': its evidence path needs ${rs.minimum_evidence_count} distinct tasks but only ${acts.size} activit${acts.size === 1 ? 'y measures' : 'ies measure'} it`);
   }
   // H5 (Phase 9): the configured numeric constraints, from the set in effect for this track and of this pack's schema.
   if (format === 2) for (const v of checkPackCountsV2(packCountsV2(p), { ref: constraints.ref, constraintsV2: constraints.constraintsV2 ?? [] })) problems.push(v.message);

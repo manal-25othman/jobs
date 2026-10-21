@@ -226,6 +226,15 @@ function evaluateRule(rule: ReadinessRule, facts: readonly SkillReadinessFacts[]
 }
 
 /**
+ * Alias handling (OPEN-039): a rule's skill means its CANONICAL skill. The same mapping is applied when a set is created
+ * (an alias is refused), approved, activated and evaluated — so a skill merged after approval is read as the skill it
+ * was merged into, never as "not part of this track".
+ */
+export function withCanonicalRuleSkills<T extends Pick<ReadinessRuleSet, 'rules'>>(set: T, canonicalOf: (skillId: string) => string): T {
+  return { ...set, rules: set.rules.map((r) => (r.skillId === null ? r : { ...r, skillId: canonicalOf(r.skillId) })) };
+}
+
+/**
  * Pure: f(rule set, facts) → report. Never writes, never derives a level, never a percentage.
  */
 export function evaluateReadiness(p: { ruleSet: ReadinessRuleSet | null; resolution: ConfigResolution | 'none'; facts: readonly SkillReadinessFacts[]; evidence?: EvidencePathFacts;

@@ -106,8 +106,11 @@ const BLOCKING_SKILL_RULES = new Set(['non_compensable_skill', 'required_skill_a
  *     classified role: its meaning would silently differ from the classification.
  * Levels are the rule set's (DM-2), never set here. Disabled rules do not count. Returns the problems (empty = consistent).
  */
-export function classificationReadinessProblems(entries: readonly SkillClassificationEntry[], set: Pick<ReadinessRuleSet, 'rules'>, canonicalOf: (skillId: string) => string = (s) => s): string[] {
+export function classificationReadinessProblems(classified: readonly SkillClassificationEntry[], set: Pick<ReadinessRuleSet, 'rules'>, canonicalOf: (skillId: string) => string = (s) => s): string[] {
   const out: string[] = [];
+  // Alias handling (OPEN-039): both sides are compared as CANONICAL skills — the same mapping at approval, activation and
+  // evaluation, so a merge after approval can never make an approved, consistent pair fail on alias handling alone.
+  const entries = classified.map((e) => ({ ...e, skillId: canonicalOf(e.skillId) }));
   const rules = set.rules.filter((r) => r.enabled);
   const bySkill = (types: readonly string[], skillId: string) => rules.some((r) => types.includes(r.type) && r.skillId !== null && canonicalOf(r.skillId) === skillId);
   for (const e of entries) {

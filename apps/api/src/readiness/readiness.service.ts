@@ -9,7 +9,7 @@ import {
 } from '@naqla/domain';
 import { evidencePathRules, loadEvidenceTaskFacts, loadUnderstanding } from './evidence-facts';
 import { integratedRules, loadIntegratedFacts } from './integrated-facts';
-import { classificationEntriesInEffect, entryFor } from '../configuration/professional-classification';
+import { classificationEntriesInEffect, entryFor, withCanonicalRules } from '../configuration/professional-classification';
 import { professionalLabel, type SkillClassificationEntry } from '@naqla/domain';
 
 /**
@@ -39,7 +39,9 @@ export class ReadinessService {
     if (!pick) return { set: null, resolution: 'none' };
     const rules = await c.query('select id, rule_type, params, skill_id, label_ar, label_en, enabled, position from readiness_rule where rule_set_id = $1 order by position', [pick.row.id]);
     const g = governedFromRow(pick.row);
-    return { set: { ...g, targetRoleId: pick.row.target_role_id, labelAr: pick.row.label_ar, labelEn: pick.row.label_en, rules: rules.rows.map(readinessRuleFromRow) }, resolution: pick.resolution };
+    // OPEN-039: rules are evaluated on canonical skills — the same mapping used when the set was approved and activated.
+    const set = await withCanonicalRules(c, { ...g, targetRoleId: pick.row.target_role_id, labelAr: pick.row.label_ar, labelEn: pick.row.label_en, rules: rules.rows.map(readinessRuleFromRow) });
+    return { set, resolution: pick.resolution };
   }
 
   /** One fact row per TrackSkill of the role, for this user. Read-only. */

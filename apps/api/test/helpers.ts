@@ -230,3 +230,37 @@ export async function approveCvBulletProposal(
     .send({ approved: true, ...(editedBody ? { editedBody } : {}) }).expect(201);
   return { proposalId: cv.id, assetId: ok.body.data.assetId as string, suggestedAr: pv.body.data.suggestedAr, suggestedEn: pv.body.data.suggestedEn };
 }
+
+/**
+ * DM-7b / Junior Frontend v2 candidate — TEST/DEVELOPMENT ONLY. A classification version for `roleId` built from the
+ * candidate's role-skill map (class + provenance per skill), approved under clearly labelled TEST FIXTURE names and made
+ * development_only with the transaction-local opt-in the database requires (refused in production). Any other active
+ * classification of the role is deactivated first (history is never deleted). Returns the set id and an `off()` that
+ * deactivates it again.
+ */
+export const CANDIDATE_FIXTURE_SME = 'SME-JFE-01 (TEST FIXTURE approval — not an expert decision)';
+export const CANDIDATE_FIXTURE_PO = 'Product Owner (TEST FIXTURE approval — not a governance decision)';
+export async function useCandidateClassification(pool: import('pg').Pool, roleId: string): Promise<{ id: string; off: () => Promise<void> }> {
+  const { join } = await import('node:path');
+  const { loadCandidate } = await import('../src/career-data/candidate');
+  const { createClassificationSet, approveClassificationSet } = await import('../src/configuration/professional-classification');
+  const root = join(__dirname, '..', '..', '..', '..');
+  const { pack } = loadCandidate(join(root, 'data', 'candidates', 'trk_frontend_junior_v2'), join(root, 'data', 'career'));
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    const ids = new Map((await c.query(`select s.slug, canonical_skill_id(rr.skill_id)::text as id from role_requirement rr join skill s on s.id = canonical_skill_id(rr.skill_id) where rr.target_role_id = $1`, [roleId])).rows.map((r) => [String(r.slug), String(r.id)]));
+    const entries = pack.track.roleSkills.map((rs) => {
+      const id = ids.get(rs.skill); if (!id) throw new Error(`candidate skill ${rs.skill} is not a requirement of role ${roleId}`);
+      return { skillId: id, cls: rs.professional_class!, source: rs.class_source!, sourceRef: rs.class_source_ref! };
+    });
+    await c.query(`update skill_classification_set set activation = 'inactive' where target_role_id = $1 and activation <> 'inactive'`, [roleId]);
+    const { id } = await createClassificationSet(c, { key: 'jfe_v2_candidate_fixture', targetRoleId: roleId, labelAr: 'تصنيف مرشّح (اختبار)', labelEn: 'v2 candidate classification (test fixture)',
+      description: 'TEST FIXTURE from data/candidates/trk_frontend_junior_v2 — development only, never production', createdBy: 'candidate fixture author', entries });
+    await approveClassificationSet(c, { id, smeApprovedBy: CANDIDATE_FIXTURE_SME, poApprovedBy: CANDIDATE_FIXTURE_PO });
+    await c.query("select set_config('naqla.classification_dev_activation', 'on', true)");
+    await c.query(`update skill_classification_set set activation = 'development_only' where id = $1`, [id]);
+    await c.query('commit');
+    return { id, off: async () => { await pool.query(`update skill_classification_set set activation = 'inactive' where id = $1`, [id]); } };
+  } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}

@@ -6,7 +6,7 @@ import { loadPathCatalog } from '../readiness/evidence-facts';
 import { loadIntegratedCatalog } from '../readiness/integrated-facts';
 import { revalidateClaimAssets, regroundApprovedAssets, groundingStandingSnapshot, reconcileGrounding, type RegroundDetail, type GroundingSnapshot } from '../agents/asset-standing';
 import { emitAuditEvent } from '../infra/audit';
-import { classificationEntriesInEffect } from './professional-classification';
+import { classificationEntriesInEffect, canonicalSkillLookup, withCanonicalRules } from './professional-classification';
 
 /**
  * The explicit, audited acts on configuration (Phase 4): approve a row, change
@@ -103,6 +103,12 @@ export async function createReadinessRuleSet(c: PoolClient, p: { key: string; ta
     [p.key, Number(next.rows[0].v), p.targetRoleId, p.labelAr, p.labelEn, p.description, p.createdBy]);
   const rules = [];
   let pos = 0;
+  // OPEN-039: a rule names a skill by its CANONICAL id. An alias is refused here, in words; one merged later is read as its
+  // canonical skill at approval, activation and evaluation (the same lookup), so an approved set never fails on alias handling.
+  const canon = await canonicalSkillLookup(c, p.rules.map((r) => r.skillId ?? null));
+  p.rules.forEach((r, i) => {
+    if (r.skillId && canon(r.skillId) !== r.skillId) throw new BadRequestException(`readiness rule #${i + 1} (${r.type}) names an alias skill ${r.skillId}; name its canonical skill ${canon(r.skillId)} instead (OPEN-039)`);
+  });
   for (const r of p.rules) {
     const row = await c.query(`insert into readiness_rule (rule_set_id, rule_type, params, skill_id, label_ar, label_en, position) values ($1,$2,$3,$4,$5,$6,$7) returning id, rule_type, params, skill_id, label_ar, label_en, enabled, position`,
       [set.rows[0].id, r.type, JSON.stringify(r.params), r.skillId ?? null, r.labelAr, r.labelEn, pos++]);
@@ -205,9 +211,9 @@ export async function assertReadinessSetConsistentWithClassification(c: PoolClie
   const cls = await classificationEntriesInEffect(c, set?.target_role_id ?? null);
   if (!cls) return;
   const { readinessRuleFromRow, classificationReadinessProblems } = await import('@naqla/domain');
-  const rows = (await c.query('select id, rule_type, params, skill_id, label_ar, label_en, enabled, position, canonical_skill_id(skill_id)::text as canon from readiness_rule where rule_set_id = $1 order by position', [setId])).rows;
-  const canon = new Map(rows.filter((r) => r.skill_id).map((r) => [String(r.skill_id), String(r.canon)]));
-  const problems = classificationReadinessProblems([...cls.values()], { rules: rows.map(readinessRuleFromRow) }, (id) => canon.get(id) ?? id);
+  const rows = (await c.query('select id, rule_type, params, skill_id, label_ar, label_en, enabled, position from readiness_rule where rule_set_id = $1 order by position', [setId])).rows;
+  // The same canonical mapping as at evaluation (readiness.service): rules and entries are compared as canonical skills.
+  const problems = classificationReadinessProblems([...cls.values()], await withCanonicalRules(c, { rules: rows.map(readinessRuleFromRow) }));
   if (problems.length) throw new BadRequestException(`this readiness rule set disagrees with the professional classification in effect for its role: ${problems.join('; ')}`);
 }
 

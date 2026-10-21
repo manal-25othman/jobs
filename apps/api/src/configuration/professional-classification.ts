@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { BadRequestException } from '@nestjs/common';
 import {
-  assertClassificationSane, classificationInEffect, CLASSIFICATION_TAXONOMY,
+  assertClassificationSane, classificationInEffect, CLASSIFICATION_TAXONOMY, withCanonicalRuleSkills, type ReadinessRuleSet,
   type SkillClassificationEntry, type SkillClassificationSet, type ProfessionalClass, type ClassSource,
 } from '@naqla/domain';
 import { isProduction } from './configuration.service';
@@ -26,11 +26,31 @@ export async function loadClassificationSets(c: PoolClient, roleId?: string): Pr
   }));
 }
 
-/** The classification in effect for a role (development only, approved; never in production), as a map by canonical skill — or null (legacy is_core applies). */
+/**
+ * Alias handling (OPEN-039): the one canonical-skill lookup used wherever a rule or a classification names a skill —
+ * readiness rule creation, approval, activation and evaluation, and the classification in effect. Unknown ids map to themselves.
+ */
+export async function canonicalSkillLookup(c: PoolClient, ids: readonly (string | null)[]): Promise<(skillId: string) => string> {
+  const list = [...new Set(ids.filter((x): x is string => !!x))];
+  if (list.length === 0) return (s) => s;
+  const rows = (await c.query('select id::text as id, canonical_skill_id(id)::text as canon from skill where id = any($1::uuid[])', [list])).rows;
+  const map = new Map(rows.map((r) => [String(r.id), String(r.canon)]));
+  return (s) => map.get(s) ?? s;
+}
+
+/** A readiness rule set with every rule's skill read as its canonical skill (the shared mapping above). */
+export async function withCanonicalRules<T extends Pick<ReadinessRuleSet, 'rules'>>(c: PoolClient, set: T): Promise<T> {
+  return withCanonicalRuleSkills(set, await canonicalSkillLookup(c, set.rules.map((r) => r.skillId)));
+}
+
+/** The classification in effect for a role (development only, approved; never in production), as a map by CANONICAL skill — or null (legacy is_core applies). */
 export async function classificationEntriesInEffect(c: PoolClient, roleId: string | null): Promise<Map<string, SkillClassificationEntry> | null> {
   if (!roleId || isProduction()) return null;
   const set = classificationInEffect(await loadClassificationSets(c, roleId), roleId, { production: isProduction() });
-  return set ? new Map(set.entries.map((e) => [e.skillId, e])) : null;
+  if (!set) return null;
+  // An entry stays fixed once approved; if its skill is merged later, it is read as the skill it was merged into.
+  const canon = await canonicalSkillLookup(c, set.entries.map((e) => e.skillId));
+  return new Map(set.entries.map((e) => [canon(e.skillId), { ...e, skillId: canon(e.skillId) }]));
 }
 
 /** The entry for one (possibly alias) skill of a role's classification in effect. */

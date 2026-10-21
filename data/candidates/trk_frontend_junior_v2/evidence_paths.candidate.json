@@ -1,0 +1,332 @@
+{
+  "_label": "DRAFT / NOT SME APPROVED / v2 CANDIDATE — NOT A RULE SET",
+  "_note": "Per-skill evidence paths (05 §2) as EXT-2 skill_evidence_path params, checked against the candidate pack by `career-data candidate-validate`. Text only: no readiness_rule_set row is created; EXT-2 stays sealed until P6. Path wording and variant distinctness are SME items S5/S6. Supporting skills have no path (they never block).",
+  "pack": "trk_frontend_junior@0.3.0-candidate.1",
+  "paths": [
+    {
+      "path": "P-HTML",
+      "skill": "skl_html_semantic",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "semantic_structure"
+            ]
+          },
+          "act_fe_debug_improve": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "semantic_fixed"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-06 (2 tasks)"
+    },
+    {
+      "path": "P-CSS",
+      "skill": "skl_css_responsive",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "responsive_layout"
+            ]
+          },
+          "act_fe_debug_improve": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "responsive_fixed"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-07 (2 tasks)"
+    },
+    {
+      "path": "P-JS",
+      "skill": "skl_js_fundamentals",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_debug_improve": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "validation_fixed"
+            ]
+          },
+          "act_fe_change_request": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "js_correctness"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-08 (2 tasks), F2"
+    },
+    {
+      "path": "P-DBG",
+      "skill": "skl_frontend_debugging",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "root_cause_fixed"
+            ]
+          },
+          "act_fe_change_request": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "root_cause_fixed"
+            ]
+          },
+          "act_fe_debug_improve": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "root_cause_note"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "within_criterion",
+        "legacy_results": "exclude"
+      },
+      "sme_basis": "SME-12 (2 tasks); Task A may replace one"
+    },
+    {
+      "path": "P-READ",
+      "skill": "skl_code_reading",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "problem_traced"
+            ]
+          },
+          "act_fe_change_request": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "component_explained",
+              "problem_traced"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "within_criterion",
+        "legacy_results": "exclude"
+      },
+      "sme_basis": "SME-12 (2 tasks), F1 (explain + trace, separate from Debugging)"
+    },
+    {
+      "path": "P-GIT",
+      "skill": "skl_version_control_basics",
+      "class": "must",
+      "params": {
+        "min_distinct_tasks": 1,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "git_workflow"
+            ]
+          }
+        },
+        "require_validation_activity": false,
+        "understanding": "within_criterion",
+        "legacy_results": "exclude"
+      },
+      "sme_basis": "F4: one inspected project (branch, commits, pull request, explained changes); G-4 inside git_workflow; no commit-count minimum (S7)"
+    },
+    {
+      "path": "P-UI",
+      "skill": "skl_ui_state_interaction",
+      "class": "core",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "state_transitions"
+            ]
+          },
+          "act_fe_change_request": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "filter_in_state"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-09 (2 tasks)"
+    },
+    {
+      "path": "P-API",
+      "skill": "skl_api_data_states",
+      "class": "core",
+      "params": {
+        "min_distinct_tasks": 2,
+        "counted_criteria": {
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "data_states"
+            ]
+          },
+          "act_fe_change_request": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "empty_state_correct"
+            ]
+          }
+        },
+        "require_validation_activity": true,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-10 (2 tasks), SME-35"
+    },
+    {
+      "path": "P-A11Y",
+      "skill": "skl_accessibility_basics",
+      "class": "core",
+      "params": {
+        "min_distinct_tasks": 1,
+        "counted_criteria": {
+          "act_fe_debug_improve": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "a11y_keyboard_forms"
+            ]
+          },
+          "act_fe_build_interface": {
+            "versions": [
+              "0.2.0"
+            ],
+            "criteria": [
+              "a11y_basics"
+            ]
+          }
+        },
+        "require_validation_activity": false,
+        "understanding": "integrated_code_understanding",
+        "legacy_results": "exclude",
+        "understanding_source": {
+          "activity": "act_fe_build_interface",
+          "versions": [
+            "0.2.0"
+          ],
+          "criteria": [
+            "code_understanding"
+          ]
+        }
+      },
+      "sme_basis": "SME-11 (1 task); Task A or INT"
+    }
+  ]
+}

@@ -5,18 +5,22 @@ import type { Pack } from './pack-schema';
 
 export interface RawFile { readonly name: string; readonly sha256: string; readonly content: unknown; }
 
-/** Reads /global and /tracks/<packId>. Every file is kept as an L0 raw snapshot. */
-export function loadPack(root: string, packId: string): { pack: Pack; files: RawFile[] } {
+/**
+ * Reads /global and /tracks/<packId>. Every file is kept as an L0 raw snapshot.
+ * `globalRoot` lets a track CANDIDATE (data/candidates/…) reuse the canonical global registry as is — same skill
+ * identities, no copied registry entries.
+ */
+export function loadPack(root: string, packId: string, globalRoot: string = root): { pack: Pack; files: RawFile[] } {
   const files: RawFile[] = [];
   const read = (rel: string): unknown => {
-    const text = readFileSync(join(root, rel), 'utf8');
+    const text = readFileSync(join(rel.startsWith('global/') ? globalRoot : root, rel), 'utf8');
     files.push({ name: rel, sha256: createHash('sha256').update(text).digest('hex'), content: JSON.parse(text) });
     return JSON.parse(text);
   };
   const recs = (v: unknown) => (v as { records: unknown[] }).records;
   const g = (f: string) => read(`global/${f}`);
   const t = (f: string) => read(`tracks/${packId}/${f}`);
-  for (const f of readdirSync(join(root, 'global'))) if (!f.endsWith('.json')) throw new Error(`unexpected file in global/: ${f}`);
+  for (const f of readdirSync(join(globalRoot, 'global'))) if (!f.endsWith('.json')) throw new Error(`unexpected file in global/: ${f}`);
   const pack: Pack = {
     global: {
       sources: recs(g('sources.json')) as Pack['global']['sources'],

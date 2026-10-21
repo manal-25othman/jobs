@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertClassificationSane, classificationApprovalProblems, classificationInEffect, professionalLabel, requiredForRole, classificationReadinessProblems,
-  evaluateReadiness, assertPackConstraintsSaneV2, checkPackCountsV2, resolvePackConstraints, LEGACY_PACK_CONSTRAINTS, PACK_CONSTRAINT_TYPES_V2, DomainError,
+  evaluateReadiness, withCanonicalRuleSkills, assertPackConstraintsSaneV2, checkPackCountsV2, resolvePackConstraints, LEGACY_PACK_CONSTRAINTS, PACK_CONSTRAINT_TYPES_V2, DomainError,
   type SkillClassificationEntry, type SkillClassificationSet, type ReadinessRuleSet, type ReadinessRule, type PackConstraintSet, type PackConstraintV2, type PackCountsV2,
 } from './index.js';
 
@@ -83,6 +83,26 @@ describe('P-3 readiness consistency (D-3) — categories from the classification
     const none = evaluateReadiness({ ruleSet: null, resolution: 'none', facts, classification: JFE });
     assert.equal(none.status, 'not_yet_configured', 'a classification without a rule set grants nothing');
     assert.equal(evaluateReadiness({ ruleSet: rs(full()), resolution: 'production_active', facts }).classificationProblems, undefined, 'no classification ⇒ unchanged report shape');
+  });
+});
+
+describe('alias handling (OPEN-039) is the same at approval, activation and evaluation', () => {
+  const R = (id: string, type: ReadinessRule['type'], skillId: string | null): ReadinessRule => ({ id, type, params: { min_level: 'demonstrated' }, skillId, labelAr: id, labelEn: id, enabled: true, position: 0 });
+  const rules = (): ReadinessRule[] => [...JFE.filter((e) => e.cls === 'must').map((e) => R(`m-${e.skillId}`, 'non_compensable_skill', e.skillId)), ...JFE.filter((e) => e.cls === 'core').map((e) => R(`c-${e.skillId}`, 'required_skill_at_level', e.skillId))];
+  const set = (r: ReadinessRule[]): ReadinessRuleSet => ({ id: 'rs', key: 'k', version: 1, reviewStatus: 'approved', activation: 'production_active', baselineOf: null, approvedBy: 'x', targetRoleId: 'role', labelAr: 'x', labelEn: 'x', rules: r } as ReadinessRuleSet);
+  // After approval, `git` is merged into `vcs` (the registry repoints role requirements; rules and classification entries keep their ids).
+  const canonical = (id: string) => (id === 'git' ? 'vcs' : id);
+  const facts = JFE.map((e) => ({ skillId: canonical(e.skillId), slug: e.skillId, labelAr: e.skillId, labelEn: e.skillId, verificationLevel: 'demonstrated' as const, progressState: null, standingEvidenceCount: 1, config: null }));
+  test('an approved, consistent pair stays consistent after a merge: both sides are compared as canonical skills', () => {
+    assert.deepEqual(classificationReadinessProblems(JFE, set(rules()), canonical), []);
+    assert.deepEqual(classificationReadinessProblems(JFE.map((e) => ({ ...e, skillId: canonical(e.skillId) })), set(rules()), canonical), [], 'entries already canonical');
+  });
+  test('evaluation reads a merged skill as the skill it was merged into, never as "not part of this track"', () => {
+    const raw = evaluateReadiness({ ruleSet: set(rules()), resolution: 'production_active', facts });
+    assert.equal(raw.rules.find((r) => r.ruleId === 'm-git')!.outcome, 'indeterminate', 'without the mapping the merged skill is lost (the gap this closes)');
+    const r = evaluateReadiness({ ruleSet: withCanonicalRuleSkills(set(rules()), canonical), resolution: 'production_active', facts, classification: JFE.map((e) => ({ ...e, skillId: canonical(e.skillId) })) });
+    assert.equal(r.rules.find((x) => x.ruleId === 'm-git')!.outcome, 'satisfied');
+    assert.deepEqual(r.classificationProblems, []); assert.equal(r.status, 'evaluated');
   });
 });
 
