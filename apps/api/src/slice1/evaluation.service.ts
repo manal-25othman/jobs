@@ -822,7 +822,7 @@ export class EvaluationService {
     c: PoolClient, activitySpecId: string, activitySpecVersion: string, rubricVersionId: string | null = null,
   ): Promise<PublishedRubric> {
     const { rows } = await c.query(
-      `select id, version, status, criteria, pass_threshold, proposes_state
+      `select id, version, status, criteria, pass_threshold, proposes_state, is_demo_fixture, pass_threshold_status::text as pass_threshold_status
          from rubric_version
         where activity_spec_id = $1 and status = 'published' and ($2::uuid is null or id = $2::uuid)
         order by created_at desc limit 1`,
@@ -856,12 +856,15 @@ export class EvaluationService {
           default: return null;
         }
       };
-      if (rv.pass_threshold === null || rv.proposes_state === null) {
+      // D-135 (development pilot): only a DEMO rubric whose pass threshold is not decided may leave it empty; its overall
+      // result is then `undetermined` (never a pass or a fail). Every other rubric must state it, as before.
+      const undecidedThreshold = rv.pass_threshold === null && rv.is_demo_fixture === true && rv.pass_threshold_status !== 'approved' && !isProduction();
+      if ((rv.pass_threshold === null && !undecidedThreshold) || rv.proposes_state === null) {
         throw new BadRequestException('a normalized rubric must state pass_threshold and proposes_state');
       }
       return {
         rubricVersionId: rv.id, version: rv.version, activitySpecId, activitySpecVersion, status: 'published',
-        passThreshold: Number(rv.pass_threshold), proposesState: rv.proposes_state as EvidenceState,
+        passThreshold: undecidedThreshold ? null : Number(rv.pass_threshold), proposesState: rv.proposes_state as EvidenceState,
         criteria: crit.rows.map((r) => ({
           // OPEN-044: a gate/quality criterion carries no skill; it can never feed skill evidence.
           key: r.key, label: r.name_ar, maxScore: Number(r.max_score), kind: r.criterion_kind, skillId: r.linked_skill_id, mandatory: r.mandatory,
@@ -877,6 +880,8 @@ export class EvaluationService {
 
     const body = rv.criteria as { passThreshold: number; proposesState: EvidenceState; criteria: unknown[] } | null;
     if (!body) throw new BadRequestException('published rubric has neither criterion rows nor a legacy snapshot');
+    // D-135: the undecided threshold exists only for criterion-row demo rubrics; a legacy snapshot must state a number.
+    if (typeof body.passThreshold !== 'number') throw new BadRequestException('a legacy rubric snapshot must state pass_threshold');
     return {
       rubricVersionId: rv.id,
       version: rv.version,

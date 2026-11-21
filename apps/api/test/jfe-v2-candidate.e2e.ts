@@ -36,6 +36,8 @@ const tx = async <T>(fn: (c: PoolClient) => Promise<T>): Promise<T> => {
 const fresh = (): CandidateBundle => loadCandidate(DIR, CANON);
 const mutated = (fn: (p: Pack, b: CandidateBundle) => void): CandidateBundle => { const b = fresh(); fn(b.pack, b); return b; };
 const has = (b: CandidateBundle, re: RegExp) => validateCandidate(b).problems.some((x) => re.test(x));
+// D-135: rows of a development pilot load ARE this candidate (loaded as demo pilot content); they are not "existing" content.
+const NOT_PILOT = 'not exists (select 1 from pilot_content_load l where l.target_role_id = activity_spec.target_role_id)';
 const INT = 'act_fe_integrated_leave_requests'; const LEGACY_INT = 'act_fe_build_interface'; const TA = 'act_fe_debug_improve'; const TB = 'act_fe_change_request';
 
 before(async () => { app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] }); });
@@ -164,12 +166,12 @@ describe('final candidate review: Forms validation criterion and J-7 activity id
     const newer = (a: string, b: string) => { const [x, y] = [semver(a), semver(b)]; for (let i = 0; i < 3; i++) if (x[i]! !== y[i]!) return x[i]! > y[i]!; return false; };
     for (const code of [TA, TB]) {
       const v = pack.track.activities.find((a) => a.code === code)!.version;
-      const existing = [...(await pool.query('select version from activity_spec where slug = $1', [code])).rows.map((r) => String(r.version)), canonical.track.activities.find((a) => a.code === code)!.version];
+      const existing = [...(await pool.query(`select version from activity_spec where slug = $1 and ${NOT_PILOT}`, [code])).rows.map((r) => String(r.version)), canonical.track.activities.find((a) => a.code === code)!.version];
       assert.ok(existing.every((e) => newer(v, e)), `${code}@${v} is ordered above every existing version (${[...new Set(existing)].join(', ')}); none is overwritten`);
     }
     const int = pack.track.activities.find((a) => a.code === INT)!;
     assert.equal(int.version, '0.1.0');
-    assert.equal(Number((await one('select count(*)::int n from activity_spec where slug = $1', [INT])).n), 0, 'a new, unused code');
+    assert.equal(Number((await one(`select count(*)::int n from activity_spec where slug = $1 and ${NOT_PILOT}`, [INT])).n), 0, 'a new, unused code');
     assert.match(String((int as unknown as { derived_from: string }).derived_from), /^act_fe_build_interface@0\.1\.0/);
     assert.ok(!pack.track.activities.some((a) => a.code === LEGACY_INT), 'the v2 pack keeps three activities');
     // The original stays exactly as it was: in the canonical (v1) pack, in the database, and as the global resources' practice link.

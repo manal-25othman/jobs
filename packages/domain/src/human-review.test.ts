@@ -102,3 +102,27 @@ describe('queue, permissions, blind payload, decisions, values, promotion', () =
     assert.throws(() => assertPromotionAllowed({ sourceIsDemo: true, sourceStatus: 'draft', alreadyPromoted: true }), DomainError);
   });
 });
+
+describe('D-135 — an undecided pass threshold decides nothing (development pilot)', () => {
+  const tbd: PublishedRubric = { ...rubric, passThreshold: null };
+  const det = runDeterministicEvaluation({ rubric: tbd, artifacts: arts, integritySpecs: [blockingSpec], currentState: 'practiced' });
+  test('the deterministic stage is unchanged: human criteria pending, nothing proposed', () => {
+    assert.equal(det.outcome, 'needs_human_review'); assert.equal(det.proposedState, null);
+  });
+  for (const [label, s1, s2] of [['full marks', 2, 2], ['zero marks', 0, 0], ['a missed mandatory criterion', 0, 2]] as const) {
+    test(`${label} → undetermined: never passed, never below_threshold, never a proposal; criterion results kept as feedback`, () => {
+      const a = aggregateWithHumanDecisions({ rubric: tbd, deterministic: det, decisions: [{ criterionKey: 'structure', score: s1, rationale: 'observed structure' }, { criterionKey: 'clarity', score: s2, rationale: 'observed clarity' }], currentState: 'practiced' });
+      assert.equal(a.outcome, 'undetermined'); assert.equal(a.proposedState, null);
+      assert.deepEqual(a.criteria.map((c) => [c.criterionId, c.score]), [['files', 1], ['structure', s1], ['clarity', s2]]);
+      assert.match(a.reason, /not yet determined/);
+    });
+  }
+  test('a rule-only rubric with an undecided threshold is undetermined too; a decided threshold behaves exactly as before', () => {
+    const only = [rubric.criteria[0]!];
+    assert.equal(runDeterministicEvaluation({ rubric: { ...tbd, criteria: only }, artifacts: arts, integritySpecs: [], currentState: 'practiced' }).outcome, 'undetermined');
+    assert.equal(runDeterministicEvaluation({ rubric: { ...rubric, criteria: only }, artifacts: arts, integritySpecs: [], currentState: 'practiced' }).outcome, 'passed');
+  });
+  test('a blocking integrity failure still blocks (an undecided threshold never lifts a check)', () => {
+    assert.equal(runDeterministicEvaluation({ rubric: tbd, artifacts: [arts[0]!], integritySpecs: [blockingSpec], currentState: 'practiced' }).outcome, 'blocked_by_checks');
+  });
+});

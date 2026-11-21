@@ -15,7 +15,7 @@ export interface ActivityContext {
   deliverables: { key: string; mandatory: boolean; descriptionEn: string }[];
   relatedSkills: { skillId: string; code: string; labelEn: string; depth: string }[];
   tasks: { code: string; titleEn: string }[];
-  rubric: { version: string; criteria: { key: string; nameEn: string; linkedSkillId: string; weight: number; mandatory: boolean; evaluatorType: string }[] } | null;
+  rubric: { version: string; criteria: { key: string; nameEn: string; linkedSkillId: string; weight: number | null; mandatory: boolean; evaluatorType: string }[] } | null;
 }
 
 /**
@@ -86,7 +86,7 @@ export async function loadActivityContext(c: PoolClient, activitySpecId: string 
   let rubric: ActivityContext['rubric'] = null;
   if (rv.rowCount) {
     const crit = await c.query('select key, name_en, linked_skill_id, weight, mandatory, evaluator_type from rubric_criterion where rubric_version_id = $1 order by position', [rv.rows[0].id]);
-    rubric = { version: rv.rows[0].version, criteria: crit.rows.map((r) => ({ key: r.key, nameEn: r.name_en, linkedSkillId: r.linked_skill_id, weight: Number(r.weight), mandatory: r.mandatory, evaluatorType: r.evaluator_type })) };
+    rubric = { version: rv.rows[0].version, criteria: crit.rows.map((r) => ({ key: r.key, nameEn: r.name_en, linkedSkillId: r.linked_skill_id, weight: r.weight === null ? null : Number(r.weight), mandatory: r.mandatory, evaluatorType: r.evaluator_type })) };
   }
   const structured = deliverables.rowCount! > 0 && skills.rowCount! > 0;
   return { status: structured ? 'structured' : 'legacy_snapshot', activitySpecId: row.id, slug: row.slug, version: row.version, titleAr: row.title_ar, titleEn: row.title_en, objectiveEn: row.objective_en,

@@ -14,6 +14,8 @@
  *   claims-reground --dry-run [--json]            Phase 9: the re-grounding plan, same code path, rolled back — nothing written
  *   claims-reground --operator <uuid> --reason "<why>"   Phase 9: execute (product_owner grant required); reconciliation must pass or nothing changes
  *   claims-public-freeze --operator <uuid> --reason "<why>"   Phase 9: pre-deployment — close direct public paths until re-grounded
+ *   pilot-load [dir] --by <name> --reason "<why>"   D-135: DEVELOPMENT ONLY — load the v2 candidate as DEMO pilot content (undecided values stay empty + TBD); refused in production
+ *   pilot-policy <per-skill|baseline> --by <name>   D-135: DEVELOPMENT ONLY — per-skill feedback for the pilot, or restore the D-118 safety baseline
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
 import { Pool } from 'pg';
@@ -26,6 +28,7 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
+import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, PilotLoadError } from './pilot-loader';
 import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims, cliRegroundAssets, cliGroundingStanding, cliFreezePublicGrounding } from '../configuration/config-admin.service';
 import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
@@ -56,6 +59,28 @@ export async function main(argv: string[], root: string): Promise<number> {
       console.log(`  near-duplicate candidates proposed: ${r.nearDuplicates.length} (nothing merged automatically)`);
       for (const x of r.resolutions) console.log(`  owner-decided resolution: ${x.alias} → ${x.canonical} ${x.applied ? `applied (alias kept as merged_into; repointed ${Object.entries(x.repointed).map(([k, v]) => `${k}=${v}`).join(' ') || 'nothing'})` : 'already applied'}`);
       return 0;
+    }
+    if (cmd === 'pilot-load') {
+      const dir = a1 && !a1.startsWith('--') ? a1 : 'data/candidates/trk_frontend_junior_v2';
+      const by = arg(argv, '--by'); const reason = arg(argv, '--reason');
+      if (!by || !reason) { console.error('pilot-load needs --by <name> and --reason "<why>"'); return 2; }
+      try {
+        const r = await loadPilotCandidate(pool, { candidateDir: join(root, dir), canonicalRoot: join(root, 'data', 'career'), byLabel: by, reason, production });
+        console.log(`pilot ${r.packId}@${r.packVersion} — DEVELOPMENT ONLY, DEMO fixture, not SME approved${r.alreadyLoaded ? ' (already loaded; nothing rewritten)' : ''}`);
+        console.log(`  role ${r.role.slug} (${r.role.id})`);
+        for (const a of r.activities) console.log(`  activity ${a.code}@${a.version} (${a.activityId}) · rubric ${a.rubricId}`);
+        console.log(`  written: ${Object.entries(r.written).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+        return 0;
+      } catch (e) { if (e instanceof PilotLoadError) { console.error(e.message); return 1; } throw e; }
+    }
+    if (cmd === 'pilot-policy') {
+      const by = arg(argv, '--by'); if (!by) { console.error('pilot-policy needs --by <name>'); return 2; }
+      if (a1 === 'per-skill') {
+        try { const id = await usePilotPerSkillPolicy(pool, { byLabel: by, production }); console.log(`per-skill pilot policy in effect (development_only, unapproved draft): ${id}`); return 0; }
+        catch (e) { if (e instanceof PilotLoadError) { console.error(e.message); return 1; } throw e; }
+      }
+      if (a1 === 'baseline') { await restoreSafetyBaseline(pool, { byLabel: by }); console.log('D-118 safety baseline restored'); return 0; }
+      console.error('pilot-policy <per-skill|baseline> --by <name>'); return 2;
     }
     if (cmd === 'validate') {
       const { results, failed } = await runQualityChecks(pool);

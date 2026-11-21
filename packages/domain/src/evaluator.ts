@@ -85,8 +85,11 @@ export interface PublishedRubric {
   readonly activitySpecVersion: string;
   readonly status: 'published';
   readonly criteria: readonly RubricCriterion[];
-  /** Fraction of the maximum required to pass. */
-  readonly passThreshold: number;
+  /**
+   * Fraction of the maximum required to pass. `null` = not yet decided by the SME (TBD, D-135 development pilot only):
+   * the overall result is then `undetermined` — never a pass or a fail, never a proposal.
+   */
+  readonly passThreshold: number | null;
   /** The state a pass proposes. Never above what the ladder allows. */
   readonly proposesState: EvidenceState;
 }
@@ -382,6 +385,24 @@ function concludeRun(rubric: PublishedRubric, criteria: readonly EvaluationCrite
     const scored = criteria.find((s) => s.criterionId === c.key);
     return c.mandatory && scored !== undefined && scored.score < c.maxScore;
   });
+
+  /* D-135: an undecided pass threshold (and with it the undecided pass rule) decides nothing. The criterion results stand
+        as feedback; the overall result is `undetermined`, which yields no evidence and no promotion. */
+  if (rubric.passThreshold === null) {
+    return {
+      outcome: 'undetermined',
+      rubricVersion: rubric.version,
+      activitySpecVersion: rubric.activitySpecVersion,
+      criteria,
+      integrityChecks,
+      totalScore,
+      maxScore,
+      proposedState: null,
+      reason: 'not yet determined: the pass threshold and pass rule are not yet decided by the SME (TBD); criterion results are feedback only',
+      pendingHumanCriteria: [],
+      deferredChecks,
+    };
+  }
 
   const ratio = maxScore === 0 ? 0 : totalScore / maxScore;
   const passed = missedMandatory.length === 0 && ratio >= rubric.passThreshold;

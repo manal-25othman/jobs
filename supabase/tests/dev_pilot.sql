@@ -1,0 +1,99 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- D-135 proofs (migration 0035): an undecided criterion weight stays undecided, only on a DEMO rubric, only inside the
+-- development pilot loader's opt-in, never in production; the pilot-load ledger is append-only, opt-in, demo-only and
+-- invisible to clients. Own fixtures (a1…). Run by scripts/db-test.sh.
+-- ═══════════════════════════════════════════════════════════════════════════
+\set ON_ERROR_STOP on
+
+create or replace function dp_must_fail(setup text, stmt text, label text, expect_error text) returns void language plpgsql as $$
+  begin
+    begin
+      if setup is not null then execute setup; end if;
+      execute stmt;
+    exception when others then
+      if SQLERRM !~ expect_error then raise exception 'FAIL  %  — refused for the WRONG reason: %', label, SQLERRM; end if;
+      raise notice 'PASS  %  (refused: %)', label, replace(SQLERRM, E'\n', ' ');
+      return;
+    end;
+    raise exception 'FAIL  %  — ACCEPTED', label;
+  end $$;
+create or replace function dp_ok(setup text, stmt text, label text) returns void language plpgsql as $$
+  begin
+    begin
+      if setup is not null then execute setup; end if;
+      execute stmt;
+      raise notice 'PASS  %  (accepted)', label;
+      raise exception 'dp_rollback';
+    exception when others then
+      if SQLERRM = 'dp_rollback' then return; end if;
+      raise exception 'FAIL  %  — refused: %', label, SQLERRM;
+    end;
+  end $$;
+
+do $$ begin
+  if exists (select 1 from rubric_criterion where weight is null) then raise exception 'FAIL  0035 left an existing weight empty'; end if;
+  if exists (select 1 from pilot_content_load) then raise exception 'FAIL  0035 created a pilot load'; end if;
+  raise notice 'PASS  0035: no existing weight changed; no pilot content created';
+end $$;
+
+insert into skill (id, slug, label_ar, label_en, provenance_class, provenance_source) values ('a1000000-0000-4000-8000-000000000011', 'dp-html', 'h', 'h', 'curated', 'D-135 proof');
+insert into activity_spec (id, slug, version, status, title_ar, ai_usage_mode, spec, is_demo_fixture) values
+  ('a1000000-0000-4000-8000-000000000021', 'dp-demo', '1.0.0', 'draft', 'نشاط', 'ai_assisted', '{}'::jsonb, true),
+  ('a1000000-0000-4000-8000-000000000022', 'dp-real', '1.0.0', 'draft', 'نشاط', 'ai_assisted', '{}'::jsonb, false);
+insert into rubric_version (id, activity_spec_id, version, status, criteria, is_demo_fixture) values
+  ('a1000000-0000-4000-8000-000000000031', 'a1000000-0000-4000-8000-000000000021', 'dp-demo@1', 'draft', '[]'::jsonb, true),
+  ('a1000000-0000-4000-8000-000000000032', 'a1000000-0000-4000-8000-000000000022', 'dp-real@1', 'draft', '[]'::jsonb, false);
+
+create or replace function dp_crit(rubric text, weight text, status text) returns text language sql as $$
+  select format($f$insert into rubric_criterion (rubric_version_id, key, name_ar, name_en, dimension, linked_skill_id, source, weight, weight_status, max_score,
+                    evaluator_type, human_review_required, description_ar, description_en, expected_evidence_ar, expected_evidence_en, rationale_when_met_ar, rationale_when_unmet_ar)
+                  values (%L, 'k', 'n', 'n', (select enum_range(null::rubric_dimension))[1], 'a1000000-0000-4000-8000-000000000011', 'activity', %s, %L, 2,
+                          'human', true, 'd', 'd', 'e', 'e', 'm', 'u')$f$, rubric, weight, status)
+$$;
+
+select dp_must_fail(null, dp_crit('a1000000-0000-4000-8000-000000000031', 'null', 'TBD'),
+  '0035: an empty weight is refused outside the pilot loader (no opt-in)', 'only by the development pilot loader');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true), set_config('naqla.production', 'on', true)$$, dp_crit('a1000000-0000-4000-8000-000000000031', 'null', 'TBD'),
+  '0035: an empty weight is refused in production, even with the opt-in', 'never written in production');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true)$$, dp_crit('a1000000-0000-4000-8000-000000000032', 'null', 'TBD'),
+  '0035: an empty weight is refused on a NON-demo rubric', 'only on a DEMO-fixture rubric');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true)$$, dp_crit('a1000000-0000-4000-8000-000000000031', 'null', 'proposed'),
+  '0035: an empty weight must say TBD (never a disguised proposal)', 'rubric_criterion_weight_undecided_is_tbd');
+select dp_ok($$select set_config('naqla.pilot_content_load', 'on', true)$$, dp_crit('a1000000-0000-4000-8000-000000000031', 'null', 'TBD'),
+  '0035: an empty, TBD weight on a DEMO rubric inside the pilot opt-in is accepted');
+select dp_ok(null, dp_crit('a1000000-0000-4000-8000-000000000032', '0.5', 'proposed'),
+  '0035: a stated weight is written exactly as before (no opt-in needed)');
+select dp_must_fail(dp_crit('a1000000-0000-4000-8000-000000000032', '0.5', 'TBD'), $$update rubric_criterion set weight = null where rubric_version_id = 'a1000000-0000-4000-8000-000000000032'$$,
+  '0035: an existing weight is never emptied outside the pilot loader', 'only by the development pilot loader');
+select dp_must_fail(null, $$update rubric_version set values_approved_by = gen_random_uuid(), values_approved_by_label = 'proof SME', values_approved_at = now(), values_approval_reason = 'D-135 proof',
+      pass_threshold = null, pass_threshold_status = 'approved' where id = 'a1000000-0000-4000-8000-000000000032'$$,
+  '0035: an approved pass threshold always has a value (even with a recorded SME approval)', 'rubric_version_approved_threshold_has_value');
+
+insert into target_role (id, slug, label_ar, label_en, track_id, source_label, provenance_class, provenance_source, is_demo_fixture) values
+  ('a1000000-0000-4000-8000-000000000041', 'dp-pilot-role', 'r', 'r', 'dp', 'D-135 proof', 'curated', 'D-135 proof', true),
+  ('a1000000-0000-4000-8000-000000000042', 'dp-real-role', 'r', 'r', 'dp', 'D-135 proof', 'curated', 'D-135 proof', false);
+create or replace function dp_load(role text) returns text language sql as $$
+  select format($f$insert into pilot_content_load (pack_id, pack_version, target_role_id, loaded_by_label, reason, files, written)
+                  values ('dp', '1', %L, 'proof', 'D-135 proof', '[]', '{}')$f$, role)
+$$;
+select dp_must_fail(null, dp_load('a1000000-0000-4000-8000-000000000041'), '0035: a pilot load needs the explicit opt-in', 'explicit, transaction-local opt-in');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true), set_config('naqla.production', 'on', true)$$, dp_load('a1000000-0000-4000-8000-000000000041'),
+  '0035: a pilot load is refused in production', 'never loaded in production');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true)$$, dp_load('a1000000-0000-4000-8000-000000000042'),
+  '0035: a pilot role is always a DEMO fixture', 'always a DEMO fixture');
+select dp_ok($$select set_config('naqla.pilot_content_load', 'on', true)$$, dp_load('a1000000-0000-4000-8000-000000000041'), '0035: a pilot load with the opt-in on a demo role is accepted');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true); $$ || dp_load('a1000000-0000-4000-8000-000000000041'),
+  $$update pilot_content_load set reason = 'changed'$$, '0035: the pilot-load ledger is append-only (no update)', 'append-only');
+select dp_must_fail($$select set_config('naqla.pilot_content_load', 'on', true); $$ || dp_load('a1000000-0000-4000-8000-000000000041'),
+  $$delete from pilot_content_load$$, '0035: the pilot-load ledger is append-only (no delete)', 'append-only');
+
+do $$ begin
+  if has_table_privilege('authenticated', 'pilot_content_load', 'SELECT') or has_table_privilege('anon', 'pilot_content_load', 'SELECT')
+     or has_table_privilege('authenticated', 'pilot_content_load', 'INSERT') then
+    raise exception 'FAIL  0035: a client role can read or write the pilot-load ledger';
+  end if;
+  raise notice 'PASS  0035: the pilot-load ledger is service-only (no anon or authenticated read or write)';
+end $$;
+
+-- Fixtures stay (content rows are never deleted); they are demo/draft and named dp-*.
+drop function dp_must_fail(text, text, text, text); drop function dp_ok(text, text, text); drop function dp_crit(text, text, text); drop function dp_load(text);
