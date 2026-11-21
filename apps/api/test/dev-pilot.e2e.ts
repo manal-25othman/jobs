@@ -7,6 +7,9 @@
  *  - idempotent (a second load rewrites nothing); the v1 demo rows are byte-identical before and after
  *  - creates no classification, readiness rule set, pack constraint, policy or published content; nothing is graduate-usable
  *  - the per-skill pilot policy is development-only and the D-118 safety baseline is restored afterwards
+ *  - D-136: the authorized Product Owner publishes the pilot (local development only; never SME approval); an internal
+ *    graduate then reaches all three activities and completes Task B: submit → human review → an UNDETERMINED result
+ *    with per-skill feedback; no evidence, no level, no claim, no readiness; another user sees none of it
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,10 +17,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
-import { bootApp, newUser, type TestUser } from './helpers';
+import { bootApp, newUser, uploadFile, filesFor, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
 import { loadCandidate } from '../src/career-data/candidate';
 import { importPack } from '../src/career-data/pipeline';
-import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, PILOT_POLICY_DESCRIPTION, type PilotLoadReport } from '../src/career-data/pilot-loader';
+import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PILOT_POLICY_DESCRIPTION, type PilotLoadReport } from '../src/career-data/pilot-loader';
 
 let app: INestApplication; let http: ReturnType<typeof request>; let pool: Pool;
 const ROOT = join(__dirname, '..', '..', '..', '..');
@@ -118,5 +121,121 @@ describe('per-skill pilot policy (development only)', () => {
     } finally { await restoreSafetyBaseline(pool, { byLabel: 'e2e' }); }
     const inEffect = await one(`select activation::text as a, version, baseline_of is not null as baseline from verification_policy where key = 'default' and activation <> 'inactive'`);
     assert.deepEqual([inEffect.a, inEffect.version, inEffect.baseline], ['legacy_baseline', 2, true]);
+  });
+});
+
+const PILOT_PUBLICATION = 'D-136 pilot publication e2e (TEST FIXTURE Product Owner — not a governance decision)';
+const pilotRows = async () => (await pool.query(`select 'activity_spec' as kind, a.id from activity_spec a join pilot_content_load l on l.target_role_id = a.target_role_id
+  union all select 'rubric_version', rv.id from rubric_version rv join activity_spec a on a.id = rv.activity_spec_id join pilot_content_load l on l.target_role_id = a.target_role_id`)).rows as { kind: string; id: string }[];
+
+describe('D-136 — development-only DEMO publication of the pilot (an authorized Product Owner operation)', () => {
+  let po: TestUser;
+  before(async () => {
+    po = await newUser(); await http.post('/v1/me/bootstrap').set(auth(po)).send({}).expect(201);
+    await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'product_owner', $2)`, [po.id, PILOT_PUBLICATION]);
+  });
+  const url = () => process.env['DATABASE_URL']!;
+  test('refused in production, against a non-local (staging) database, and for an operator without a product_owner grant — nothing changes', async () => {
+    const before = (await one(`select string_agg(status::text, ',' order by id) as s from (select id, status from activity_spec where target_role_id = $1) x`, [report.role.id])).s;
+    await assert.rejects(() => publishPilotDemo(pool, { operatorId: po.id, reason: 'x', nodeEnv: 'production', databaseUrl: url() }), /outside local development/);
+    await assert.rejects(() => publishPilotDemo(pool, { operatorId: po.id, reason: 'x', nodeEnv: undefined, databaseUrl: url() }), /outside local development/);
+    await assert.rejects(() => publishPilotDemo(pool, { operatorId: po.id, reason: 'x', nodeEnv: 'development', databaseUrl: 'postgresql://u@db.staging-project.supabase.co:5432/postgres' }), /not a local development database/);
+    const nobody = await newUser(); await http.post('/v1/me/bootstrap').set(auth(nobody)).send({}).expect(201);
+    await assert.rejects(() => publishPilotDemo(pool, { operatorId: nobody.id, reason: 'x', nodeEnv: 'test', databaseUrl: url() }), /no active product_owner grant/);
+    assert.equal((await one(`select string_agg(status::text, ',' order by id) as s from (select id, status from activity_spec where target_role_id = $1) x`, [report.role.id])).s, before);
+  });
+  test('the database refuses the shortcut itself: no opt-in, production, or an operator without a grant; and never an SME approval on a pilot row', async () => {
+    const id = report.activities[0]!.activityId;
+    const c = await pool.connect();
+    try {
+      const attempt = async (setup: string, sql = `update activity_spec set status = 'published' where id = '${id}'`) => {
+        await c.query('begin');
+        try { await c.query(`update activity_spec set status = 'curated' where id = '${id}' and status = 'draft'`); if (setup) await c.query(setup); await c.query(sql); return 'accepted'; }
+        catch (e) { return (e as Error).message; } finally { await c.query('rollback'); }
+      };
+      assert.match(await attempt(''), /published only by the authorized Product Owner pilot operation/);
+      assert.match(await attempt(`select set_config('naqla.pilot_demo_publication', 'on', true), set_config('naqla.pilot_publication_operator', '${po.id}', true), set_config('naqla.production', 'on', true)`), /never published in production/);
+      assert.match(await attempt(`select set_config('naqla.pilot_demo_publication', 'on', true), set_config('naqla.pilot_publication_operator', gen_random_uuid()::text, true)`), /active product_owner grant/);
+      assert.match(await attempt('', `update activity_spec set sme_approved_by = gen_random_uuid(), sme_approved_at = now() where id = '${id}'`), /never carries an SME approval/);
+    } finally { c.release(); }
+  });
+  test('the authorized operation publishes the 3 activities and 3 rubrics, logs each as product_owner (D-136), writes no SME approval; a rerun publishes nothing', async () => {
+    const r = await publishPilotDemo(pool, { operatorId: po.id, reason: 'D-136 e2e: internal graduate journey', nodeEnv: 'test', databaseUrl: url() });
+    assert.equal(r.published.length, 6);
+    const rows = await pilotRows();
+    for (const x of rows) {
+      const st = await one(`select status::text as s, is_demo_fixture from ${x.kind} where id = $1`, [x.id]);
+      assert.deepEqual([st.s, st.is_demo_fixture], ['published', true], `${x.kind} ${x.id}`);
+      const log = (await pool.query(`select role_performed::text as role, to_status::text as t, decided_by, reason from review_log where entity_id = $1 order by decided_at`, [x.id])).rows;
+      assert.deepEqual(log.map((l) => `${l.role}:${l.t}`), ['content_author:curated', 'product_owner:published']);
+      assert.equal(log[1].decided_by, po.id); assert.match(log[1].reason, /D-136 DEVELOPMENT PILOT DEMO PUBLICATION.*not an SME approval/);
+    }
+    assert.equal(Number((await one(`select count(*)::int n from review_log where entity_id = any($1) and role_performed = 'sme'`, [rows.map((x) => x.id)])).n), 0, 'no SME record');
+    assert.equal(Number((await one(`select count(*)::int n from activity_spec where target_role_id = $1 and (sme_approved_by is not null or reviewed_by is not null)`, [report.role.id])).n), 0);
+    assert.equal(Number((await one(`select count(*)::int n from rubric_version rv join activity_spec a on a.id = rv.activity_spec_id where a.target_role_id = $1
+      and (rv.values_approved_at is not null or rv.pass_threshold is not null or rv.activity_spec_version is distinct from a.version)`, [report.role.id])).n), 0, 'undecided values unchanged; each rubric bound to its activity version');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'pilot.demo_published' and actor_id = $1`, [po.id])).n), 6);
+    assert.equal((await publishPilotDemo(pool, { operatorId: po.id, reason: 'again', nodeEnv: 'test', databaseUrl: url() })).published.length, 0);
+    assert.equal((await one(NON_PILOT)).h, before0, 'every non-pilot content row is still byte-identical');
+  });
+
+  test('an internal graduate who picks the pilot role reaches all three activities, each marked as DEMO (experimental)', async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    const items = (await http.get('/v1/me/activities').set(auth(u)).expect(200)).body.data.items as { id: string; isDemo: boolean }[];
+    assert.deepEqual(items.map((i) => i.id).sort(), report.activities.map((a) => a.activityId).sort());
+    assert.ok(items.every((i) => i.isDemo));
+    for (const a of report.activities) assert.equal((await http.get(`/v1/me/activities/${a.activityId}`).set(auth(u)).expect(200)).body.data.isDemo, true);
+  });
+
+  test('complete journey on Task B: submit → human review → overall result UNDETERMINED, per-skill feedback only; no evidence, level, claim or readiness; private to the graduate', async () => {
+    const taskB = report.activities.find((a) => a.code === 'act_fe_change_request')!;
+    await usePilotPerSkillPolicy(pool, { byLabel: 'e2e (D-136)', production: false });
+    try {
+      const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+      await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+      const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'تعديل قائمة المهام', kind: 'platform_activity', activitySpecId: taskB.activityId }).expect(201)).body.data.id as string;
+      const primaries = (await pool.query(`select skill_id from activity_skill where activity_spec_id = $1 and depth = 'primary' order by skill_id`, [taskB.activityId])).rows.map((r) => r.skill_id as string);
+      const f1 = await uploadFile(app, http, u, 'app.js', TEST_BYTES); const f2 = await uploadFile(app, http, u, 'index.html', COMPONENT_BYTES, 'text/plain');
+      const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: primaries, files: filesFor([f1, f2], ['file.app_js', 'file.index_html']),
+        aiDisclosure: { declaredUse: [] }, artifacts: [
+          { key: 'note.decision', kind: 'text', valueText: 'اخترتُ إضافة الفلتر الثاني إلى الحالة نفسها بدل نسخ القائمة، لأن ذلك يبقي مصدرًا واحدًا للبيانات.', locator: 'notes.md' },
+          { key: 'answer.explanation', kind: 'text', valueText: 'التغيير يقرأ الفلترين معًا ثم يعرض القائمة الفارغة رسالةً لا خطأً.', locator: 'notes.md' },
+          { key: 'answer.component_explained', kind: 'text', valueText: 'المكوّن يستقبل القائمة المفلترة ويعرض العناصر أو حالة الفراغ.', locator: 'notes.md' },
+        ] }).expect(201)).body.data.id as string;
+      const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
+      assert.equal(ev.outcome, 'needs_human_review', `the activity is human-reviewed (${ev.outcome})`);
+      const reviewer = await newUser(); await http.post('/v1/me/bootstrap').set(auth(reviewer)).send({}).expect(201);
+      await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'e2e operator (D-136 pilot)')`, [reviewer.id]);
+      const items = (await pool.query(`select q.id, q.criterion_key, (select l.level_key from rubric_criterion_level l where l.criterion_id = q.criterion_id order by l.score desc limit 1) as top
+        from review_queue_item q where q.evaluation_id = $1 order by q.criterion_key`, [ev.evaluationId])).rows;
+      assert.ok(items.length > 0);
+      for (const it of items) {
+        await http.post(`/v1/review/queue/${it.id}/assign`).set(auth(reviewer)).send({}).expect(201);
+        await http.get(`/v1/review/items/${it.id}`).set(auth(reviewer)).expect(200);
+        await http.post(`/v1/review/items/${it.id}/decision`).set(auth(reviewer)).send({ levelKey: it.top, rationale: `لاحظتُ في الملفات المسلّمة: ${it.criterion_key}.` }).expect(201);
+      }
+      const view = (await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(u)).expect(200)).body.data;
+      // Even with every criterion at its TOP level, nothing is passed: the pass threshold and rule are undecided.
+      assert.equal(view.outcome, 'undetermined'); assert.equal(view.isDemo, true); assert.equal(view.transition, null);
+      assert.ok(view.criteria.length > 0 && view.criteria.every((c: { rationale: string }) => c.rationale.trim().length > 0), 'criterion feedback is shown');
+      assert.ok(view.skills.length > 0, 'per-skill feedback is shown');
+      assert.ok(view.skills.every((s: { outcome: string }) => s.outcome === 'incomplete'), `every skill reads "not yet decided": ${view.skills.map((s: { outcome: string }) => s.outcome)}`);
+      assert.ok(view.skills.every((s: { criteria: { status: string }[] }) => s.criteria.every((c) => c.status === 'threshold_unapproved')), 'no threshold was invented');
+      assert.equal(Number((await one('select count(*)::int n from evidence where user_id = $1', [u.id])).n), 0, 'no evidence');
+      assert.equal(Number((await one(`select count(*)::int n from skill_claim where user_id = $1 and state::text in ('practiced','demonstrated','verified')`, [u.id])).n), 0, 'no level');
+      assert.equal(Number((await one(`select count(*)::int n from verification_decision where user_id = $1 and evidence_id is not null`, [u.id])).n), 0, 'no promotion decision');
+      assert.equal(Number((await one(`select count(*)::int n from readiness_evaluation where user_id = $1`, [u.id])).n), 0, 'no readiness');
+      assert.equal(Number((await one(`select count(*)::int n from claim_draft_event where user_id = $1`, [u.id])).n), 0, 'no career claim');
+      assert.equal(Number((await one(`select count(*)::int n from skill_classification_set where activation <> 'inactive'`)).n), 0, 'no classification active');
+      // Tenant isolation: another graduate cannot read the submission, its evaluation, or start its evaluation.
+      const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+      await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(other)).expect(404);
+      await http.get(`/v1/submissions/${sid}`).set(auth(other)).expect(404);
+      await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(other)).expect(404);
+      assert.equal(((await http.get('/v1/projects').set(auth(other)).expect(200)).body.data.items as unknown[]).length, 0);
+      const mine = (await http.get('/v1/projects').set(auth(u)).expect(200)).body.data.items as { id: string; activity: { isDemo: boolean } }[];
+      assert.ok(mine.some((p) => p.id === pid && p.activity.isDemo === true), 'My Work marks the work as DEMO');
+    } finally { await restoreSafetyBaseline(pool, { byLabel: 'e2e (D-136)' }); }
   });
 });

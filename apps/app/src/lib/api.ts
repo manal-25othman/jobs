@@ -136,7 +136,7 @@ export interface ActivityDetail extends ActivityBase {
 export interface ProjectStatus {
   id: string; title: string; kind: 'platform_activity' | 'personal_project'; status: string;
   activitySpecId: string | null; activitySpecVersion: string | null;
-  activity: { id: string; slug: string; titleAr: string; titleEn: string } | null;
+  activity: { id: string; slug: string; titleAr: string; titleEn: string; isDemo?: boolean } | null;
   attempts: number; createdAt: string; updatedAt: string;
   latestSubmission: null | { id: string; submittedAt: string; evaluationId: string | null; evaluationState: string | null; resultId: string | null; outcome: string | null; decision: string | null; levelChanged: boolean;
     /** ENG-1 P5 (additive): per-skill outcomes of this attempt; empty for legacy results. */
@@ -146,6 +146,8 @@ export interface ProjectStatus {
 /** GET /submissions/:id/evaluation — a pure read, valid in every state; never starts a run. */
 export interface EvaluationView {
   submissionId: string; evaluationId: string | null;
+  /** D-136: the work is on DEMO content (experimental, not professionally approved). */
+  isDemo?: boolean;
   state: 'not_evaluated' | 'queued' | 'running' | 'completed' | 'failed' | 'queued_for_human' | string;
   workStatus: WorkStatus;
   resultId: string | null; outcome: string | null; totalScore: number | null; maxScore: number | null; reason: string | null;

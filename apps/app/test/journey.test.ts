@@ -232,3 +232,12 @@ describe('P4 — corroborating evidence reads as supporting evidence, never as a
     assert.equal(perSkillSummaryAr([sk({ decision: d, evidence: { id: 'e', withdrawn: false } })]).raised, 0);
   });
 });
+
+describe('D-135 — an undetermined overall result is shown as «not yet determined», never as a pass or a fail', () => {
+  test('undetermined → result_undetermined (not needs_more_evidence, not a completed level)', () => {
+    assert.equal(evaluationPageState({ state: 'completed', workStatus: 'feedback_ready', outcome: 'undetermined' }), 'result_undetermined');
+    assert.equal(evaluationPageState({ state: 'completed', workStatus: 'feedback_ready', outcome: 'below_threshold' }), 'needs_more_evidence');
+    assert.equal(evaluationPageState({ state: 'completed', workStatus: 'feedback_ready', outcome: 'passed' }), 'completed_feedback');
+    assert.equal(evaluationPageState({ state: 'queued_for_human', workStatus: 'under_human_review', outcome: null }), 'human_review_pending');
+  });
+});

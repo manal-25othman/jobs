@@ -111,6 +111,31 @@ export function assertReviewTransition(d: ReviewDecision): void {
   }
 }
 
+/**
+ * D-136 (conditional PO approval, Option B) — the DEVELOPMENT-ONLY publication of DEMO pilot content, to test the
+ * graduate journey. A separate rule: `assertReviewTransition` and REVIEW_TRANSITIONS (the real SME workflow) are
+ * unchanged and still refuse it. Never an SME approval, a professional approval or a production publication.
+ * Returns why it is refused, or null.
+ */
+export function pilotDemoPublicationRefusal(p: {
+  readonly nodeEnv: string | undefined; readonly databaseHost: string | null;
+  readonly isDemoFixture: boolean; readonly isPilotContent: boolean; readonly from: ReviewState; readonly reason: string;
+}): string | null {
+  if (p.nodeEnv !== 'development' && p.nodeEnv !== 'test') return `refused outside local development (NODE_ENV=${p.nodeEnv ?? 'unset'}): production and staging never take this exception`;
+  if (!isLocalDatabaseHost(p.databaseHost)) return `refused: the database (${p.databaseHost ?? 'unknown host'}) is not a local development database; staging and production never take this exception`;
+  if (!p.isDemoFixture || !p.isPilotContent) return 'refused: only DEMO-fixture content recorded as a development pilot load can take this exception';
+  if (p.from !== 'curated') return `refused: pilot content is published from curated (found '${p.from}')`;
+  if (!p.reason.trim()) return 'refused: a pilot publication states why';
+  return null;
+}
+
+/** A database on this machine: a loopback host or a local socket. A hosted (staging/production) database never is. */
+export function isLocalDatabaseHost(host: string | null): boolean {
+  if (host === null) return false;
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  return h === 'localhost' || h === '::1' || /^127(\.\d{1,3}){3}$/.test(h) || h.startsWith('/');
+}
+
 /** The product consumes the published layer only. */
 export function consumableByProduct(state: ReviewState): boolean {
   return state === 'published';

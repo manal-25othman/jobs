@@ -110,7 +110,9 @@ export function nextActionFor(p: { projectId: string; workStatus: string; latest
 
 export type EvaluationPageState =
   | 'not_evaluated' | 'evaluation_pending' | 'evaluation_failed' | 'human_review_pending'
-  | 'needs_more_evidence' | 'pending_validation' | 'completed_level' | 'completed_feedback';
+  | 'needs_more_evidence' | 'pending_validation' | 'completed_level' | 'completed_feedback'
+  /** D-135: the overall result cannot be determined (the pass threshold/rule is not decided). Never a pass or a fail. */
+  | 'result_undetermined';
 
 /** Which of the evaluation page's states to show, from the read view only. */
 export function evaluationPageState(v: { state: string; workStatus: string; outcome: string | null }): EvaluationPageState {
@@ -122,7 +124,7 @@ export function evaluationPageState(v: { state: string; workStatus: string; outc
     case 'blocked_by_checks': return 'needs_more_evidence';
     case 'pending_validation': return 'pending_validation';
     case 'level_recorded': return 'completed_level';
-    default: return v.outcome === 'below_threshold' ? 'needs_more_evidence' : 'completed_feedback';
+    default: return v.outcome === 'undetermined' ? 'result_undetermined' : v.outcome === 'below_threshold' ? 'needs_more_evidence' : 'completed_feedback';
   }
 }
 

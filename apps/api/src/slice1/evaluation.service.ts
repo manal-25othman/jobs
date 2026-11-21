@@ -984,8 +984,13 @@ export class EvaluationService {
       return { r, criteria, legacy, decisions, assessed, assessedCriteria, evidence };
     });
 
+    // D-136: whether this work is on DEMO (experimental, not professionally approved) content — shown on every result.
+    // Ownership was established above under RLS; the flag is read for this user's own submission only.
+    const isDemo = await this.db.asService(async (sc) => (await sc.query(
+      `select coalesce(a.is_demo_fixture, false) as demo from submission s join project p on p.id = s.project_id left join activity_spec a on a.id = p.activity_spec_id where s.id = $1`,
+      [submissionId])).rows[0]?.demo === true);
     if (!view) {
-      return { submissionId, evaluationId: null, state: 'not_evaluated' as const, workStatus: 'submitted' as WorkStatus, resultId: null, outcome: null,
+      return { submissionId, evaluationId: null, state: 'not_evaluated' as const, isDemo, workStatus: 'submitted' as WorkStatus, resultId: null, outcome: null,
         totalScore: null, maxScore: null, reason: null, criteria: [], integrityChecks: [], transition: null, verification: null, verificationDecision: null,
         humanReview: null, evaluatedAt: null, activitySpecVersion: null, rubricVersion: null, levelAttribution: null, skills: [], actions: { evaluate: true } };
     }
@@ -1058,6 +1063,7 @@ export class EvaluationService {
       humanReview,
       resultId: r.result_id,
       outcome: r.outcome,
+      isDemo,
       totalScore: r.result_id ? totalFromRows : null,
       maxScore: r.result_id ? (svc.rubric?.max_total !== null && svc.rubric?.max_total !== undefined ? Number(svc.rubric.max_total) : criteria.reduce((a, x) => a + Number(x.max_score), 0)) : null,
       reason: svc.reason,

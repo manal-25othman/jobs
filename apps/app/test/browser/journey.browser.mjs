@@ -13,6 +13,9 @@
  * verifies the signature exactly as in production. No Supabase project is contacted.
  *
  * B14 covers the Junior Frontend v2 candidate's classification labels (learner + admin), development only.
+ * B15 is the D-135/D-136 development pilot: the v2 candidate loaded and published as DEMO pilot content by an authorized
+ * (TEST FIXTURE) Product Owner, then one complete graduate journey: role → activities → Task B → submission → human
+ * review → an undetermined, experimental result with per-skill feedback. Can run alone: --only B15.
  *
  * Every scenario checks what the graduate SEES and, where it matters, what the DATABASE holds (no second
  * evaluation, explicit file mapping, no level).
@@ -69,6 +72,7 @@ const { loadCandidate } = apiRequire('./dist/src/career-data/candidate');
 const { roleSkillVisibility } = apiRequire('./dist/src/career-data/publication-safety');
 const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
+const { loadPilotCandidate, publishPilotDemo, usePilotPerSkillPolicy } = apiRequire('./dist/src/career-data/pilot-loader');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const one = async (sql, p = []) => (await pool.query(sql, p)).rows[0];
@@ -338,6 +342,110 @@ async function scenarioB14(browser) {
     }
     check('B14i', 'nothing stays in effect: no active classification for the role', await count(`select count(*)::int n from skill_classification_set where target_role_id = $1 and activation <> 'inactive'`, [jfeRole]) === 0);
   }
+}
+
+/* ───────────────────────────── B15 (can run alone: --only B15) ───────────────────────────── */
+
+async function scenarioB15(browser) {
+  // B15 · D-135/D-136 DEVELOPMENT PILOT of the Junior Frontend v2 candidate. Loaded as DEMO pilot content (undecided values
+  // empty + TBD), published by an authorized TEST FIXTURE Product Owner (local development only; never an SME approval),
+  // with the per-skill pilot policy on for the journey and the D-118 safety baseline restored afterwards.
+  const LABEL = 'محتوى تجريبي غير معتمد مهنيًا';
+  const report = await loadPilotCandidate(pool, { candidateDir: join(ROOT, 'data/candidates/trk_frontend_junior_v2'), canonicalRoot: join(ROOT, 'data/career'),
+    byLabel: 'UI acceptance (D-135 pilot)', reason: 'B15 browser journey', production: false });
+  const po = await newUser();
+  await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'product_owner', 'UI acceptance (TEST FIXTURE Product Owner — not a governance decision)')`, [po.id]);
+  await publishPilotDemo(pool, { operatorId: po.id, reason: 'B15 browser journey', nodeEnv: 'test', databaseUrl: process.env.DATABASE_URL });
+  check('B15a', 'the pilot is published as DEMO content by the authorized Product Owner operation, with no SME approval and undecided values still empty',
+    await count(`select count(*)::int n from activity_spec where target_role_id = $1 and status = 'published' and is_demo_fixture and sme_approved_by is null`, [report.role.id]) === 3
+    && await count(`select count(*)::int n from rubric_version rv join activity_spec a on a.id = rv.activity_spec_id where a.target_role_id = $1 and rv.status = 'published' and rv.pass_threshold is null and rv.values_approved_at is null`, [report.role.id]) === 3
+    && await count(`select count(*)::int n from review_log where role_performed = 'sme' and entity_id in (select id from activity_spec where target_role_id = $1)`, [report.role.id]) === 0);
+  await usePilotPerSkillPolicy(pool, { byLabel: 'UI acceptance (D-136)', production: false });
+  try {
+    const u = await newUser(); const page = await pageFor(browser, u);
+    // Role selection, in the UI.
+    await page.goto(`${APP}/goal`); await page.getByRole('heading', { name: 'هدفك المهني' }).waitFor();
+    await page.locator(`input[type=radio][value="${report.role.id}"]`).waitFor();
+    const goalText = await bodyText(page);
+    await page.locator(`input[type=radio][value="${report.role.id}"]`).check();
+    await page.getByRole('button', { name: /هذا هو هدفي المهني/ }).click();
+    await page.waitForURL(`${APP}/activities`); await page.locator('article').first().waitFor();
+    check('B15b', 'the pilot role is offered on the goal page as an unapproved internal pilot', /تجربة داخلية \(نسخة ثانية غير معتمدة\)/.test(goalText));
+    const cards = page.locator('article');
+    const cardTexts = await cards.allInnerTexts();
+    check('B15c', 'the internal graduate sees all three pilot activities, each marked «محتوى تجريبي غير معتمد مهنيًا»',
+      cardTexts.length === 3 && cardTexts.every((t) => t.includes(LABEL)) && await page.locator('[data-testid="experimental-chip"]').count() === 3, `${cardTexts.length} cards`);
+    await shot(page, 'B15-pilot-activities-desktop');
+    // Every activity page carries the notice.
+    let allDetails = true;
+    for (const a of report.activities) {
+      await page.goto(`${APP}/activities/${a.activityId}`); await page.getByRole('heading', { name: 'كيف يُقيَّم عملك' }).waitFor();
+      allDetails = allDetails && await page.locator('[data-testid="experimental-notice"]').count() === 1 && (await bodyText(page)).includes(LABEL);
+    }
+    check('B15d', 'each of the three activity pages shows the experimental notice', allDetails);
+    // Task B: start, deliver, submit.
+    const taskB = report.activities.find((a) => a.code === 'act_fe_change_request');
+    await page.goto(`${APP}/activities/${taskB.activityId}`); await page.getByRole('heading', { name: 'كيف يُقيَّم عملك' }).waitFor();
+    await shot(page, 'B15-pilot-activity-detail-desktop');
+    await page.getByRole('button', { name: 'ابدئي النشاط' }).click();
+    await page.waitForURL(/\/work\//); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
+    check('B15e', 'the workspace shows the experimental notice', (await bodyText(page)).includes(LABEL) && await page.locator('[data-testid="experimental-notice"]').count() === 1);
+    await uploadInto(page, 'file.app_js', 'app.js', 'const state = { tasks: [], filters: { status: "all", owner: "all" } };');
+    await uploadInto(page, 'file.index_html', 'index.html', '<main><ul id="tasks"></ul></main>');
+    await page.locator(fileInput('note.decision')).fill('أضفتُ الفلتر الثاني إلى الحالة نفسها بدل نسخ القائمة، ليبقى للبيانات مصدر واحد.');
+    await page.locator(fileInput('answer.explanation')).fill('يقرأ التغيير الفلترين معًا، وتظهر القائمة الفارغة رسالةً لا خطأً.');
+    await page.locator(fileInput('answer.component_explained')).fill('المكوّن يستقبل القائمة المفلترة ويعرض العناصر أو حالة الفراغ.');
+    await answerQuestionnaire(page);
+    await shot(page, 'B15-pilot-workspace-ready-desktop');
+    await page.getByRole('button', { name: 'تسليم للتقييم' }).click();
+    await page.waitForURL(/\/evaluation\?submission=/); await page.getByText('عملك قيد المراجعة البشرية').waitFor();
+    const sid = new URL(page.url()).searchParams.get('submission');
+    check('B15f', 'submitted and awaiting human review; the pending result already carries the experimental notice', (await bodyText(page)).includes(LABEL));
+    // Human review by a named reviewer (every criterion at its top level, to prove nothing becomes a pass).
+    const reviewer = await newUser();
+    await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'UI acceptance operator (D-136 pilot)')`, [reviewer.id]);
+    const evId = (await one('select id from evaluation where submission_id = $1', [sid])).id;
+    const items = (await pool.query(`select q.id, q.criterion_key, (select l.level_key from rubric_criterion_level l where l.criterion_id = q.criterion_id order by l.score desc limit 1) as top
+      from review_queue_item q where q.evaluation_id = $1 order by q.criterion_key`, [evId])).rows;
+    for (const it of items) {
+      await apiCall(reviewer, 'POST', `/review/queue/${it.id}/assign`, {});
+      await apiCall(reviewer, 'GET', `/review/items/${it.id}`);
+      await apiCall(reviewer, 'POST', `/review/items/${it.id}/decision`, { levelKey: it.top, rationale: `لاحظتُ في الملفات المسلّمة ما يصفه المعيار ${it.criterion_key}.` });
+    }
+    await page.reload(); await page.locator('[data-testid="result-undetermined"]').waitFor();
+    const result = await bodyText(page);
+    check('B15g', 'the overall result reads «لم يُحدَّد بعد» — no pass, no fail, no level change — under the experimental notice',
+      /النتيجة الإجمالية: لم يُحدَّد بعد/.test(result) && result.includes(LABEL) && !/اجتزتِ|نجحتِ|رسبتِ|أخفقتِ|فشلتِ|راسب|تغيّر مستوى المهارة/.test(result));
+    const outcomes = await page.locator('[data-testid="skill-outcome"]').allInnerTexts();
+    const levels = await page.locator('[data-testid="skill-level"]').allInnerTexts();
+    check('B15h', 'per-skill feedback: every assessed skill reads «not yet decided» (threshold awaiting expert approval), none raised',
+      outcomes.length > 0 && outcomes.every((t) => /لم تُحسم — بانتظار اعتماد الخبراء/.test(t)) && !levels.some((t) => /ارتفع|←/.test(t)), outcomes.join(' | '));
+    check('B15i', "the reviewer's written observations are shown criterion by criterion", items.length > 0 && result.includes('لاحظتُ في الملفات المسلّمة'));
+    check('B15j', 'no internal value is shown (weights, thresholds, TBD, null, model versions)', !/weight|threshold|TBD|null|per_skill@|عتبة/i.test(result));
+    check('B15k', 'the database holds an undetermined result with no evidence, no level, no readiness evaluation and no claim',
+      (await one(`select r.outcome::text as o from evaluation_result r join evaluation e on e.id = r.evaluation_id where e.submission_id = $1 and not exists (select 1 from evaluation_result n where n.supersedes_result_id = r.id)`, [sid])).o === 'undetermined'
+      && await count('select count(*)::int n from evidence where user_id = $1', [u.id]) === 0
+      && await count(`select count(*)::int n from skill_claim where user_id = $1 and state::text in ('practiced','demonstrated','verified')`, [u.id]) === 0
+      && await count('select count(*)::int n from readiness_evaluation where user_id = $1', [u.id]) === 0
+      && await count('select count(*)::int n from claim_draft_event where user_id = $1', [u.id]) === 0);
+    await shot(page, 'B15-pilot-result-undetermined-desktop');
+    await page.setViewportSize({ width: 375, height: 800 }); await page.reload(); await page.locator('[data-testid="result-undetermined"]').waitFor();
+    check('B15l', 'the experimental result is readable at 375 px (RTL, no horizontal overflow)', (await a11yBasics(page)).length === 0, (await a11yBasics(page)).join('; '));
+    await shot(page, 'B15-pilot-result-undetermined-mobile');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${APP}/work`); await page.locator('article').first().waitFor();
+    check('B15m', 'My Work marks the pilot work as experimental', (await page.locator('article').first().innerText()).includes(LABEL));
+    await page.context().close();
+    // Tenant isolation: another graduate cannot open this result.
+    const other = await newUser(); const op = await pageFor(browser, other);
+    await op.goto(`${APP}/evaluation?submission=${sid}`); await op.getByText('لا نجد هذا التسليم ضمن أعمالك').waitFor();
+    check('B15n', "another graduate cannot see this graduate's pilot result", !(await bodyText(op)).includes('لاحظتُ في الملفات المسلّمة'));
+    await op.context().close();
+  } finally {
+    await useSafetyBaseline();
+  }
+  check('B15o', 'afterwards the D-118 safety baseline is in effect again', await count(`select count(*)::int n from verification_policy where key = 'default' and activation = 'legacy_baseline' and version = 2`) === 1
+    && await count(`select count(*)::int n from verification_policy where key = 'default' and activation <> 'inactive'`) === 1);
 }
 
 /* ───────────────────────────── scenarios ───────────────────────────── */
@@ -629,6 +737,7 @@ async function run(browser) {
   check('B13j', 'the per-skill policy is inactive again after the scenarios', await count(`select count(*)::int n from verification_policy where assessment_scope = 'per_skill' and activation <> 'inactive'`) === 0);
 
   await scenarioB14(browser);
+  await scenarioB15(browser);
 
   // B8 · unauthorized navigation: other users' work, unpublished activities, unknown ids; the old URL redirects.
   {
@@ -697,7 +806,7 @@ try {
   next = await startApp();
   const { chromium } = appRequire('playwright-core');
   browser = await chromium.launch({ executablePath: CHROME });
-  if (ONLY === 'B14') await scenarioB14(browser); else await run(browser);
+  if (ONLY === 'B14') await scenarioB14(browser); else if (ONLY === 'B15') await scenarioB15(browser); else await run(browser);
 } catch (e) {
   check('HARNESS', 'the run completed', false, (e && e.stack) || String(e));
   for (const p of openPages) { if (!p.isClosed()) await p.screenshot({ path: join(SHOTS, `FAILURE-${Date.now()}.png`), fullPage: true }).catch(() => undefined); }

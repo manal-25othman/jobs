@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assertReviewTransition, assertSynonymWellFormed, normalizeMatchKey, matchKeySimilarity, nearDuplicateCandidates, isExactDuplicate,
   evidencePathStatus, minimumEvidenceCount, verifiedPathStatus, assertPresentationRuleSane, assertLearningResourceHonest, layerOf, consumableByProduct,
-  demoContentAllowedInProduction, integrityClassificationOf, DomainError, MissingPrerequisite, IllegalTransition,
+  demoContentAllowedInProduction, integrityClassificationOf, DomainError, MissingPrerequisite, IllegalTransition, pilotDemoPublicationRefusal,
 } from './index.js';
 
 const base = { decidedBy: 'sme-1', rolePerformed: 'sme' as const, reason: 'checked', isDemoFixture: false, draftingAid: 'none' as const, production: false };
@@ -96,5 +96,29 @@ describe('evidence paths, verified path, presentation rules, resources', () => {
     assert.doesNotThrow(() => assertLearningResourceHonest({ url: null, qualityStatus: 'unverified', practiceActivityRef: 'act' }));
     assert.throws(() => assertLearningResourceHonest({ url: null, qualityStatus: 'approved', practiceActivityRef: 'act' }), DomainError);
     assert.throws(() => assertLearningResourceHonest({ url: null, qualityStatus: 'unverified', practiceActivityRef: null }), MissingPrerequisite);
+  });
+});
+
+describe('D-136 — development-only DEMO publication of pilot content (a separate rule)', () => {
+  const ok = { nodeEnv: 'development', databaseHost: '127.0.0.1', isDemoFixture: true, isPilotContent: true, from: 'curated' as const, reason: 'internal pilot' };
+  test('accepted only for curated DEMO pilot content, in local development, with a reason', () => {
+    assert.equal(pilotDemoPublicationRefusal(ok), null);
+    assert.equal(pilotDemoPublicationRefusal({ ...ok, nodeEnv: 'test', databaseHost: 'localhost' }), null);
+  });
+  test('production and staging are refused: NODE_ENV production/unset, or any non-local database host', () => {
+    assert.match(pilotDemoPublicationRefusal({ ...ok, nodeEnv: 'production' })!, /outside local development/);
+    assert.match(pilotDemoPublicationRefusal({ ...ok, nodeEnv: undefined })!, /outside local development/);
+    for (const h of ['db.abcd.supabase.co', 'staging.internal', '10.0.0.5', null]) assert.match(pilotDemoPublicationRefusal({ ...ok, databaseHost: h })!, /not a local development database/);
+  });
+  test('real content, non-pilot demo content, other states and an empty reason are refused', () => {
+    assert.match(pilotDemoPublicationRefusal({ ...ok, isDemoFixture: false })!, /only DEMO-fixture/);
+    assert.match(pilotDemoPublicationRefusal({ ...ok, isPilotContent: false })!, /only DEMO-fixture/);
+    assert.match(pilotDemoPublicationRefusal({ ...ok, from: 'draft' })!, /from curated/);
+    assert.match(pilotDemoPublicationRefusal({ ...ok, reason: ' ' })!, /states why/);
+  });
+  test('the real SME workflow is unchanged: curated → published is still refused for every record', () => {
+    for (const isDemoFixture of [true, false]) {
+      assert.throws(() => assertReviewTransition({ from: 'curated', to: 'published', decidedBy: null, rolePerformed: 'product_owner', reason: 'r', isDemoFixture, draftingAid: 'none', production: false }), IllegalTransition);
+    }
   });
 });

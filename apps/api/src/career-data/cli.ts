@@ -15,6 +15,7 @@
  *   claims-reground --operator <uuid> --reason "<why>"   Phase 9: execute (product_owner grant required); reconciliation must pass or nothing changes
  *   claims-public-freeze --operator <uuid> --reason "<why>"   Phase 9: pre-deployment — close direct public paths until re-grounded
  *   pilot-load [dir] --by <name> --reason "<why>"   D-135: DEVELOPMENT ONLY — load the v2 candidate as DEMO pilot content (undecided values stay empty + TBD); refused in production
+ *   pilot-publish --operator <uuid> --reason "<why>"   D-136: LOCAL DEVELOPMENT ONLY — the authorized Product Owner publishes the loaded DEMO pilot content for internal testing (never production/staging; not SME approval)
  *   pilot-policy <per-skill|baseline> --by <name>   D-135: DEVELOPMENT ONLY — per-skill feedback for the pilot, or restore the D-118 safety baseline
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
  */
@@ -28,7 +29,7 @@ import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
 import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
-import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, PilotLoadError } from './pilot-loader';
+import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PilotLoadError } from './pilot-loader';
 import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims, cliRegroundAssets, cliGroundingStanding, cliFreezePublicGrounding } from '../configuration/config-admin.service';
 import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
@@ -72,6 +73,16 @@ export async function main(argv: string[], root: string): Promise<number> {
         console.log(`  written: ${Object.entries(r.written).map(([k, v]) => `${k}=${v}`).join(' ')}`);
         return 0;
       } catch (e) { if (e instanceof PilotLoadError) { console.error(e.message); return 1; } throw e; }
+    }
+    if (cmd === 'pilot-publish') {
+      const operatorId = arg(argv, '--operator'); const reason = arg(argv, '--reason');
+      if (!operatorId || !reason) { console.error('pilot-publish needs --operator <uuid with an active product_owner grant> and --reason "<why>"'); return 2; }
+      try {
+        const r = await publishPilotDemo(pool, { operatorId, reason, nodeEnv: process.env['NODE_ENV'], databaseUrl: url });
+        console.log(`D-136 development pilot publication by ${r.operator} — LOCAL DEVELOPMENT ONLY, DEMO content, not SME approved`);
+        console.log(`  published: ${r.published.length} (activity/rubric rows) · already published: ${r.alreadyPublished}`);
+        return 0;
+      } catch (e) { if (e instanceof PilotLoadError || (e as Error).name === 'MissingPrerequisite') { console.error((e as Error).message); return 1; } throw e; }
     }
     if (cmd === 'pilot-policy') {
       const by = arg(argv, '--by'); if (!by) { console.error('pilot-policy needs --by <name>'); return 2; }

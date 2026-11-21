@@ -7,6 +7,7 @@ import { useSession, Loading, ErrorBanner, EvidenceState } from '../../component
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { CompanionNudge } from '../../components/CompanionNudge';
+import { ExperimentalNotice } from '../../components/ExperimentalNotice';
 import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
   hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr } from '../../lib/journey';
 
@@ -151,6 +152,17 @@ function EvaluationInner() {
       <JourneyNav current={null} />
       <h1>نتيجة التقييم</h1>
       {error ? <ErrorBanner message={error} /> : null}
+      {view.isDemo ? <ExperimentalNotice kind="result" /> : null}
+
+      {page === 'result_undetermined' ? (
+        <section className="card" aria-labelledby="undetermined" data-testid="result-undetermined">
+          <h2 id="undetermined">النتيجة الإجمالية: لم يُحدَّد بعد</h2>
+          <p className="body-sm" style={{ margin: 0 }}>
+            لم يُحسم بعدُ حدّ الاجتياز ولا قاعدته لهذا النشاط، فلا تُعلَن نتيجة إجمالية: لا اجتياز ولا عدم اجتياز.
+            ملاحظات المراجِع على كل معيار أدناه للتعلّم فقط، ولم يتغيّر مستوى أي مهارة.
+          </p>
+        </section>
+      ) : null}
 
       {page === 'not_evaluated' ? (
         <div className="next-action">
@@ -206,7 +218,7 @@ function EvaluationInner() {
         </section>
       ) : null}
 
-      {perSkill && perSkillSummary && (page === 'pending_validation' || page === 'completed_level' || page === 'completed_feedback') ? (
+      {perSkill && perSkillSummary && (page === 'pending_validation' || page === 'completed_level' || page === 'completed_feedback' || page === 'result_undetermined') ? (
         <section className="card" aria-labelledby="per-skill-summary">
           <h2 id="per-skill-summary">{perSkillSummary.titleAr}</h2>
           <p className="body-sm" style={{ margin: 0 }}>{perSkillSummary.bodyAr}</p>

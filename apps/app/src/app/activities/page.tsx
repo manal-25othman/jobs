@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, type ActivityCatalogue } from '../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
+import { ExperimentalChip } from '../../components/ExperimentalNotice';
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { assessmentCopy, chipClass, workStatusCopy, AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR } from '../../lib/journey';
@@ -77,6 +78,7 @@ export default function ActivitiesPage() {
             <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <h2 id={`act-${a.id}`} className="grow">{a.titleAr}</h2>
               <span className={chipClass(copy.tone)}>{copy.chipAr}</span>
+              {a.isDemo ? <ExperimentalChip /> : null}
             </div>
             {a.objectiveAr ? <p className="body-sm" style={{ margin: 0 }}>{a.objectiveAr}</p> : null}
             <p className="body-sm muted" style={{ margin: 0 }}>

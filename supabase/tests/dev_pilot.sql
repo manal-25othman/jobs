@@ -95,5 +95,37 @@ do $$ begin
   raise notice 'PASS  0035: the pilot-load ledger is service-only (no anon or authenticated read or write)';
 end $$;
 
+-- ─────────────────────── 0036 (D-136): development-only DEMO publication of PILOT content ───────────────────────
+begin;
+select set_config('naqla.pilot_content_load', 'on', true);
+insert into pilot_content_load (pack_id, pack_version, target_role_id, loaded_by_label, reason, files, written)
+  values ('dp', '1', 'a1000000-0000-4000-8000-000000000041', 'proof', 'D-136 proof', '[]', '{}');
+commit;
+insert into app_user (id, display_name) values ('a1000000-0000-4000-8000-000000000061', 'proof PO (fixture)'), ('a1000000-0000-4000-8000-000000000062', 'no grant (fixture)');
+insert into reviewer_grant (user_id, role_performed, granted_by) values ('a1000000-0000-4000-8000-000000000061', 'product_owner', 'D-136 proof fixture');
+insert into activity_spec (id, slug, version, status, title_ar, ai_usage_mode, spec, is_demo_fixture, target_role_id) values
+  ('a1000000-0000-4000-8000-000000000051', 'dp-pilot-act', '1.0.0', 'curated', 'نشاط', 'ai_assisted', '{}'::jsonb, true, 'a1000000-0000-4000-8000-000000000041'),
+  ('a1000000-0000-4000-8000-000000000052', 'dp-other-demo', '1.0.0', 'curated', 'نشاط', 'ai_assisted', '{}'::jsonb, true, null),
+  ('a1000000-0000-4000-8000-000000000053', 'dp-real-curated', '1.0.0', 'curated', 'نشاط', 'ai_assisted', '{}'::jsonb, false, null);
+\set PUB 'update activity_spec set status = ''published'' where id = ''a1000000-0000-4000-8000-000000000051'''
+create or replace function dp_opt(production text, operator text) returns text language sql as $$
+  select format($f$select set_config('naqla.pilot_demo_publication', 'on', true), set_config('naqla.pilot_publication_operator', %L, true), set_config('naqla.production', %L, true)$f$, operator, production)
+$$;
+
+select dp_must_fail(null, :'PUB', '0036: pilot content is not published without the explicit opt-in (the generic demo shortcut is closed for pilot rows)', 'only by the authorized Product Owner pilot operation');
+select dp_must_fail(dp_opt('on', 'a1000000-0000-4000-8000-000000000061'), :'PUB', '0036: pilot content is never published in production, even with the opt-in and a grant', 'never published in production');
+select dp_must_fail(dp_opt('', 'a1000000-0000-4000-8000-000000000062'), :'PUB', '0036: the operator must hold an active product_owner grant', 'active product_owner grant');
+select dp_must_fail(dp_opt('', ''), :'PUB', '0036: an operator must be named', 'active product_owner grant');
+select dp_must_fail($$update platform_deployment set demo_content_visible = false$$ || '; ' || dp_opt('', 'a1000000-0000-4000-8000-000000000061'), :'PUB',
+  '0036: refused where the deployment does not show demo content', 'does not show demo content');
+select dp_ok($$select set_config('naqla.config_actor', 'proof', true), set_config('naqla.config_reason', 'D-136 proof: a development deployment that shows demo content', true); update platform_deployment set demo_content_visible = true$$ || '; ' || dp_opt('', 'a1000000-0000-4000-8000-000000000061'), :'PUB', '0036: the authorized Product Owner operation (opt-in, grant, not production) publishes curated DEMO pilot content');
+select dp_must_fail(null, $$update activity_spec set sme_approved_by = gen_random_uuid(), sme_approved_at = now() where id = 'a1000000-0000-4000-8000-000000000051'$$,
+  '0036: a pilot row never carries an SME approval', 'never carries an SME approval');
+select dp_ok(null, $$update activity_spec set status = 'published' where id = 'a1000000-0000-4000-8000-000000000052'$$,
+  '0036: non-pilot content keeps the 0007 rules exactly (unchanged; the review command still never takes this shortcut)');
+select dp_must_fail(dp_opt('', 'a1000000-0000-4000-8000-000000000061'), $$update activity_spec set status = 'published' where id = 'a1000000-0000-4000-8000-000000000053'$$,
+  '0036: real (non-demo) content still publishes only after SME approval, even with the pilot opt-in and a PO grant (0007, unchanged)', 'only an approved record');
+drop function dp_opt(text, text);
+
 -- Fixtures stay (content rows are never deleted); they are demo/draft and named dp-*.
 drop function dp_must_fail(text, text, text, text); drop function dp_ok(text, text, text); drop function dp_crit(text, text, text); drop function dp_load(text);

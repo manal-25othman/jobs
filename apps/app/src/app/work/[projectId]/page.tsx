@@ -8,6 +8,7 @@ import {
   type ActivityDetail, type ProjectStatus, type EvidenceItem, type DisclosureQuestionnaireView,
 } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../../components/Session';
+import { ExperimentalNotice } from '../../../components/ExperimentalNotice';
 import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import { DisclosureField } from '../../../components/DisclosureField';
@@ -179,6 +180,7 @@ export default function WorkspacePage() {
       <JourneyNav current="/work" />
       <Crumbs items={[{ label: 'أعمالي', href: '/work' }, { label: activity.titleAr }]} />
       <h1>{activity.titleAr}</h1>
+      {activity.isDemo ? <ExperimentalNotice kind="activity" /> : null}
       <p className="body-sm muted">
         {st ? <span className={chipClass(st.tone)}>{st.labelAr}</span> : null}{' '}
         <span className={chipClass(copy.tone)}>{copy.chipAr}</span>{' '}

@@ -9,16 +9,19 @@
  *     criterion weights, skill thresholds, pass thresholds and durations. No number is invented;
  *   - one immutable ledger row (`pilot_content_load`) with the source file hashes, who and why.
  * Every row is a DEMO fixture: the database never shows demo content in production, refuses to publish it there, and
- * refuses to let it carry an approved value. Activities and rubrics stay DRAFT: the governed review path has no way to
- * publish a demo fixture (publication needs a named SME's approval, which a demo fixture never receives), and this loader
- * does not go around it. Making draft pilot activities usable by internal test accounts is a separate PO decision.
+ * refuses to let it carry an approved value. Activities and rubrics are loaded DRAFT: the governed review path never
+ * publishes a demo fixture (publication needs a named SME's approval). Making them usable for internal testing is the
+ * separate, logged Product Owner operation `publishPilotDemo` (D-136, local development only) below.
  * It never writes skills (the existing ones are reused), tasks, learning resources, classifications, pack constraints,
  * readiness rules or policies, and never touches the v1 demo rows.
  */
 import type { Pool } from 'pg';
-import { integrityClassificationOf, type IntegrityCheckType } from '@naqla/domain';
+import { integrityClassificationOf, pilotDemoPublicationRefusal, type IntegrityCheckType, type ReviewState } from '@naqla/domain';
 import { loadCandidate, validateCandidate } from './candidate';
 import { packFormatVersion, type PackCheckDef } from './pack-schema';
+import { reviewTransition } from './review';
+import { assertAuthorizedOperator } from '../configuration/config-admin.service';
+import { emitAuditEvent } from '../infra/audit';
 
 export const PILOT_ROLE_SUFFIX = '-v2-pilot';
 export const PILOT_POLICY_DESCRIPTION = 'D-135 DEVELOPMENT PILOT ONLY: per-skill feedback for internal test accounts; unapproved draft; never production.';
@@ -208,4 +211,69 @@ export async function restoreSafetyBaseline(pool: Pool, opts: { byLabel: string 
     await c.query(`update verification_policy set activation = 'legacy_baseline' where key = 'default' and version = 2 and baseline_of is not null and activation <> 'legacy_baseline'`);
     await c.query('commit');
   } catch (e) { await c.query('rollback').catch(() => undefined); throw e; } finally { c.release(); }
+}
+
+/**
+ * D-136 (conditional PO approval, Option B): the DEVELOPMENT-ONLY publication of every loaded pilot activity and rubric,
+ * solely to test the graduate journey. NOT a professional approval, an SME sign-off or a production publication.
+ *   - an authorized Product Owner operation: the operator holds an active product_owner grant (checked here AND by the
+ *     database trigger of 0036, which also refuses production and requires the transaction-local opt-in);
+ *   - local development only: NODE_ENV development/test and a database on this machine (staging and production refuse);
+ *   - pilot DEMO content only (rows of a role in the pilot-load ledger); the real SME workflow is not used or changed:
+ *     draft → curated is the ordinary authoring step; curated → published is this separate, logged exception;
+ *   - logged twice (review_log as product_owner with the D-136 wording, and an audit event); no SME approval field is
+ *     written (the database refuses one on pilot rows).
+ */
+export async function publishPilotDemo(pool: Pool, opts: {
+  readonly operatorId: string; readonly reason: string; readonly nodeEnv: string | undefined; readonly databaseUrl: string;
+}): Promise<{ operator: string; published: { kind: 'activity_spec' | 'rubric_version'; id: string }[]; alreadyPublished: number }> {
+  const host = databaseHost(opts.databaseUrl);
+  const envRefusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: true, isPilotContent: true, from: 'curated', reason: opts.reason });
+  if (envRefusal) throw new PilotLoadError(envRefusal);
+  const operator = await withClient(pool, (c) => assertAuthorizedOperator(c, opts.operatorId));
+  const rows = (await pool.query(`select 'activity_spec' as kind, a.id, a.status::text as status, a.is_demo_fixture from activity_spec a join pilot_content_load l on l.target_role_id = a.target_role_id
+      union all select 'rubric_version', rv.id, rv.status::text, rv.is_demo_fixture from rubric_version rv join activity_spec a on a.id = rv.activity_spec_id join pilot_content_load l on l.target_role_id = a.target_role_id
+      order by 1, 2`)).rows as { kind: 'activity_spec' | 'rubric_version'; id: string; status: ReviewState; is_demo_fixture: boolean }[];
+  if (rows.length === 0) throw new PilotLoadError('no pilot content is loaded (run pilot-load first)');
+  const published: { kind: 'activity_spec' | 'rubric_version'; id: string }[] = []; let already = 0;
+  // Activities first: a rubric is bound to its activity version when it is published.
+  for (const r of [...rows.filter((x) => x.kind === 'activity_spec'), ...rows.filter((x) => x.kind === 'rubric_version')]) {
+    if (r.status === 'published') { already++; continue; }
+    if (r.status === 'draft') {
+      await reviewTransition(pool, { entityKind: r.kind, entityId: r.id, to: 'curated', decidedBy: null, decidedByLabel: operator, rolePerformed: 'content_author',
+        reason: `D-136 development pilot: DEMO pilot content complete for internal testing (${opts.reason})`, production: false });
+    }
+    const refusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: r.is_demo_fixture, isPilotContent: true, from: 'curated', reason: opts.reason });
+    if (refusal) throw new PilotLoadError(`${r.kind} ${r.id}: ${refusal}`);
+    await withClient(pool, async (c) => {
+      await c.query('begin');
+      try {
+        await c.query(`select set_config('naqla.pilot_demo_publication', 'on', true), set_config('naqla.pilot_publication_operator', $1, true)`, [opts.operatorId]);
+        const u = await c.query(`update ${r.kind} set status = 'published' where id = $1 and status = 'curated' and is_demo_fixture returning id`, [r.id]);
+        if (u.rowCount !== 1) throw new PilotLoadError(`${r.kind} ${r.id} is not curated DEMO pilot content`);
+        const why = `D-136 DEVELOPMENT PILOT DEMO PUBLICATION — local development only; not an SME approval, not a professional approval, not a production publication (${opts.reason})`;
+        await c.query(`insert into review_log (entity_kind, entity_id, from_status, to_status, decided_by, decided_by_label, role_performed, reason)
+                       values ($1, $2, 'curated', 'published', $3, $4, 'product_owner', $5)`, [r.kind, r.id, opts.operatorId, operator, why]);
+        await emitAuditEvent(c, { eventType: 'pilot.demo_published', userId: null, actorKind: 'user', actorId: opts.operatorId, rolePerformed: 'product_owner',
+          subjectTable: r.kind, subjectId: r.id, reason: why, payload: { decision: 'D-136', environment: 'local development' } });
+        await c.query('commit');
+      } catch (e) { await c.query('rollback').catch(() => undefined); throw e; }
+    });
+    published.push({ kind: r.kind, id: r.id });
+  }
+  return { operator, published, alreadyPublished: already };
+}
+
+async function withClient<T>(pool: Pool, fn: (c: import('pg').PoolClient) => Promise<T>): Promise<T> {
+  const c = await pool.connect();
+  try { return await fn(c); } finally { c.release(); }
+}
+
+/** The host a connection string points at (a socket directory for a host-less local URL). */
+export function databaseHost(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname) return u.hostname;
+    return u.searchParams.get('host') ?? '/var/run/postgresql';
+  } catch { return null; }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, type ProjectStatus, type ActivityCatalogue, type ActivityDetail, type ActivitySkill } from '../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../components/Session';
+import { ExperimentalChip } from '../../components/ExperimentalNotice';
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { workStatusCopy, chipClass, nextActionFor, isAssessedWork, perSkillWorkLineAr, workSkillChip } from '../../lib/journey';
@@ -85,6 +86,7 @@ export default function MyWorkPage() {
             <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <h2 id={`w-${p.id}`} className="grow">{title}</h2>
               <span className={chipClass(st.tone)}>{st.labelAr}</span>
+              {p.activity?.isDemo ? <ExperimentalChip /> : null}
             </div>
             {p.kind === 'personal_project' ? <p className="micro muted" style={{ margin: 0 }}>مشروع شخصي</p> : null}
             {skills.length ? (

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api, isNotFound, type ActivityDetail, type Project } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../../components/Session';
+import { ExperimentalNotice } from '../../../components/ExperimentalNotice';
 import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import {
@@ -77,6 +78,7 @@ export default function ActivityDetailPage() {
         <span className={chipClass(copy.tone)}>{copy.chipAr}</span>
       </p>
       {error ? <ErrorBanner message={error} /> : null}
+      {a.isDemo ? <ExperimentalNotice kind="activity" /> : null}
       {a.isDemo ? (
         <div className="banner banner--attention" role="note">
           <span className="grow">نشاط تجريبي غير مراجَع: للتعرّف على طريقة العمل فقط. لا يرفع مستوى أي مهارة.</span>

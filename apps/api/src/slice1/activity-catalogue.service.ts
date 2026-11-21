@@ -150,7 +150,7 @@ export class ActivityCatalogueService {
     return this.db.asUser(userId, async (c) => {
       const { rows } = await c.query(
         `select p.id, p.title, p.kind, p.status, p.activity_spec_id, p.activity_spec_version, p.created_at, p.updated_at,
-                a.slug as activity_slug, a.title_ar as activity_title_ar, a.title_en as activity_title_en,
+                a.slug as activity_slug, a.title_ar as activity_title_ar, a.title_en as activity_title_en, a.is_demo_fixture as activity_is_demo,
                 (select count(*)::int from submission s where s.project_id = p.id) as attempts,
                 ls.id as submission_id, ls.created_at as submitted_at, ev.id as evaluation_id, ev.state as evaluation_state,
                 er.id as result_id, er.outcome
@@ -186,7 +186,7 @@ export class ActivityCatalogueService {
         const levelChanged = ds.some(moves);
         return {
           id: r.id, title: r.title, kind: r.kind, status: r.status, activitySpecId: r.activity_spec_id, activitySpecVersion: r.activity_spec_version,
-          activity: r.activity_spec_id ? { id: r.activity_spec_id, slug: r.activity_slug, titleAr: r.activity_title_ar, titleEn: r.activity_title_en } : null,
+          activity: r.activity_spec_id ? { id: r.activity_spec_id, slug: r.activity_slug, titleAr: r.activity_title_ar, titleEn: r.activity_title_en, isDemo: r.activity_is_demo === true } : null,
           attempts: Number(r.attempts), createdAt: r.created_at, updatedAt: r.updated_at,
           latestSubmission: r.submission_id ? { id: r.submission_id, submittedAt: r.submitted_at, evaluationId: r.evaluation_id, evaluationState: r.evaluation_state,
             resultId: r.result_id, outcome: r.outcome, decision, levelChanged, skills } : null,
