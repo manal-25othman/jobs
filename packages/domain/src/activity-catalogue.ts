@@ -60,6 +60,8 @@ export interface ActivityAssessmentModeResult {
   readonly evaluable: boolean;
   /** Whether finished work on this activity can, under the D-118 rule, support a level. True only for `human_reviewed`. */
   readonly canSupportLevel: boolean;
+  /** Informational (UX): a named reviewer decides at least one criterion. Decides nothing; `mode` is unchanged by it. */
+  readonly hasHumanReview: boolean;
   readonly reasons: readonly string[];
 }
 
@@ -80,7 +82,7 @@ export function activityAssessmentMode(p: {
   readonly canYieldDemonstrated: boolean;
 }): ActivityAssessmentModeResult {
   if (!p.rubric) {
-    return { mode: 'formative_only', evaluable: false, canSupportLevel: false, reasons: ['no published rubric: work is recorded, no evaluation runs'] };
+    return { mode: 'formative_only', evaluable: false, canSupportLevel: false, hasHumanReview: false, reasons: ['no published rubric: work is recorded, no evaluation runs'] };
   }
   const reasons: string[] = [];
   if (p.activityIsDemo) reasons.push('the activity is DEMO content (not reviewed)');
@@ -97,7 +99,8 @@ export function activityAssessmentMode(p: {
   if (automatable && !AUTOMATED_VERIFICATION_ENABLED) reasons.push('automated verification is not enabled (no approved platform verifier)');
 
   const canSupportLevel = reasons.length === 0 && humanKeys.length === skillCriteria.length && skillCriteria.length > 0;
-  return { mode: canSupportLevel ? 'human_reviewed' : 'formative_only', evaluable: true, canSupportLevel, reasons };
+  const hasHumanReview = p.rubric.criteria.some((c) => (c.evaluatorType ?? 'rule') === 'human');
+  return { mode: canSupportLevel ? 'human_reviewed' : 'formative_only', evaluable: true, canSupportLevel, hasHumanReview, reasons };
 }
 
 /* ─────────────────────── 3. explicit deliverable mapping ─────────────────────── */

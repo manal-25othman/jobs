@@ -138,3 +138,14 @@ describe('work status (authoritative records only)', () => {
     assert.equal(workStatus({ ...base, decision: 'assessment_pending_validation', levelChanged: true }), 'pending_validation');
   });
 });
+
+describe('UX — hasHumanReview is informational and changes no decision', () => {
+  test('it reports whether a person decides any criterion; mode and canSupportLevel are exactly as before', () => {
+    const ok = { rubricValuesApproved: true, rubricIsDemo: false, activityIsDemo: false, canYieldDemonstrated: true };
+    const crit = (evaluatorType: 'human' | 'rule') => ({ key: 'k', label: 'k', maxScore: 1, skillId: 's', mandatory: false, evaluatorType, check: evaluatorType === 'rule' ? { type: 'artifact_present' as const, artifactKey: 'file.a' } : null, rationaleWhenMet: '-', rationaleWhenUnmet: '-' });
+    const demoHuman = activityAssessmentMode({ rubric: { criteria: [crit('human')] }, ...ok, rubricIsDemo: true, activityIsDemo: true });
+    assert.equal(demoHuman.hasHumanReview, true); assert.equal(demoHuman.mode, 'formative_only'); assert.equal(demoHuman.canSupportLevel, false);
+    assert.equal(activityAssessmentMode({ rubric: { criteria: [crit('rule')] }, ...ok }).hasHumanReview, false);
+    assert.equal(activityAssessmentMode({ rubric: null, ...ok }).hasHumanReview, false);
+  });
+});

@@ -8,7 +8,7 @@ import { ExperimentalNotice } from '../../../components/ExperimentalNotice';
 import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import {
-  assessmentCopy, chipClass, workStatusCopy, nextActionFor, friendlyErrorAr,
+  assessmentCopy, chipClass, workStatusCopy, nextActionFor, friendlyErrorAr, afterSubmissionAr, deliverablesSummaryAr,
   AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR,
 } from '../../../lib/journey';
 
@@ -74,28 +74,34 @@ export default function ActivityDetailPage() {
       <h1>{a.titleAr}</h1>
       <p className="body-sm muted">
         {a.estimatedMinutes ? <>≈ <span className="num">{a.estimatedMinutes}</span> دقيقة · </> : null}
-        {a.level ? <>المستوى: {LEVEL_OF_ACTIVITY_AR[a.level] ?? a.level} · </> : null}
-        <span className={chipClass(copy.tone)}>{copy.chipAr}</span>
+        {a.level ? <>المستوى: {LEVEL_OF_ACTIVITY_AR[a.level] ?? a.level}</> : null}
+        {a.isDemo ? null : <> · <span className={chipClass(copy.tone)}>{copy.chipAr}</span></>}
       </p>
       {error ? <ErrorBanner message={error} /> : null}
+      {/* One notice for demo content (it already says it raises no level). */}
       {a.isDemo ? <ExperimentalNotice kind="activity" /> : null}
-      {a.isDemo ? (
-        <div className="banner banner--attention" role="note">
-          <span className="grow">نشاط تجريبي غير مراجَع: للتعرّف على طريقة العمل فقط. لا يرفع مستوى أي مهارة.</span>
-        </div>
-      ) : null}
       {!a.available ? (
         <div className="banner banner--info" role="note">
           <span className="grow">هذا النشاط لم يعد ضمن أنشطة دورك الحالي. يمكنك مراجعة عملك السابق عليه، دون بدء عمل جديد.</span>
         </div>
       ) : null}
 
-      <section className="card" aria-labelledby="ctx">
-        <h2 id="ctx">سياق العمل</h2>
-        {a.businessContextAr ? <p className="body-sm" style={{ margin: 0 }}>{a.businessContextAr}</p> : null}
-        {a.objectiveAr ? <p className="body-sm" style={{ margin: 0 }}><strong style={{ fontWeight: 500 }}>المطلوب منك: </strong>{a.objectiveAr}</p> : null}
+      <section className="card" aria-labelledby="brief" data-testid="activity-brief">
+        <h2 id="brief">باختصار</h2>
+        <ol className="body-sm" style={{ margin: 0, paddingInlineStart: 20, display: 'grid', gap: 6 }}>
+          {a.objectiveAr ? <li><strong style={{ fontWeight: 500 }}>المطلوب منك: </strong>{a.objectiveAr}</li> : null}
+          <li><strong style={{ fontWeight: 500 }}>ما تسلّمينه: </strong>{deliverablesSummaryAr(a.deliverables.length, a.deliverables.filter((d) => d.kind === 'file').length)} — التفاصيل في «المخرجات المطلوبة» أدناه.</li>
+          <li><strong style={{ fontWeight: 500 }}>بعد التسليم: </strong>{afterSubmissionAr(a.assessment, a.isDemo)}</li>
+        </ol>
         <p className="micro muted" style={{ margin: 0 }}>{AI_USAGE_AR[a.aiUsageMode] ?? ''}</p>
       </section>
+
+      {a.businessContextAr ? (
+        <section className="card" aria-labelledby="ctx">
+          <h2 id="ctx">سياق العمل</h2>
+          <p className="body-sm" style={{ margin: 0 }}>{a.businessContextAr}</p>
+        </section>
+      ) : null}
 
       <section className="card" aria-labelledby="skills">
         <h2 id="skills">المهارات التي تطوّرينها</h2>
@@ -150,7 +156,7 @@ export default function ActivityDetailPage() {
 
       <section className="card" aria-labelledby="assess">
         <h2 id="assess">كيف يُقيَّم عملك</h2>
-        <p className="body-sm" style={{ margin: 0 }}><span className={chipClass(copy.tone)}>{copy.chipAr}</span></p>
+        {a.isDemo ? null : <p className="body-sm" style={{ margin: 0 }}><span className={chipClass(copy.tone)}>{copy.chipAr}</span></p>}
         <p className="body-sm" style={{ margin: 0 }}>{copy.explanationAr}</p>
         <p className="body-sm muted" style={{ margin: 0 }}>{SUBMISSION_IS_NOT_A_LEVEL_AR}</p>
       </section>

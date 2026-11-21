@@ -6,7 +6,7 @@ import { useSession, Loading, ErrorBanner } from '../../components/Session';
 import { ExperimentalChip } from '../../components/ExperimentalNotice';
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
-import { assessmentCopy, chipClass, workStatusCopy, AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR } from '../../lib/journey';
+import { assessmentCopy, chipClass, workStatusCopy, afterSubmissionAr, deliverablesSummaryAr, AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR } from '../../lib/journey';
 
 /**
  * U1 — the activity catalogue of the graduate's current role.
@@ -77,20 +77,24 @@ export default function ActivitiesPage() {
           <article key={a.id} className="card" aria-labelledby={`act-${a.id}`}>
             <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <h2 id={`act-${a.id}`} className="grow">{a.titleAr}</h2>
-              <span className={chipClass(copy.tone)}>{copy.chipAr}</span>
-              {a.isDemo ? <ExperimentalChip /> : null}
+              {/* One label per card: demo content carries the experimental label instead of a second demo chip. */}
+              {a.isDemo ? <ExperimentalChip /> : <span className={chipClass(copy.tone)}>{copy.chipAr}</span>}
             </div>
-            {a.objectiveAr ? <p className="body-sm" style={{ margin: 0 }}>{a.objectiveAr}</p> : null}
-            <p className="body-sm muted" style={{ margin: 0 }}>
+            <dl className="activity-summary body-sm" style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
+              {a.objectiveAr ? <><dt className="muted">المطلوب</dt><dd style={{ margin: 0 }}>{a.objectiveAr}</dd></> : null}
+              <dt className="muted">تسلّمين</dt><dd style={{ margin: 0 }}>{deliverablesSummaryAr(a.deliverableCount, a.fileDeliverableCount)}</dd>
+              <dt className="muted">بعد التسليم</dt><dd style={{ margin: 0 }}>{afterSubmissionAr(a.assessment, a.isDemo)}</dd>
+            </dl>
+            <p className="micro muted" style={{ margin: 0 }}>
               {a.estimatedMinutes ? <>≈ <span className="num">{a.estimatedMinutes}</span> دقيقة · </> : null}
               {a.level ? <>المستوى: {LEVEL_OF_ACTIVITY_AR[a.level] ?? a.level} · </> : null}
-              المخرجات: <span className="num">{a.deliverableCount}</span>
-              {a.fileDeliverableCount ? <> (منها <span className="num">{a.fileDeliverableCount}</span> ملفات)</> : null}
+              {AI_USAGE_AR[a.aiUsageMode] ?? ''}
             </p>
-            <p className="micro muted" style={{ margin: 0 }}>{AI_USAGE_AR[a.aiUsageMode] ?? ''}</p>
             {a.skills.length ? (
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} aria-label="المهارات المرتبطة">
-                {a.skills.map((s) => <span key={s.id} className="chip">{s.labelAr}{s.depth === 'primary' ? ' · رئيسية' : ''}</span>)}
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} aria-label="المهارات الرئيسية">
+                {a.skills.filter((s) => s.depth === 'primary').map((s) => <span key={s.id} className="chip">{s.labelAr}</span>)}
+                {a.skills.some((s) => s.depth !== 'primary')
+                  ? <span className="micro muted">{supportingCountAr(a.skills.filter((s) => s.depth !== 'primary').length)} — في صفحة النشاط</span> : null}
               </div>
             ) : null}
             <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
@@ -108,4 +112,9 @@ export default function ActivitiesPage() {
       {data && data.items.length > 0 ? <p className="disclaimer">{SUBMISSION_IS_NOT_A_LEVEL_AR}</p> : null}
     </main>
   );
+}
+
+/** "and N supporting skills", with Arabic number agreement. */
+function supportingCountAr(n: number): string {
+  return n === 1 ? 'ومهارة مساندة واحدة' : n === 2 ? 'ومهارتان مساندتان' : `و${n} مهارات مساندة`;
 }

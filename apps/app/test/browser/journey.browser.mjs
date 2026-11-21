@@ -376,6 +376,8 @@ async function scenarioB15(browser) {
     check('B15c', 'the internal graduate sees all three pilot activities, each marked «محتوى تجريبي غير معتمد مهنيًا»',
       cardTexts.length === 3 && cardTexts.every((t) => t.includes(LABEL)) && await page.locator('[data-testid="experimental-chip"]').count() === 3, `${cardTexts.length} cards`);
     await shot(page, 'B15-pilot-activities-desktop');
+    check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
+      cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));
     // Every activity page carries the notice.
     let allDetails = true;
     for (const a of report.activities) {
@@ -386,6 +388,10 @@ async function scenarioB15(browser) {
     // Task B: start, deliver, submit.
     const taskB = report.activities.find((a) => a.code === 'act_fe_change_request');
     await page.goto(`${APP}/activities/${taskB.activityId}`); await page.getByRole('heading', { name: 'كيف يُقيَّم عملك' }).waitFor();
+    const brief = await page.locator('[data-testid="activity-brief"]').innerText();
+    check('B15q', 'UX: the activity opens with a three-point brief (what to do, what to hand in, what happens after) and one notice, not two',
+      /المطلوب منك/.test(brief) && /ما تسلّمينه: ملفان و3 إجابات مكتوبة/.test(brief) && /بعد التسليم/.test(brief) && /مراجِع مختص/.test(brief) && /لا يتغيّر مستوى أي مهارة/.test(brief)
+      && await page.locator('.banner').count() === 1, brief.replace(/\n/g, ' | '));
     await shot(page, 'B15-pilot-activity-detail-desktop');
     await page.getByRole('button', { name: 'ابدئي النشاط' }).click();
     await page.waitForURL(/\/work\//); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
@@ -410,7 +416,7 @@ async function scenarioB15(browser) {
     for (const it of items) {
       await apiCall(reviewer, 'POST', `/review/queue/${it.id}/assign`, {});
       await apiCall(reviewer, 'GET', `/review/items/${it.id}`);
-      await apiCall(reviewer, 'POST', `/review/items/${it.id}/decision`, { levelKey: it.top, rationale: `لاحظتُ في الملفات المسلّمة ما يصفه المعيار ${it.criterion_key}.` });
+      await apiCall(reviewer, 'POST', `/review/items/${it.id}/decision`, { levelKey: it.top, rationale: 'لاحظتُ في الملفات المسلّمة ما يصفه هذا المعيار بوضوح.' });
     }
     await page.reload(); await page.locator('[data-testid="result-undetermined"]').waitFor();
     const result = await bodyText(page);
@@ -428,6 +434,18 @@ async function scenarioB15(browser) {
       && await count(`select count(*)::int n from skill_claim where user_id = $1 and state::text in ('practiced','demonstrated','verified')`, [u.id]) === 0
       && await count('select count(*)::int n from readiness_evaluation where user_id = $1', [u.id]) === 0
       && await count('select count(*)::int n from claim_draft_event where user_id = $1', [u.id]) === 0);
+    const critNames = await page.locator('[data-testid="criterion-row"]').allInnerTexts();
+    const decisions = await page.locator('[data-testid="criterion-decision"]').allInnerTexts();
+    check('B15r', 'UX: every criterion is named in Arabic, says who decided it, and no raw identifier (snake_case key) is shown anywhere',
+      critNames.length === items.length + 1 && decisions.filter((d) => d === 'المراجِع: مستوفى').length === items.length && decisions.includes('فحص آلي: مستوفى')
+      && !/\b[a-z]+_[a-z_]+\b/.test(result), decisions.join(' | '));
+    const judgements = await page.locator('[data-testid="three-judgements"]').innerText();
+    check('B15s', 'UX: criteria met, the undetermined overall result and the unverified skill level are three separate lines; what was achieved and the next step are stated',
+      /المعايير/.test(judgements) && /النتيجة الإجمالية/.test(judgements) && /مستوى المهارات/.test(judgements) && /لا يُتحقَّق من مستوى أي مهارة مهنيًا/.test(judgements)
+      && /سلّمتِ النشاط كاملًا/.test(result) && await page.locator('[data-testid="next-step"]').count() === 1 && !/%/.test(result), judgements.replace(/\n/g, ' | '));
+    const explanation = 'لكن حدّ الاستيفاء الخاص بها لم يعتمده الخبراء بعد';
+    check('B15t', 'UX: the "awaiting expert approval" explanation is said once for all skills, not repeated under each skill or criterion',
+      result.split(explanation).length === 2 && (result.match(/الحدّ بانتظار الاعتماد/g) ?? []).length === 1);
     await shot(page, 'B15-pilot-result-undetermined-desktop');
     await page.setViewportSize({ width: 375, height: 800 }); await page.reload(); await page.locator('[data-testid="result-undetermined"]').waitFor();
     check('B15l', 'the experimental result is readable at 375 px (RTL, no horizontal overflow)', (await a11yBasics(page)).length === 0, (await a11yBasics(page)).join('; '));
@@ -721,7 +739,7 @@ async function run(browser) {
         await pool.query(`update activity_spec set status = 'curated' where id = $1 and status = 'draft'`, [demo.id]); await pool.query(`update activity_spec set status = 'published' where id = $1`, [demo.id]);
       }
       const u = await newUser();
-      const { page, sid } = await reviewedSubmission(u, HTML_AR, demo.id, 'تجريبي — غير مراجَع');
+      const { page, sid } = await reviewedSubmission(u, HTML_AR, demo.id, 'محتوى تجريبي غير معتمد مهنيًا'); // UX pass: the one experimental notice replaces the second demo chip
       const after = await finishReview(page, sid);
       const t = await page.locator('[data-testid="skill-result"]').first().innerText();
       check('B13i', 'unapproved thresholds: the skill is shown as not decided (awaiting expert approval), no level, not a failure',

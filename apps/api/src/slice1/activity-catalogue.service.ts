@@ -130,7 +130,7 @@ export class ActivityCatalogueService {
       rubric, rubricValuesApproved: !!rv?.values_approved_at, rubricIsDemo: rv ? rv.is_demo_fixture === true : true,
       activityIsDemo: a.is_demo_fixture === true, canYieldDemonstrated: a.can_yield_demonstrated === true,
     });
-    return { mode: m.mode, evaluable: m.evaluable, canSupportLevel: m.canSupportLevel, reasons: m.reasons };
+    return { mode: m.mode, evaluable: m.evaluable, canSupportLevel: m.canSupportLevel, hasHumanReview: m.hasHumanReview, reasons: m.reasons };
   }
 
   /** The verification policy in effect, only to flag a development-only legacy policy (never production: the DB refuses it). */

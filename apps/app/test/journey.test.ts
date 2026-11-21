@@ -5,7 +5,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assessmentCopy, workStatusCopy, nextActionFor, evaluationPageState, levelChangeToShow, buildFileMapping, buildTextArtifacts,
+  assessmentCopy, workStatusCopy, nextActionFor, evaluationPageState, afterSubmissionAr, deliverablesSummaryAr, criterionDecisionCopy, sharedSkillExplanationAr, sharedCriterionStatus, levelChangeToShow, buildFileMapping, buildTextArtifacts,
   attemptsOf, criterionResult, isAssessedWork, WORK_STATUS_COPY, SUBMISSION_IS_NOT_A_LEVEL_AR, friendlyErrorAr, attributionNoticeAr,
 } from '../src/lib/journey.ts';
 
@@ -239,5 +239,38 @@ describe('D-135 — an undetermined overall result is shown as «not yet determi
     assert.equal(evaluationPageState({ state: 'completed', workStatus: 'feedback_ready', outcome: 'below_threshold' }), 'needs_more_evidence');
     assert.equal(evaluationPageState({ state: 'completed', workStatus: 'feedback_ready', outcome: 'passed' }), 'completed_feedback');
     assert.equal(evaluationPageState({ state: 'queued_for_human', workStatus: 'under_human_review', outcome: null }), 'human_review_pending');
+  });
+});
+
+describe('UX pass — plain summaries and separate judgements', () => {
+  const human = { mode: 'human_reviewed' as const, evaluable: true, canSupportLevel: true };
+  test('after-submission sentence: demo or unapproved content never promises a level; approved human review may', () => {
+    assert.match(afterSubmissionAr(human, true), /مراجِع مختص.*لا يتغيّر مستوى أي مهارة/);
+    assert.match(afterSubmissionAr({ ...human, canSupportLevel: false }, false), /لا يتغيّر مستوى أي مهارة/);
+    assert.match(afterSubmissionAr(human, false), /قد يرتفع مستوى المهارة/);
+    assert.doesNotMatch(afterSubmissionAr({ mode: 'formative_only', evaluable: true, canSupportLevel: false }, false), /مراجِع/);
+    // Reviewed by a person but unable to raise a level (demo / unapproved): says a reviewer looks at it, and that no level changes.
+    assert.match(afterSubmissionAr({ mode: 'formative_only', evaluable: true, canSupportLevel: false, hasHumanReview: true }, true), /مراجِع مختص.*لا يتغيّر مستوى أي مهارة/);
+  });
+  test('what to hand in: counted with Arabic number forms; no percentages', () => {
+    assert.equal(deliverablesSummaryAr(5, 2), 'ملفان و3 إجابات مكتوبة');
+    assert.equal(deliverablesSummaryAr(1, 1), 'ملف واحد');
+    assert.equal(deliverablesSummaryAr(10, 3), '3 ملفات و7 إجابات مكتوبة');
+    assert.doesNotMatch(deliverablesSummaryAr(4, 2), /%/);
+  });
+  test('a criterion decision names who decided it and is never worded as the overall result or a level', () => {
+    assert.equal(criterionDecisionCopy(2, 2, 'human').labelAr, 'المراجِع: مستوفى');
+    assert.equal(criterionDecisionCopy(1, 1, 'rule').labelAr, 'فحص آلي: مستوفى');
+    assert.equal(criterionDecisionCopy(0, 2, 'human').labelAr, 'المراجِع: غير مستوفى بعد');
+    for (const x of [criterionDecisionCopy(2, 2, 'human'), criterionDecisionCopy(0, 2, 'rule')]) assert.doesNotMatch(x.labelAr, /اجتياز|نجاح|مستوى|موثّق/);
+  });
+  test('a shared explanation or criterion status is said once only when every skill would repeat it', () => {
+    const tbd = { outcome: 'incomplete', criteria: [{ key: 'a', status: 'threshold_unapproved' }] };
+    const met = { outcome: 'met', criteria: [{ key: 'b', status: 'met' }] };
+    assert.match(sharedSkillExplanationAr([tbd, tbd, tbd] as never)!, /لم يعتمده الخبراء/);
+    assert.equal(sharedSkillExplanationAr([tbd, met] as never), null);
+    assert.equal(sharedSkillExplanationAr([tbd] as never), null, 'one skill keeps its own text');
+    assert.equal(sharedCriterionStatus([tbd, tbd] as never), 'threshold_unapproved');
+    assert.equal(sharedCriterionStatus([tbd, met] as never), null);
   });
 });

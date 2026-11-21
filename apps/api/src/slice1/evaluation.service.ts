@@ -1020,7 +1020,9 @@ export class EvaluationService {
       const labels = assessed.length ? (await sc.query('select id, slug, label_ar, label_en from skill where id = any($1::uuid[])', [assessed.map((x) => x.skill_id)])).rows : [];
       // P5: the learner-facing NAME of each criterion (already shown in the human-review awaiting list) — never its levels,
       // descriptors, observations, threshold or checks, which stay reviewer-only.
-      const criterionNames = assessed.length ? (await sc.query('select key, name_ar from rubric_criterion where rubric_version_id = $1', [assessed[0]!.rubric_version_id])).rows : [];
+      // The learner-facing NAME of each criterion (never its descriptors or values), and whether a person or a rule decided it.
+      const criterionRubric = assessed.length ? assessed[0]!.rubric_version_id : r.rubric_version_id;
+      const criterionNames = criterionRubric ? (await sc.query('select key, name_ar, evaluator_type::text as evaluator_type from rubric_criterion where rubric_version_id = $1', [criterionRubric])).rows : [];
       return { queue, integrity, messages, reason, rubric, levelAttribution, labels, criterionNames };
     });
 
@@ -1070,7 +1072,11 @@ export class EvaluationService {
       rubricVersion: svc.rubric?.version ?? null,
       activitySpecVersion: r.activity_spec_version,
       evaluatedAt: r.evaluated_at,
-      criteria,
+      // UX: the criterion's Arabic name and who decided it, beside the unchanged identifier (additive).
+      criteria: criteria.map((c) => {
+        const n = svc.criterionNames.find((x) => x.key === c.criterion_key);
+        return { ...c, nameAr: (n?.name_ar as string | undefined) ?? null, evaluatorType: (n?.evaluator_type as string | undefined) ?? null };
+      }),
       integrityChecks: svc.integrity.map((i) => ({ check_key: i.check_key, key: i.check_key, passed: i.passed, message: svc.messages.find((m) => m.key === i.check_key)?.user_facing_message ?? null })),
       // A level change, read from the decision that made it (never inferred from the outcome).
       transition: moved ? { from: moved.previous_state as EvidenceState, to: moved.resulting_state as EvidenceState, evidenceId: moved.evidence_id as string } : null,

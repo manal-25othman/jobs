@@ -56,6 +56,54 @@ export function assessmentCopy(a: { mode: AssessmentMode; evaluable: boolean; ca
       + 'معاييره بانتظار اعتماد الخبراء أو تحقّق مستقل.' };
 }
 
+/**
+ * UX: "what happens after you submit", in one plain sentence, from the same facts as `assessmentCopy`. Never promises a
+ * level the API does not report as reachable.
+ */
+export function afterSubmissionAr(a: { mode: AssessmentMode; evaluable: boolean; canSupportLevel: boolean; hasHumanReview?: boolean }, isDemo: boolean): string {
+  if (!a.evaluable) return 'يُسجَّل عملك في سجلّك، دون نتيجة تقييم.';
+  const review = a.mode === 'human_reviewed' || a.hasHumanReview
+    ? 'تُفحص المخرجات آليًا للتأكد من اكتمالها، ثم يكتب مراجِع مختص ملاحظاته على كل معيار.'
+    : 'تُفحص المخرجات آليًا وتصلك ملاحظات على كل معيار.';
+  if (isDemo || !a.canSupportLevel) return `${review} لا يتغيّر مستوى أي مهارة من هذا النشاط.`;
+  return `${review} إن استوفى عملك المعايير المعتمدة قد يرتفع مستوى المهارة.`;
+}
+
+/** UX: what the graduate hands in, counted from the declared deliverables (files and written answers). */
+export function deliverablesSummaryAr(total: number, files: number): string {
+  const texts = Math.max(0, total - files);
+  const parts: string[] = [];
+  if (files) parts.push(files === 1 ? 'ملف واحد' : files === 2 ? 'ملفان' : `${files} ملفات`);
+  if (texts) parts.push(texts === 1 ? 'إجابة مكتوبة واحدة' : texts === 2 ? 'إجابتان مكتوبتان' : `${texts} إجابات مكتوبة`);
+  return parts.length ? parts.join(' و') : 'لا مخرجات مطلوبة';
+}
+
+/**
+ * UX: one criterion of a finished evaluation — who decided it and what they decided. A criterion decision is NOT the
+ * overall result and NOT a skill level; the label says which judgement it is.
+ */
+export function criterionDecisionCopy(score: number, max: number, evaluatorType: string | null | undefined): { labelAr: string; tone: Tone; byAr: string } {
+  const r = criterionResult(score, max);
+  const byAr = evaluatorType === 'human' ? 'المراجِع' : evaluatorType === 'rule' ? 'فحص آلي' : 'التقييم';
+  return { labelAr: `${byAr}: ${r.labelAr}`, tone: r.tone, byAr };
+}
+
+/**
+ * UX: the explanation shared by every skill in a per-skill list, when they all say the same thing — said once at the
+ * top instead of under each skill. Null when the explanations differ (each skill keeps its own).
+ */
+export function sharedSkillExplanationAr(skills: readonly Pick<SkillResultView, 'outcome' | 'criteria'>[]): string | null {
+  if (skills.length < 2) return null;
+  const all = skills.map((s) => skillOutcomeCopy(s).explanationAr);
+  return all.every((x) => x === all[0]) ? all[0]! : null;
+}
+
+/** UX: the criterion status shared by every criterion of every skill (e.g. all awaiting an approved threshold), else null. */
+export function sharedCriterionStatus(skills: readonly Pick<SkillResultView, 'criteria'>[]): string | null {
+  const st = skills.flatMap((s) => s.criteria.map((c) => c.status));
+  return st.length > 1 && st.every((x) => x === st[0]) ? st[0]! : null;
+}
+
 /** The one sentence every activity page carries: submitting is not earning a level. */
 export const SUBMISSION_IS_NOT_A_LEVEL_AR =
   'تسليم العمل يسجّله ويمنحك ملاحظات، ولا يرفع مستوى المهارة وحده. يرتفع المستوى فقط حين يتحقّق منه تقييم مستقل — مراجعة بشرية بمعايير معتمدة — ويُظهر ذلك قرار التحقق.';

@@ -9,7 +9,8 @@ import { JourneyNav } from '../../components/JourneyNav';
 import { CompanionNudge } from '../../components/CompanionNudge';
 import { ExperimentalNotice } from '../../components/ExperimentalNotice';
 import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
-  hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr } from '../../lib/journey';
+  hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr,
+  criterionDecisionCopy, sharedSkillExplanationAr, sharedCriterionStatus } from '../../lib/journey';
 
 /**
  * U4 — the evaluation of one submission.
@@ -88,11 +89,17 @@ function EvaluationInner() {
   // ENG-1 P5: an evaluation recorded skill by skill (development pathway) is shown skill by skill; a legacy one exactly as before.
   const perSkill = hasPerSkillResults(view) && page !== 'not_evaluated' && page !== 'evaluation_pending' ? view.skills! : null;
   const perSkillSummary = perSkill ? perSkillSummaryAr(perSkill) : null;
+  // UX: what every skill would repeat (the same explanation, the same criterion status) is said once.
+  const sharedExplanation = perSkill ? sharedSkillExplanationAr(perSkill) : null;
+  const sharedStatus = perSkill ? sharedCriterionStatus(perSkill) : null;
+  const metCount = view.criteria.filter((c) => criterionResult(Number(c.score), Number(c.maxScore ?? c.max_score ?? 1)).labelAr === 'مستوفى').length;
 
   const perSkillCard = perSkill ? (
     <section className="card" aria-labelledby="per-skill" data-testid="per-skill-results">
       <h2 id="per-skill">نتيجة كل مهارة</h2>
       <p className="body-sm muted" style={{ margin: 0 }}>لكل مهارة سطران منفصلان: ما وجده التقييم في معاييرها، وما سجّله قرار التحقق لمستواها.</p>
+      {sharedExplanation ? <p className="body-sm" style={{ margin: 0 }} data-testid="skills-shared-note">{sharedExplanation}</p> : null}
+      {sharedStatus ? <p className="body-sm muted" style={{ margin: 0 }}>كل المعايير أدناه: <span className={chipClass(skillCriterionCopy(sharedStatus).tone)}>{skillCriterionCopy(sharedStatus).labelAr}</span></p> : null}
       <div className="rows">
         {perSkill.map((sk) => {
           const o = skillOutcomeCopy(sk);
@@ -105,7 +112,7 @@ function EvaluationInner() {
                 <span className="micro muted">نتيجة التقييم:</span>
                 <span className={chipClass(o.tone)} data-testid="skill-outcome">{o.labelAr}</span>
               </div>
-              <p className="body-sm" style={{ margin: 0 }}>{o.explanationAr}</p>
+              {sharedExplanation ? null : <p className="body-sm" style={{ margin: 0 }}>{o.explanationAr}</p>}
               <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                 <span className="micro muted">مستوى المهارة:</span>
                 <span className={chipClass(lv.tone)} data-testid="skill-level">{lv.labelAr}</span>
@@ -117,7 +124,7 @@ function EvaluationInner() {
                 <ul className="body-sm" style={{ margin: 0, paddingInlineStart: 20 }} aria-label={`معايير ${name}`}>
                   {sk.criteria.map((c) => {
                     const cc = skillCriterionCopy(c.status);
-                    return <li key={c.key}>{c.nameAr ?? 'معيار من معايير هذه المهارة'} — <span className={chipClass(cc.tone)}>{cc.labelAr}</span></li>;
+                    return <li key={c.key}>{c.nameAr ?? 'معيار من معايير هذه المهارة'}{sharedStatus ? null : <> — <span className={chipClass(cc.tone)}>{cc.labelAr}</span></>}</li>;
                   })}
                 </ul>
               ) : null}
@@ -134,11 +141,14 @@ function EvaluationInner() {
       <h2 id="crit">الملاحظات على كل معيار</h2>
       <div className="rows">
         {view.criteria.map((c, i) => {
-          const r = criterionResult(Number(c.score), Number(c.maxScore ?? c.max_score ?? 1));
+          const r = criterionDecisionCopy(Number(c.score), Number(c.maxScore ?? c.max_score ?? 1), c.evaluatorType);
           return (
-            <div key={(c.criterionId ?? c.criterion_key ?? '') + i} className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              <span className="grow body-sm">{c.rationale}</span>
-              <span className={chipClass(r.tone)}>{r.labelAr}</span>
+            <div key={(c.criterionId ?? c.criterion_key ?? '') + i} className="stack" style={{ gap: 4 }} data-testid="criterion-row">
+              <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                <span className="grow body-sm" style={{ fontWeight: 500 }}>{c.nameAr ?? 'معيار'}</span>
+                <span className={chipClass(r.tone)} data-testid="criterion-decision">{r.labelAr}</span>
+              </div>
+              {c.rationale ? <p className="body-sm muted" style={{ margin: 0 }}>{c.evaluatorType === 'human' ? 'ملاحظة المراجِع: ' : ''}{c.rationale}</p> : null}
             </div>
           );
         })}
@@ -155,13 +165,32 @@ function EvaluationInner() {
       {view.isDemo ? <ExperimentalNotice kind="result" /> : null}
 
       {page === 'result_undetermined' ? (
-        <section className="card" aria-labelledby="undetermined" data-testid="result-undetermined">
-          <h2 id="undetermined">النتيجة الإجمالية: لم يُحدَّد بعد</h2>
-          <p className="body-sm" style={{ margin: 0 }}>
-            لم يُحسم بعدُ حدّ الاجتياز ولا قاعدته لهذا النشاط، فلا تُعلَن نتيجة إجمالية: لا اجتياز ولا عدم اجتياز.
-            ملاحظات المراجِع على كل معيار أدناه للتعلّم فقط، ولم يتغيّر مستوى أي مهارة.
-          </p>
-        </section>
+        <>
+          <section className="card" aria-labelledby="undetermined" data-testid="result-undetermined">
+            <h2 id="undetermined">النتيجة الإجمالية: لم يُحدَّد بعد</h2>
+            <p className="body-sm" style={{ margin: 0 }} data-testid="accomplished">
+              <strong style={{ fontWeight: 500 }}>ما أنجزتِه: </strong>سلّمتِ النشاط كاملًا، وراجعه مراجِع مختص وكتب ملاحظاته على كل معيار.
+            </p>
+            {/* Three separate judgements, never merged into one. */}
+            <dl className="body-sm" style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', alignItems: 'baseline' }} data-testid="three-judgements">
+              <dt className="muted">المعايير</dt>
+              <dd style={{ margin: 0 }}>المستوفاة بحسب المراجِع والفحوص: <span className="num">{metCount}</span> من <span className="num">{view.criteria.length}</span></dd>
+              <dt className="muted">النتيجة الإجمالية</dt>
+              <dd style={{ margin: 0 }}>لم تُحدَّد بعد — حدّ الاجتياز وقاعدته لم يعتمدهما الخبراء، فلا اجتياز ولا عدم اجتياز.</dd>
+              <dt className="muted">مستوى المهارات</dt>
+              <dd style={{ margin: 0 }}>لم يتغيّر — لا يُتحقَّق من مستوى أي مهارة مهنيًا في هذه التجربة.</dd>
+            </dl>
+          </section>
+          <div className="next-action" data-testid="next-step">
+            <span className="kicker">الخطوة التالية</span>
+            <h2>اقرئي ملاحظات المراجِع، ثم جرّبي نشاطًا آخر</h2>
+            <p>ابدئي بالمعايير غير المستوفاة إن وُجدت؛ ملاحظاته تقول ما الذي يحسّن عملك. ثم اختاري نشاطًا آخر من أنشطة دورك.</p>
+            <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <a className="btn btn--on-dark" style={{ textDecoration: 'none' }} href="#crit">ملاحظات المراجِع</a>
+              <a className="btn btn--ghost" style={{ textDecoration: 'none' }} href="/activities">أنشطة دوري</a>
+            </div>
+          </div>
+        </>
       ) : null}
 
       {page === 'not_evaluated' ? (
@@ -218,7 +247,7 @@ function EvaluationInner() {
         </section>
       ) : null}
 
-      {perSkill && perSkillSummary && (page === 'pending_validation' || page === 'completed_level' || page === 'completed_feedback' || page === 'result_undetermined') ? (
+      {perSkill && perSkillSummary && (page === 'pending_validation' || page === 'completed_level' || page === 'completed_feedback') ? (
         <section className="card" aria-labelledby="per-skill-summary">
           <h2 id="per-skill-summary">{perSkillSummary.titleAr}</h2>
           <p className="body-sm" style={{ margin: 0 }}>{perSkillSummary.bodyAr}</p>

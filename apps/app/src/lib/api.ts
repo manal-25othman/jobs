@@ -84,6 +84,8 @@ export interface EvaluationCriterion {
   criterionId?: string; criterion_key?: string;
   score: number | string; maxScore?: number; max_score?: string;
   rationale: string; supportingExcerpt?: string | null; supporting_excerpt?: string | null;
+  /** UX (additive): the criterion's Arabic name and who decided it; the identifier above is unchanged. */
+  nameAr?: string | null; evaluatorType?: string | null;
 }
 
 export interface EvaluationResult {
@@ -105,7 +107,7 @@ export type WorkStatus =
   | 'blocked_by_checks' | 'pending_validation' | 'level_recorded' | 'feedback_ready';
 
 /** Derived by the API from the rubric an evaluation would use (D-118 rule). Informational: it decides nothing. */
-export interface ActivityAssessment { mode: 'human_reviewed' | 'formative_only' | 'automated_verified'; evaluable: boolean; canSupportLevel: boolean; reasons: string[] }
+export interface ActivityAssessment { mode: 'human_reviewed' | 'formative_only' | 'automated_verified'; evaluable: boolean; canSupportLevel: boolean; hasHumanReview?: boolean; reasons: string[] }
 export interface ActivitySkill { id: string; slug: string; labelAr: string; labelEn: string; depth: 'primary' | 'secondary' }
 interface ActivityBase {
   id: string; slug: string; version: string; titleAr: string; titleEn: string; objectiveAr: string | null;
