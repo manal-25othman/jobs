@@ -11,7 +11,8 @@ const gw = () => new AgentGateway(new LocalTestProvider('normal'), { maxCallsPer
 
 describe('Phase B package 5 — three capabilities on existing contracts, permission-aware read tools', () => {
   test('three capabilities, each mapped to registry contracts and an implemented agent; no new agent', () => {
-    assert.deepEqual(CAPABILITIES.map((c) => c.capability), ['career_guidance', 'learning_guidance', 'assessment_feedback']);
+    assert.deepEqual(CAPABILITIES.map((c) => c.capability), ['career_guidance', 'learning_guidance', 'assessment_feedback', 'improvement_hints']);
+    assert.deepEqual(capabilitySpec('improvement_hints').contracts, ['A15', 'A03']);
     assert.deepEqual(capabilitySpec('career_guidance').contracts, ['A01', 'A02', 'A04']);
     assert.deepEqual(capabilitySpec('learning_guidance').contracts, ['A07', 'A03']);
     assert.deepEqual(capabilitySpec('assessment_feedback').contracts, ['A13', 'A15']);
@@ -58,5 +59,21 @@ describe('Phase B package 5 — three capabilities on existing contracts, permis
   });
   test('the test provider is refused in production for every capability', () => {
     assert.throws(() => new AgentGateway(new LocalTestProvider('normal'), { maxCallsPerWindow: 1, async callsUsed() { return 0; } }, ids, { production: true }), /TEST\/NON-PRODUCTION/);
+  });
+});
+
+describe('R1 — improvement hints (A15/A03): one level per request, never code', () => {
+  test('one improvement_action per unmet criterion, with its severity; routed by R11', async () => {
+    assert.equal(route({ type: 'user.requested', userId: 'u', facts: { capability: 'improvement_hints' } })?.ruleId, 'R11-improvement-hints-to-technical');
+    const r = await gw().invoke({ agentType: 'technical', trigger: 'user.requested', userId: 'u', targetRoleId: null, capability: 'improvement_hints', inputReferences: [], domainFacts: facts,
+      fullContext: { guidanceRequest: { capability: 'improvement_hints', level: 1, items: [
+        { criterionKey: 'c1', severity: 'important', questionAr: 'ما الذي ينقص «رسالة الخطأ» في عملك؟', hintAr: 'انظري إلى ما يحدث حين يفشل الطلب.' },
+        { criterionKey: 'c2', severity: 'improvement', questionAr: 'ما الذي ينقص «وصف القرار»؟', hintAr: 'اقرئي ملاحظة المراجِع على هذا البند.' }] } } });
+    assert.deepEqual(r.proposals.map((p) => [p.proposalType, p.warnings[0]]), [['improvement_action', 'severity:important'], ['improvement_action', 'severity:improvement']]);
+  });
+  test('a hint carrying ready code is refused by the gateway', async () => {
+    const r = await gw().invoke({ agentType: 'technical', trigger: 'user.requested', userId: 'u', targetRoleId: null, capability: 'improvement_hints', inputReferences: [], domainFacts: facts,
+      fullContext: { guidanceRequest: { capability: 'improvement_hints', level: 2, items: [{ criterionKey: 'c1', severity: 'important', questionAr: 'سؤال', hintAr: 'اكتبي if (!res.ok) { showError() }' }] } } });
+    assert.equal(r.proposals.length, 0); assert.match(r.rejected[0]!.reason, /never contains ready code/);
   });
 });

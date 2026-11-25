@@ -90,6 +90,13 @@ export const RULES: readonly Rule[] = [
       requestedAction: 'explain the recorded evaluation and the way to improve (A13/A15)', expectedProposalTypes: ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'] },
   },
   {
+    // R1 (code-review guidance): progressive hints per unmet criterion of the graduate's own result (A15/A03).
+    ruleId: 'R11-improvement-hints-to-technical',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'improvement_hints',
+    route: { ruleId: 'R11-improvement-hints-to-technical', agentType: 'technical',
+      requestedAction: 'progressive hints per unmet criterion; never code (A15/A03)', expectedProposalTypes: ['improvement_action'] },
+  },
+  {
     // A11 (FR-U-026): the graduate writes to the virtual manager of their work simulation; the cap is checked before.
     ruleId: 'R10-manager-message-to-virtual-manager',
     when: (e) => e.type === 'user.requested' && e.facts['managerTurn'] === true,

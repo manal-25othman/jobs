@@ -29,10 +29,13 @@ export const RecruitmentAgent: AgentSpec = {
 
 export const TechnicalAgent: AgentSpec = {
   agentType: 'technical',
-  requestedAction: (_t, cap) => cap === 'learning_guidance'
+  requestedAction: (_t, cap) => cap === 'improvement_hints'
+    ? 'give ONE level of hint for each unmet criterion of the graduate\'s own result: where to look, the concept, or a resource; never code or the fix (A15/A03)'
+    : cap === 'learning_guidance'
     ? 'guide learning for one skill as a technical mentor: the registry resource, the practice and self-check questions; never a solution (A07/A03)'
     : 'review the evaluation as a technical mentor: explain, point out weaknesses, propose next step',
-  expectedProposalTypes: (_t, cap) => cap === 'learning_guidance' ? ['technical_next_action', 'followup_question']
+  expectedProposalTypes: (_t, cap) => cap === 'improvement_hints' ? ['improvement_action']
+    : cap === 'learning_guidance' ? ['technical_next_action', 'followup_question']
     : ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'],
 };
 

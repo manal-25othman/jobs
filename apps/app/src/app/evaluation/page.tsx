@@ -7,6 +7,7 @@ import { useSession, Loading, ErrorBanner, EvidenceState } from '../../component
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { GuidancePanel } from '../../components/GuidancePanel';
+import { HintsPanel } from '../../components/HintsPanel';
 import { ExperimentalNotice } from '../../components/ExperimentalNotice';
 import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
   hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr,
@@ -367,6 +368,12 @@ function EvaluationInner() {
         <section className="card">
           <h2>مرشد التحسين</h2>
           <GuidancePanel token={token} capability="assessment_feedback" submissionId={submissionId} buttonAr="اشرحي لي النتيجة وكيف أتحسّن" />
+        </section>
+      ) : null}
+      {token && view?.resultId && submissionId ? (
+        <section className="card">
+          <h2>تلميحات خطوة خطوة</h2>
+          <HintsPanel token={token} submissionId={submissionId} />
         </section>
       ) : null}
       <p className="body-sm">

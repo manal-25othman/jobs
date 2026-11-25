@@ -368,9 +368,9 @@ export interface CareerSnapshot {
   kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[]; selfAssessed: SourcedStatement[];
   gapOrderAr: string; nextStep: NextStep; limitsAr: string[];
 }
-export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback';
+export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback' | 'improvement_hints';
 export interface GuidanceAnswer {
-  capability: GuidanceCapability; labelAr: string; contracts: string[]; toolsUsed: string[]; noticeAr: string; withheldAr: string | null;
+  capability: GuidanceCapability; labelAr: string; contracts: string[]; toolsUsed: string[]; noticeAr: string; withheldAr: string | null; noneAr?: string; level?: number;
   status: string; provider: string; testOnly: true; ruleId: string;
   proposals: { id: string; proposalType: string; summary: string; structuredPayload: Record<string, unknown>; warnings: string[]; lifecycle: string }[];
 }

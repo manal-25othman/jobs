@@ -156,6 +156,8 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
 function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
   const guidance = ctx['guidanceRequest'] as LearningGuidanceRequest | undefined;
   if (guidance?.capability === 'learning_guidance') return learningGuidanceCandidates(guidance);
+  const hints = ctx['guidanceRequest'] as ImprovementHintsRequest | undefined;
+  if (hints?.capability === 'improvement_hints') return improvementHintCandidates(hints);
   const r = ctx['deterministicResults'] as { evaluationResultId: string; outcome: string; skillId: string;
     criteria: { key: string; met: boolean; rationale: string }[]; blockingCheck: string | null } | undefined;
   if (!r) return [];
@@ -477,4 +479,22 @@ function managerCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
     evidenceRefs: [], sourceRefs: [], warnings: [], requiresUserApproval: false,
     rationale: basis === 'clarification' ? 'a clarification the scenario allows, restated' : basis === 'refusal' ? 'a solution, code or score request is refused in persona (A11)' : 'nothing in the scenario answers this; the decision is left to the graduate',
   }];
+}
+
+/* ───────────── R1: progressive hints per unmet criterion (A15/A03) — restates the prepared hint; never code ───────────── */
+
+interface ImprovementHintsRequest {
+  readonly capability: 'improvement_hints';
+  readonly level: 1 | 2 | 3;
+  readonly items: readonly { readonly criterionKey: string; readonly severity: 'important' | 'improvement'; readonly questionAr: string; readonly hintAr: string }[];
+}
+
+function improvementHintCandidates(g: ImprovementHintsRequest): unknown[] {
+  return g.items.map((i) => ({
+    proposalType: 'improvement_action', subjectType: 'submission', subjectId: i.criterionKey,
+    summary: i.questionAr,
+    structuredPayload: { kind: 'action', action: `hint level ${g.level} for criterion ${i.criterionKey}`, why: i.hintAr, estimatedMinutes: null },
+    evidenceRefs: [], sourceRefs: [], warnings: [`severity:${i.severity}`], requiresUserApproval: false,
+    rationale: 'a guiding question and one level of hint for an unmet criterion of the graduate\'s own result; the fix stays theirs',
+  }));
 }

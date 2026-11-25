@@ -19,7 +19,7 @@ export class GuidanceController {
   capabilities() { return { ok: true, data: { items: this.guidance.capabilities() } }; }
 
   @Post('me/guidance')
-  async ask(@CurrentUser() u: AuthenticatedUser, @Body() body: { capability?: string; skillId?: string; submissionId?: string }) {
+  async ask(@CurrentUser() u: AuthenticatedUser, @Body() body: { capability?: string; skillId?: string; submissionId?: string; level?: number }) {
     return { ok: true, data: await this.guidance.ask(u.id, body ?? {}) };
   }
 }

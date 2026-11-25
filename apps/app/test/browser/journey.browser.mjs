@@ -613,6 +613,12 @@ async function scenarioB15(browser) {
     check('B15t', 'UX: the "awaiting expert approval" explanation is said once for all skills, not repeated under each skill or criterion',
       result.split(explanation).length === 2 && (result.match(/الحدّ بانتظار الاعتماد/g) ?? []).length === 1);
     await shot(page, 'B15-pilot-result-undetermined-desktop');
+    // B23 · R1: progressive hints on the evaluation page (A15/A03, test provider). Every criterion here is met, so it says so.
+    await page.locator('[data-testid="hints-panel"] button').click();
+    await page.locator('[data-testid="hints-level"]').first().waitFor();
+    const hintsText = await page.locator('[data-testid="hints-panel"]').innerText();
+    check('B23a', 'evaluation page: «تلميحات خطوة خطوة» answers on request, labelled as a test template; with every criterion met it says there is nothing to hint',
+      /كل البنود مستوفاة/.test(hintsText) && /لا يعمل نموذج ذكاء اصطناعي حقيقي/.test(hintsText) && /لا تكتب الحل ولا الكود/.test(hintsText) && await page.locator('[data-testid="hint-item"]').count() === 0);
     await page.setViewportSize({ width: 375, height: 800 }); await page.reload(); await page.locator('[data-testid="result-undetermined"]').waitFor();
     check('B15l', 'the experimental result is readable at 375 px (RTL, no horizontal overflow)', (await a11yBasics(page)).length === 0, (await a11yBasics(page)).join('; '));
     await shot(page, 'B15-pilot-result-undetermined-mobile');

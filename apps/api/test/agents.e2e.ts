@@ -182,3 +182,27 @@ describe('11 — isolation, and 17 — failure leaves authoritative state untouc
     } finally { delete process.env['AGENT_TEST_PROVIDER_MODE']; await broken.close(); }
   });
 });
+
+describe('R1 — improvement hints (A15/A03) on the graduate\'s own result: progressive, never code, nothing changed', () => {
+  test('one level per request for each unmet criterion (mandatory first, at most three); a fully met result has none', async () => {
+    const user = await newUser(); const { submissionId, ev } = await evaluated(user, INCOMPLETE_ARTIFACTS);
+    assert.equal(ev.outcome, 'below_threshold');
+    const before = await pool.query(`select (select count(*) from evidence where user_id = $1)::int ev, (select state::text from skill_claim where user_id = $1 and skill_id = $2) st, (select count(*) from model_call)::int mc`, [user.id, FIXTURE.skillUiTesting]);
+    for (const level of [1, 2, 3]) {
+      const r = (await http.post('/v1/me/guidance').set(auth(user)).send({ capability: 'improvement_hints', submissionId, level }).expect(201)).body.data;
+      assert.equal(r.ruleId, 'R11-improvement-hints-to-technical'); assert.deepEqual(r.contracts, ['A15', 'A03']); assert.equal(r.level, level);
+      assert.ok(r.proposals.length >= 1 && r.proposals.length <= 3, `${r.proposals.length} hints`);
+      assert.ok(r.proposals.every((p: { proposalType: string; warnings: string[] }) => p.proposalType === 'improvement_action' && /^severity:(important|improvement)$/.test(p.warnings[0]!)));
+      const text = JSON.stringify(r.proposals);
+      assert.ok(!/`|=>|\bfunction\b|document\./.test(text), 'no code in a hint');
+      if (level === 1) assert.ok(r.proposals.every((p: { summary: string }) => /ما الذي ينقص/.test(p.summary)), 'a guiding question, not an answer');
+    }
+    assert.deepEqual((await pool.query(`select (select count(*) from evidence where user_id = $1)::int ev, (select state::text from skill_claim where user_id = $1 and skill_id = $2) st, (select count(*) from model_call)::int mc`, [user.id, FIXTURE.skillUiTesting])).rows[0], before.rows[0], 'no evidence, level or model call changed');
+    const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+    await http.post('/v1/me/guidance').set(auth(other)).send({ capability: 'improvement_hints', submissionId, level: 1 }).expect(404);
+    await http.post('/v1/me/guidance').set(auth(user)).send({ capability: 'improvement_hints', submissionId, level: 4 }).expect(400);
+    const done = await newUser(); const full = await evaluated(done, COMPLETE_ARTIFACTS);
+    const n = (await http.post('/v1/me/guidance').set(auth(done)).send({ capability: 'improvement_hints', submissionId: full.submissionId }).expect(201)).body.data;
+    assert.equal(n.proposals.length, 0); assert.match(n.noneAr, /كل البنود مستوفاة/);
+  });
+});

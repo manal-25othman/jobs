@@ -360,6 +360,12 @@ export function validateAgainstDomain(
     if (fail) throw new ProposalRejected('domain', fail);
   }
 
+  // R1 (A15/A03): a mentor's hint, next action or question never hands over ready code.
+  if (['improvement_action', 'technical_next_action', 'followup_question'].includes(p.proposalType)) {
+    const texts = [p.summary ?? '', ...Object.values(payload as unknown as Record<string, unknown>).flatMap((v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []))];
+    if (texts.some((t) => codeLikeViolation(t))) throw new ProposalRejected('domain', 'A03/A15 guard: a hint never contains ready code');
+  }
+
   // A11 (FR-A-002): the manager never gives code or solution steps, never hints at a score or criterion.
   if (payload.kind === 'manager_turn') {
     const v = managerTurnViolation(payload.replyAr);
@@ -380,8 +386,13 @@ export function validateAgainstDomain(
  */
 export function managerTurnViolation(text: string): string | null {
   if (text.length > 700) return 'a manager turn is short (≤ 700 characters)';
-  if (/[{};`]|=>|<\/?[a-z][a-z0-9]*[\s>/]|\b(function|const|let|var|return|document|querySelector|addEventListener|console)\b/i.test(text)) return 'code or code-like content';
+  if (codeLikeViolation(text)) return 'code or code-like content';
   if (/(الحل هو|الحل:|خطوات الحل|الخطوة الأولى|اكتبي الكود|غيّري السطر|غيري السطر|استخدمي الدالة|عدّلي الملف|عدلي الملف)/.test(text)) return 'solution steps';
   if (/(درجة|درجتك|الدرجات|علامة|علامتك|معيار|المعايير|ربريك|رُبريك|ستنجحين|ستجتازين|اجتياز|تقييمك|نقاطك)/.test(text) || /\b(score|grade|rubric|pass(ed)?)\b/i.test(text)) return 'a hint about the score or the criteria';
   return null;
+}
+
+/** Code or code-like content (used by the A11 and A03/A15 guards). */
+export function codeLikeViolation(text: string): boolean {
+  return /`|=>|\{[^}]*\}|\w\(\)\s*;|<\/?[a-z][a-z0-9]*(\s[^>]*)?>|\bfunction\s*\w*\s*\(|\b(const|let|var)\s+\w+\s*=|document\.|querySelector|addEventListener|console\./i.test(text);
 }
