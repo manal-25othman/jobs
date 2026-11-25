@@ -480,6 +480,31 @@ async function scenarioB15(browser) {
     const snapDir = await page.locator('main').evaluate((el) => getComputedStyle(el).direction);
     await shot(page, 'B20-snapshot-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
     check('B20e', 'snapshot and guidance are right-to-left and fit a 390px phone', snapDir === 'rtl' && snapOverflow <= 0, `dir=${snapDir} overflow=${snapOverflow}`);
+    // B21 · FR-U-013: self-assessment is a private starting point (Observed only) — never evidence, a level or a strength.
+    await page.goto(`${APP}/self-assessment`); await page.locator('[data-testid="self-assessment-skill"]').first().waitFor();
+    const saSkills = page.locator('[data-testid="self-assessment-skill"]');
+    const saCount = await saSkills.count();
+    const saNotice = await page.locator('[data-testid="self-assessment-notice"]').innerText();
+    await saSkills.nth(0).getByLabel('متقدم').check();
+    await saSkills.nth(1).getByLabel('لست متأكدة').check();
+    await page.getByRole('button', { name: 'احفظي تقديري' }).click();
+    await page.locator('[data-testid="self-assessment-saved"]').waitFor();
+    const savedText = await page.locator('[data-testid="self-assessment-saved"]').innerText();
+    check('B21a', 'self-assessment page: the 12 skills of the role, the scale plus «لست متأكدة», a notice that it is not evidence; saving says no level changed',
+      saCount === 12 && /لا يُحتسب دليلًا/.test(saNotice) && /لم يتغيّر أي مستوى/.test(savedText), `${saCount} skills · ${savedText}`);
+    await shot(page, 'B21-self-assessment-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const saOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    await shot(page, 'B21-self-assessment-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${APP}/skills`); await page.locator('a.row[href^="/skills/"]').first().waitFor();
+    const rowsAfter = await page.locator('a.row[href^="/skills/"]').allInnerTexts();
+    check('B21b', 'after self-rating «متقدم», every skill still reads «لا يوجد دليل مُقيَّم بعد» — a self-assessment never raises a level; the page fits a phone',
+      rowsAfter.length === 12 && rowsAfter.every((t) => t.includes('لا يوجد دليل مُقيَّم بعد')) && saOverflow <= 0, `overflow=${saOverflow}`);
+    await page.goto(`${APP}/snapshot`); await page.locator('[data-testid="snapshot-self"]').waitFor();
+    const selfItems = await page.locator('[data-testid="snapshot-self"] li').count();
+    const strengthsText = await page.locator('[data-testid="snapshot-strengths"]').innerText();
+    check('B21c', 'snapshot: the self-assessment appears in its own section with its source; strengths stay empty',
+      selfItems === 2 && /لا توجد بعد/.test(strengthsText) && /المصدر: تقييمك الذاتي/.test(await page.locator('[data-testid="snapshot-self"]').innerText()), `${selfItems} self-assessed`);
     await page.goto(`${APP}/activities`); await page.locator('article').first().waitFor();
     check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
       cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));

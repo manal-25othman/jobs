@@ -563,3 +563,65 @@ describe('Phase B package 5 — A01 next step, A02 Career Snapshot and the three
     await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback' }).expect(400);
   });
 });
+
+describe('FR-U-013 — self-assessment: Observed only, private, never evidence or a level (PO decision 1, post-package-5 review)', () => {
+  const graduate = async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const state = async (u: TestUser) => one(`select (select count(*) from skill_claim where user_id = $1)::int claims, (select count(*) from evidence where user_id = $1)::int ev,
+    (select count(*) from verification_decision where user_id = $1)::int decisions, (select count(*) from skill_progress_event where user_id = $1)::int progress`, [u.id]);
+
+  test('the role\'s 12 skills with the proficiency scale plus «not tried» and «unsure»; the notice says it is not evidence', async () => {
+    const u = await graduate();
+    const v = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data;
+    assert.equal(v.items.length, 12); assert.equal(v.confidence, 'observed');
+    assert.deepEqual(v.scale.map((x: { key: string }) => x.key), ['foundation', 'working', 'independent', 'advanced', 'not_tried', 'unsure']);
+    assert.match(v.noticeAr, /ليس مهارة مُثبتة/); assert.match(v.notEvidenceAr, /لا يُحتسب دليلًا/);
+    assert.ok(v.items.every((i: { latest: unknown }) => i.latest === null));
+  });
+
+  test('saving a self-assessment changes no claim, evidence, decision, progress, level, snapshot strength or next step; history is kept', async () => {
+    const u = await graduate();
+    const skills = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data.items as { skillId: string }[];
+    const before = await state(u);
+    const stepBefore = (await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data;
+    const r = (await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'advanced', note: 'أثق بها كثيرًا' }, { skillId: skills[1]!.skillId, rating: 'unsure' }] }).expect(200)).body.data;
+    assert.equal(r.recorded, 2);
+    assert.deepEqual(await state(u), before, 'nothing in the evidence chain moved');
+    const page = (await http.get('/v1/me/track-skills').set(auth(u)).expect(200)).body.data as { items: { skillId: string; verification: { level: string } }[] };
+    assert.ok(page.items.every((s) => s.verification.level === 'gap'), 'every level is still «no evaluated evidence», even the one self-rated advanced');
+    const detail = (await http.get(`/v1/me/track-skills/${skills[0]!.skillId}`).set(auth(u)).expect(200)).body.data;
+    assert.deepEqual([detail.selfAssessment.rating, detail.selfAssessment.ratingAr, detail.skill.verification.level], ['advanced', 'متقدم', 'gap']);
+    const snap = (await http.get('/v1/me/career-snapshot').set(auth(u)).expect(200)).body.data;
+    assert.equal(snap.strengths.length, 0, 'a self-rating is never a strength');
+    assert.ok(snap.selfAssessed.length === 2 && snap.selfAssessed.every((x: { source: string }) => x.source === 'self_assessment'));
+    assert.deepEqual((await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data, stepBefore, 'the next step is unchanged');
+    // Same values again: nothing new recorded; a change: one new row, the old one kept.
+    assert.equal((await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'advanced', note: 'أثق بها كثيرًا' }] }).expect(200)).body.data.recorded, 0);
+    assert.equal((await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'working' }] }).expect(200)).body.data.recorded, 1);
+    assert.equal(Number((await one(`select count(*)::int n from skill_self_assessment where user_id = $1 and skill_id = $2`, [u.id, skills[0]!.skillId])).n), 2, 'history kept');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'profile.skills_declared' and user_id = $1`, [u.id])).n), 2, 'audited (no audit for an unchanged save)');
+  });
+
+  test('private: another graduate sees none of it; a skill outside the role and a rating outside the scale are refused; no public or agent path reads it', async () => {
+    const u = await graduate();
+    const skills = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data.items as { skillId: string }[];
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'independent', note: 'ملاحظة خاصة جدًا' }] }).expect(200);
+    const other = await graduate();
+    const ov = (await http.get('/v1/me/self-assessment').set(auth(other)).expect(200)).body.data;
+    assert.ok(ov.items.every((i: { latest: unknown }) => i.latest === null), "another graduate never sees a self-assessment");
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: '00000000-0000-4000-8000-000000000000', rating: 'working' }] }).expect(422);
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'expert' }] }).expect(422);
+    const noGoal = await newUser(); await http.post('/v1/me/bootstrap').set(auth(noGoal)).send({}).expect(201);
+    await http.put('/v1/me/self-assessment').set(auth(noGoal)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'working' }] }).expect(409);
+    // Career guidance (the agent path) never receives the private note.
+    const g = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'career_guidance' }).expect(201)).body.data;
+    const inv = await one(`select allowed_context from agent_invocation where id = $1`, [g.invocationId]);
+    assert.ok(!JSON.stringify(g).includes('ملاحظة خاصة جدًا') && !JSON.stringify(inv).includes('selfAssess'), 'no self-assessment reaches an agent');
+    // No public path: the public report and share routes read claims, never this table.
+    const src = (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'report.service.js'), 'utf8') + (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'share.service.js'), 'utf8');
+    assert.ok(!src.includes('skill_self_assessment'), 'public report and share never read self-assessments');
+  });
+});

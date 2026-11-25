@@ -13,7 +13,7 @@ import { GuidancePanel } from '../../components/GuidancePanel';
  */
 const SOURCE_AR: Record<string, string> = {
   career_goal: 'المصدر: هدفك المهني', skill_claim: 'المصدر: سجل التحقق', role_requirement: 'المصدر: متطلبات الدور', project: 'المصدر: أعمالك',
-  evaluation: 'المصدر: نتيجة التقييم', agent_proposal: 'المصدر: اقتراح ينتظرك', activity_catalogue: 'المصدر: أنشطة دورك',
+  evaluation: 'المصدر: نتيجة التقييم', agent_proposal: 'المصدر: اقتراح ينتظرك', activity_catalogue: 'المصدر: أنشطة دورك', self_assessment: 'المصدر: تقييمك الذاتي',
 };
 
 export default function SnapshotPage() {
@@ -52,6 +52,14 @@ export default function SnapshotPage() {
         <h2>ثلاث فجوات</h2>
         <p className="micro muted">{s.gapOrderAr}</p>
         <ul className="body-sm">{s.gaps.map((x) => <li key={x.sourceRef}><a className="link" href={`/skills/${x.sourceRef}`}>{x.textAr}</a> <Source x={x} /></li>)}</ul>
+      </section>
+
+      <section className="card" data-testid="snapshot-self">
+        <h2>تقديرك الذاتي</h2>
+        <p className="micro muted">تقدير ذاتي لا يُحتسب دليلًا ولا نقطة قوة، ولا يظهر لغيرك.</p>
+        {s.selfAssessed.length ? <ul className="body-sm">{s.selfAssessed.map((x) => <li key={x.sourceRef}>{x.textAr} <Source x={x} /></li>)}</ul>
+          : <p className="body-sm muted">لم تقيّمي نفسك بعد.</p>}
+        <a className="link" href="/self-assessment">قيّمي نفسك</a>
       </section>
 
       <section className="card" data-testid="snapshot-next">

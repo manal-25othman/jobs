@@ -32,7 +32,7 @@ export function workNextAction(p: { readonly projectId: string; readonly workSta
 
 /* ───────────────────────────────── A01: one next step ───────────────────────────────── */
 
-export type GuidanceSource = 'career_goal' | 'project' | 'evaluation' | 'agent_proposal' | 'activity_catalogue' | 'skill_claim' | 'role_requirement';
+export type GuidanceSource = 'career_goal' | 'project' | 'evaluation' | 'agent_proposal' | 'activity_catalogue' | 'skill_claim' | 'role_requirement' | 'self_assessment';
 
 export interface WorkItem {
   readonly projectId: string;
@@ -109,6 +109,8 @@ export interface SnapshotSkill {
   /** An expert-approved professional class in effect, else null. */
   readonly approvedClass: 'must' | 'core' | 'supporting' | null;
   readonly roleOrder: number;
+  /** FR-U-013: the graduate's latest self-rating, in Arabic, if any — shown apart, never a strength or a level. */
+  readonly selfRatingAr?: string | null;
 }
 
 export interface SourcedStatement { readonly textAr: string; readonly source: GuidanceSource; readonly sourceRef: string | null }
@@ -120,6 +122,8 @@ export interface CareerSnapshot {
   readonly role: SourcedStatement | null;
   readonly strengths: readonly SourcedStatement[];
   readonly gaps: readonly SourcedStatement[];
+  /** FR-U-013 / BR-001: self-assessments, labelled as such; Observed only, never strengths. */
+  readonly selfAssessed: readonly SourcedStatement[];
   readonly gapOrderAr: string;
   readonly nextStep: NextStep;
   readonly limitsAr: readonly string[];
@@ -146,6 +150,7 @@ export function careerSnapshot(input: { readonly roleLabelAr: string | null; rea
     kind: 'CareerSnapshot', agent: 'A02', mode: 'deterministic',
     role: input.roleLabelAr ? { textAr: input.roleLabelAr, source: 'career_goal', sourceRef: input.roleId } : null,
     strengths, gaps,
+    selfAssessed: input.skills.filter((s) => s.selfRatingAr).map((s) => ({ textAr: `«${s.labelAr}»: قدّرتِها «${s.selfRatingAr}»`, source: 'self_assessment' as const, sourceRef: s.skillId })),
     gapOrderAr: classed ? 'مرتّبة حسب تصنيف معتمد من الخبراء' : 'بترتيب الدور كما سُجّل، لا أولوية معتمدة',
     nextStep: input.nextStep, limitsAr,
   };

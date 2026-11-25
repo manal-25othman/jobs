@@ -35,6 +35,13 @@ export default function SkillDetailPage() {
       <h1>{s.labelAr} <span className="term muted" lang="en">{s.labelEn}</span></h1>
       <SkillExplained d={d} token={token} />
 
+      <section className="card" data-testid="self-assessment-card">
+        <h2>تقديرك الذاتي</h2>
+        {d.selfAssessment ? <p className="body-sm" style={{ margin: 0 }}>قدّرتِ نفسك: <strong>{d.selfAssessment.ratingAr}</strong>{d.selfAssessment.note ? ` — ${d.selfAssessment.note}` : ''}</p>
+          : <p className="body-sm muted" style={{ margin: 0 }}>لم تقدّري نفسك في هذه المهارة بعد.</p>}
+        <p className="micro muted">تقدير ذاتي: لا يُحتسب دليلًا، ولا يغيّر مستوى التحقق، ولا يظهر لأي جهة خارجية. <a className="link" href="/self-assessment">قيّمي نفسك</a></p>
+      </section>
+
       <h2 style={{ marginTop: 8 }}>حالتك في هذه المهارة</h2>
       <section className="card">
         <h2>١ · رحلة المهارة</h2>

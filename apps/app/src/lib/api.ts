@@ -328,6 +328,8 @@ export interface TrackSkillDetail {
   activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];
   /** Phase B package 2: the deterministic A07 recommendation (registry only, mandatory practice, never a level). */
   learning?: LearningPlan;
+  /** FR-U-013: the graduate's own latest self-assessment (Observed only; never a level). */
+  selfAssessment?: { rating: string; ratingAr: string; note: string | null; at: string; count: number } | null;
 }
 export interface RecommendedResource {
   id: string; code: string; titleAr: string; titleEn: string; provider: string | null; typeAr: string; languageAr: string; costAr: string;
@@ -363,7 +365,7 @@ export interface ChallengeView {
 export interface NextStep { code: string; textAr: string; whyAr: string; href: string; source: string; sourceRef: string | null; agent: 'A01' }
 export interface SourcedStatement { textAr: string; source: string; sourceRef: string | null }
 export interface CareerSnapshot {
-  kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[];
+  kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[]; selfAssessed: SourcedStatement[];
   gapOrderAr: string; nextStep: NextStep; limitsAr: string[];
 }
 export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback';
@@ -371,4 +373,12 @@ export interface GuidanceAnswer {
   capability: GuidanceCapability; labelAr: string; contracts: string[]; toolsUsed: string[]; noticeAr: string; withheldAr: string | null;
   status: string; provider: string; testOnly: true; ruleId: string;
   proposals: { id: string; proposalType: string; summary: string; structuredPayload: Record<string, unknown>; warnings: string[]; lifecycle: string }[];
+}
+
+/* ───────────── FR-U-013 self-assessment (Observed only) ───────────── */
+export interface SelfAssessmentView {
+  role: { id: string; labelAr: string } | null; noticeAr: string; notEvidenceAr: string; confidence: 'observed';
+  scale: { key: string; labelAr: string; descriptorAr: string }[];
+  items: { skillId: string; labelAr: string; latest: { rating: string; ratingAr: string; note: string | null; at: string; count: number } | null }[];
+  recorded?: number;
 }

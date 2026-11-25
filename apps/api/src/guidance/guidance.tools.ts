@@ -5,6 +5,7 @@ import { CareerService } from '../slice1/career.service';
 import { ActivityCatalogueService } from '../slice1/activity-catalogue.service';
 import { EvaluationService } from '../slice1/evaluation.service';
 import { ReadinessService } from '../readiness/readiness.service';
+import { SelfAssessmentService } from '../readiness/self-assessment.service';
 
 /**
  * Phase B, package 5 — the permission-aware READ tools behind the three guidance capabilities.
@@ -23,6 +24,7 @@ export class GuidanceTools {
     private readonly catalogue: ActivityCatalogueService,
     private readonly evaluations: EvaluationService,
     private readonly readiness: ReadinessService,
+    private readonly selfAssessment: SelfAssessmentService,
   ) {}
 
   /** occupation_profile — the graduate's current role, as the goal page shows it (visible content only). */
@@ -49,18 +51,19 @@ export class GuidanceTools {
   /** my_progress — the graduate's own skills, work and pending proposals (row security; never another user's). */
   async myProgress(cap: GuidanceCapability, userId: string) {
     assertToolAllowed(cap, 'my_progress');
-    const [skills, work, catalogue, pending] = await Promise.all([
+    const [skills, work, catalogue, pending, selfRatings] = await Promise.all([
       this.readiness.trackSkills(userId),
       this.catalogue.projectStatuses(userId, null),
       this.catalogue.list(userId),
       this.pendingProposals(userId),
+      this.selfAssessment.latest(userId),
     ]);
     return {
       hasGoal: catalogue.unavailableReason !== 'no_career_goal',
       roleAvailable: catalogue.unavailableReason !== 'role_unavailable',
       role: skills.role,
       skills: skills.items.map((s, i) => ({ skillId: s.skillId, labelAr: s.labelAr, level: s.verification.level, standingEvaluatedCount: s.evidence.standingEvaluatedCount,
-        approvedClass: s.readiness.expertApproved === true && s.readiness.professionalClass ? s.readiness.professionalClass : null, roleOrder: s.readiness.displayOrder ?? i })),
+        approvedClass: s.readiness.expertApproved === true && s.readiness.professionalClass ? s.readiness.professionalClass : null, roleOrder: s.readiness.displayOrder ?? i, selfRatingAr: selfRatings.get(s.skillId)?.ratingAr ?? null })),
       work: work.map((w) => ({ projectId: String(w.id), title: String(w.activity?.titleAr ?? w.title), workStatus: w.workStatus, latestSubmissionId: w.latestSubmission?.id ?? null, updatedAt: new Date(w.updatedAt as string | Date).toISOString() })),
       startableActivityCount: catalogue.items.filter((a) => a.startable && !a.myLatest).length,
       pendingProposals: pending,

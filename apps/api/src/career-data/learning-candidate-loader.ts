@@ -133,5 +133,13 @@ function readDirectChecks(dir: string): DirectCheckFile | null {
   if (!existsSync(dir)) return null;
   const files = readdirSync(dir).filter((f) => /^direct-check-.*\.json$/.test(f)).sort();
   if (files.length === 0) return null;
-  return JSON.parse(readFileSync(join(dir, files[files.length - 1]!), 'utf8')) as DirectCheckFile;
+  // Every recorded pass counts; a later pass (file name order) replaces an earlier record of the same resource or
+  // host only where it actually opened it — a later "not opened" never erases an earlier direct observation.
+  const resources = new Map<string, DirectCheckFile['resources'][number]>(); const hosts = new Map<string, DirectCheckFile['hosts'][number]>();
+  for (const f of files) {
+    const d = JSON.parse(readFileSync(join(dir, f), 'utf8')) as DirectCheckFile;
+    for (const r of d.resources ?? []) if (r.opened || !resources.has(r.code)) resources.set(r.code, r);
+    for (const h of d.hosts ?? []) if (h.opened || !hosts.has(h.host)) hosts.set(h.host, h);
+  }
+  return { resources: [...resources.values()], hosts: [...hosts.values()] };
 }

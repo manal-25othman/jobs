@@ -51,3 +51,4 @@ export * from './workspace-draft.js';
 export * from './activity-materials.js';
 export * from './learning-recommendation.js';
 export * from './career-guidance.js';
+export * from './self-assessment.js';
