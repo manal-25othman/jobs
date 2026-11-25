@@ -120,7 +120,10 @@ export default function ActivityDetailPage() {
       <section className="card" aria-labelledby="deliv">
         <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
           <h2 id="deliv">المخرجات المطلوبة</h2>
-          <span className="chip push"><span className="num">{a.deliverables.length}</span> مخرجات</span>
+          <span className="chip push">
+            <span className="num">{a.deliverables.filter((d) => d.mandatory).length}</span> إلزامية
+            {a.deliverables.some((d) => !d.mandatory) ? <> · <span className="num">{a.deliverables.filter((d) => !d.mandatory).length}</span> اختيارية</> : null}
+          </span>
         </div>
         <div className="rows">
           {a.deliverables.map((d) => (

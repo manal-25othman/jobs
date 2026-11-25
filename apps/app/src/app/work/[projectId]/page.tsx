@@ -19,6 +19,9 @@ import {
 
 interface ProjectRow { id: string; title: string; kind: 'platform_activity' | 'personal_project'; activity_spec_id: string | null }
 type Slot = { status: 'uploading' } | { status: 'done'; uploadId: string; name: string; size: number } | { status: 'error'; message: string; detail: string };
+type SaveState = { kind: 'idle' } | { kind: 'pending' } | { kind: 'saving' } | { kind: 'saved'; at: Date } | { kind: 'error'; attempts: number } | { kind: 'conflict' } | { kind: 'off'; reason: string };
+interface DraftView { texts: Record<string, string>; files: Record<string, { uploadId: string; name: string; size: number | null }>; skillIds: string[]; disclosure: Record<string, unknown>; revision: number; updatedAt: string }
+const timeAr = (d: Date) => d.toLocaleTimeString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
 
 const dateAr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ar-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' }) : '');
 
@@ -30,7 +33,10 @@ const dateAr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('
  * positional, and nothing declares a technical fact (no ticks, no signals). Submitting sends the work and starts
  * its evaluation in the same explicit click; the evaluation page only reads.
  *
- * Work in progress is NOT saved before submission (no draft API exists): said plainly, never simulated.
+ * Phase B, package 4 (FR-U-025): work in progress is saved automatically as a private DRAFT (texts, file references,
+ * selected skills, work-method answers) and restored on return. The save state is always shown; a failed save is
+ * retried and can be retried by hand; a save from a stale window is refused rather than overwriting newer work. A draft
+ * is never evidence — the submission is still built from what is sent on «تسليم», and it removes the draft.
  */
 export default function WorkspacePage() {
   const { token, loading } = useSession();
@@ -50,6 +56,11 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<{ textAr: string; detail: string } | null>(null);
   const submitting = useRef(false);
+  const [save, setSave] = useState<SaveState>({ kind: 'idle' });
+  const revision = useRef<number | null>(null);
+  const restored = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaved = useRef<string | null>(null);
 
   useEffect(() => {
     if (!token || !params?.projectId) return;
@@ -69,7 +80,22 @@ export default function WorkspacePage() {
         if (p.activity_spec_id) {
           const a = await api<ActivityDetail>(`/me/activities/${encodeURIComponent(p.activity_spec_id)}`, { token });
           setActivity(a);
-          setSkills(a.skills.filter((s) => s.depth === 'primary').map((s) => s.id));
+          // FR-U-025: restore the private draft, if any; otherwise start from the activity's primary skills.
+          const draft = await api<DraftView | null>(`/projects/${id}/draft`, { token });
+          if (draft) {
+            revision.current = draft.revision;
+            setTexts(draft.texts);
+            setSlots(Object.fromEntries(Object.entries(draft.files).map(([k, f]) => [k, { status: 'done' as const, uploadId: f.uploadId, name: f.name, size: f.size ?? 0 }])));
+            setSkills(draft.skillIds.length ? draft.skillIds : a.skills.filter((s) => s.depth === 'primary').map((s) => s.id));
+            setAnswers(draft.disclosure);
+            setSave({ kind: 'saved', at: new Date(draft.updatedAt) });
+            lastSaved.current = JSON.stringify([draft.texts, Object.fromEntries(Object.entries(draft.files).map(([k, f]) => [k, f.uploadId])),
+              draft.skillIds.length ? draft.skillIds : a.skills.filter((s) => s.depth === 'primary').map((s) => s.id), draft.disclosure]);
+          } else {
+            setSkills(a.skills.filter((s) => s.depth === 'primary').map((s) => s.id));
+          }
+          if (!a.available) setSave({ kind: 'off', reason: 'unavailable' });
+          restored.current = true;
         }
       } catch (e) {
         if (isNotFound(e)) setNotFound(true); else setError((e as Error).message);
@@ -95,15 +121,51 @@ export default function WorkspacePage() {
   const progress = deliverableProgress(deliverables.map((d) => ({
     key: d.key, required: d.mandatory, completed: d.kind === 'file' ? !!uploaded[d.key] : (texts[d.key] ?? '').trim().length > 0,
   })));
-  const dirty = Object.keys(slots).length > 0 || Object.values(texts).some((t) => t.trim().length > 0);
+  const unsaved = anyUploading || save.kind === 'pending' || save.kind === 'saving' || save.kind === 'error' || save.kind === 'conflict';
+  const draftFiles = Object.fromEntries(Object.entries(slots).flatMap(([k, sl]) => (sl.status === 'done' ? [[k, sl.uploadId]] : [])));
+  const draftKey = JSON.stringify([texts, draftFiles, skills, answers]);
 
-  // No draft is saved anywhere: warn before leaving with unsent work rather than pretend it is kept.
+  async function saveDraft(attempt = 0): Promise<void> {
+    if (!token || !project || submitting.current) return;
+    const key = draftKey;
+    setSave({ kind: 'saving' });
+    try {
+      const d = await api<DraftView>(`/projects/${encodeURIComponent(project.id)}/draft`, {
+        method: 'PUT', token, body: { texts, files: draftFiles, skillIds: skills, disclosure: answers, revision: revision.current },
+      });
+      revision.current = d.revision; lastSaved.current = key;
+      setSave({ kind: 'saved', at: new Date(d.updatedAt) });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (/draft_conflict/.test(msg)) { setSave({ kind: 'conflict' }); return; }
+      if (/activity_unavailable/.test(msg)) { setSave({ kind: 'off', reason: 'unavailable' }); return; }
+      // Transient failure: retry with backoff (2s, 4s, 8s), then wait for the graduate's own retry.
+      if (attempt < 3) { setSave({ kind: 'error', attempts: attempt + 1 }); saveTimer.current = setTimeout(() => void saveDraft(attempt + 1), 2000 * 2 ** attempt); return; }
+      setSave({ kind: 'error', attempts: attempt + 1 });
+    }
+  }
+
+  // Autosave: one second after the last change (never while uploading, submitting, or for a read-only activity).
   useEffect(() => {
-    if (!dirty) return;
+    if (!restored.current || !activity?.available || submitting.current || anyUploading) return;
+    if (save.kind === 'conflict' || save.kind === 'off') return;
+    if (draftKey === lastSaved.current) return; // nothing changed since the last save (or the restore)
+    const meaningful = Object.values(texts).some((t) => t.trim() !== '') || Object.keys(draftFiles).length > 0 || Object.keys(answers).length > 0;
+    if (revision.current === null && !meaningful) return; // opening a workspace never creates an empty draft
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSave((s) => (s.kind === 'saving' ? s : { kind: 'pending' }));
+    saveTimer.current = setTimeout(() => void saveDraft(), 1000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, anyUploading]);
+
+  // Warn before leaving only while something is NOT yet saved (an upload, a pending or failed save).
+  useEffect(() => {
+    if (!unsaved) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [unsaved]);
 
   async function onFile(key: string, file: File | null) {
     if (!token) return;
@@ -121,6 +183,7 @@ export default function WorkspacePage() {
   async function submit() {
     if (!token || !project || submitting.current || problems.length) return;
     submitting.current = true; setSubmitError(null);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     try {
       setBusy('جارٍ التسليم…');
       const sub = await api<{ id: string }>(`/projects/${encodeURIComponent(project.id)}/submissions`, {
@@ -138,7 +201,9 @@ export default function WorkspacePage() {
       // The explicit act of submitting also asks for the evaluation. If that request fails, the evaluation page
       // offers the same explicit action; it never starts one by itself.
       await api(`/submissions/${encodeURIComponent(sub.id)}/evaluate`, { method: 'POST', token }).catch(() => undefined);
-      setSlots({}); setTexts({});
+      // The submission removed the draft (same transaction); nothing local is kept either.
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      revision.current = null; setSlots({}); setTexts({});
       router.push(`/evaluation?submission=${encodeURIComponent(sub.id)}`);
     } catch (e) {
       setSubmitError(friendlyErrorAr((e as Error).message, 'تعذّر التسليم. لم يُرسل شيء؛ راجعي المخرجات ثم حاولي مجددًا.'));
@@ -210,6 +275,7 @@ export default function WorkspacePage() {
             <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <h2 id="outputs">المخرجات المطلوبة</h2>
               <span className="chip push" aria-live="polite">{progress.labelAr}</span>
+              <SaveIndicator state={save} onRetry={() => void saveDraft()} />
             </div>
             <div className="rows">
               {activity.deliverables.map((d) => {
@@ -219,13 +285,19 @@ export default function WorkspacePage() {
                 return (
                   <div key={d.key} className="field">
                     <label className="field__label" htmlFor={inputId}>
-                      {label} <span className="chip" style={{ marginInlineStart: 6 }}>{d.mandatory ? 'إلزامي' : 'اختياري'}</span>
+                      {label} <span className={d.mandatory ? 'chip chip--info' : 'chip'} style={{ marginInlineStart: 6 }}>{d.mandatory ? 'إلزامي' : 'اختياري'}</span>
                     </label>
                     {d.kind === 'file' ? (
                       <>
-                        <input id={inputId} className="input" type="file" disabled={slot?.status === 'uploading' || !!busy}
-                               aria-describedby={`${inputId}-state`}
-                               onChange={(e) => void onFile(d.key, e.target.files?.[0] ?? null)} />
+                        <span className="file-pick">
+                          <input id={inputId} className="file-pick__input" type="file" disabled={slot?.status === 'uploading' || !!busy}
+                                 aria-describedby={`${inputId}-state`}
+                                 onChange={(e) => { void onFile(d.key, e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                          <label htmlFor={inputId} className="btn btn--secondary btn--sm file-pick__button" aria-hidden="true">
+                            {slot?.status === 'done' ? 'استبدلي الملف' : 'اختاري ملفًا'}
+                          </label>
+                          {!slot ? <span className="micro muted">لم يُختر ملف بعد</span> : null}
+                        </span>
                         <span id={`${inputId}-state`} className="micro" aria-live="polite">
                           {slot?.status === 'uploading' ? <span className="muted">جارٍ الرفع…</span> : null}
                           {slot?.status === 'done' ? <span className="chip chip--success">مرفوع: <span className="term">{slot.name}</span> · <span className="num">{sizeLabel(slot.size)}</span></span> : null}
@@ -291,7 +363,7 @@ export default function WorkspacePage() {
               </div>
             ) : <p className="body-sm" style={{ margin: 0 }}>كل المطلوب جاهز للتسليم.</p>}
             <p className="disclaimer">
-              لا يُحفظ عملك قبل التسليم: إن غادرتِ الصفحة أو أعدتِ تحميلها فستحتاجين إلى إعادة رفع الملفات وكتابة النصوص.
+              يُحفظ عملك تلقائيًا مسودةً خاصة بك، فتجدينه كما تركتِه حين تعودين. المسودة ليست تسليمًا ولا دليلًا، ولا يراها أحد غيرك؛ وتُحذف عند التسليم.
             </p>
           </section>
 
@@ -330,4 +402,30 @@ export default function WorkspacePage() {
       </section>
     </main>
   );
+}
+
+/** The draft save state, in words and never by colour alone (FR-U-025). */
+function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
+  const body = (() => {
+    switch (state.kind) {
+      case 'idle': return <span className="micro muted">يُحفظ عملك تلقائيًا</span>;
+      case 'pending': return <span className="micro muted">تغييرات لم تُحفظ بعد…</span>;
+      case 'saving': return <span className="micro muted">جارٍ الحفظ…</span>;
+      case 'saved': return <span className="chip chip--success">تم الحفظ · <span className="num">{timeAr(state.at)}</span></span>;
+      case 'error': return (
+        <>
+          <span className="field__error">تعذّر الحفظ{state.attempts <= 3 ? '، نعيد المحاولة…' : ''}</span>
+          {state.attempts > 3 ? <button type="button" className="btn btn--ghost btn--sm" onClick={onRetry}>أعيدي المحاولة</button> : null}
+        </>
+      );
+      case 'conflict': return (
+        <>
+          <span className="field__error">حُفظ هذا العمل من نافذة أخرى.</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => window.location.reload()}>اعرضي أحدث نسخة</button>
+        </>
+      );
+      case 'off': return <span className="micro muted">لا يُحفظ عمل جديد لنشاط لم يعد ضمن أنشطتك</span>;
+    }
+  })();
+  return <span className="save-state" role="status" aria-live="polite" data-testid="draft-save-state">{body}</span>;
 }

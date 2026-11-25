@@ -222,6 +222,9 @@ export class SubmissionService {
         payload: { projectId, artifactCount: hasAny, uploads: mapped.length, fileMapping: input.files !== undefined ? 'explicit' : 'legacy_positional', links: input.externalUrls?.length ?? 0 },
       });
 
+      // FR-U-025: the workspace draft has served its purpose. It never became evidence; it is removed with the submission.
+      await c.query('delete from project_draft where project_id = $1 and user_id = $2', [projectId, userId]);
+
       return { ...sub.rows[0], claimedSkillIds: input.skillIds };
     });
   }

@@ -540,7 +540,9 @@ async function run(browser) {
     check('B2g', 'starting the activity creates a project authorized by the API and opens its workspace', await count('select count(*)::int n from project where id = $1 and user_id = $2', [demoProjectId, u.id]) === 1);
     const ws = await bodyText(page);
     check('B2h', 'the workspace has no tick-boxes claiming technical facts', !(await page.locator('input[type=checkbox]').evaluateAll((els) => els.some((e) => !e.closest('[aria-labelledby="skills-title"]')))));
-    check('B2i', 'the workspace states that nothing is saved before submission', /لا يُحفظ عملك قبل التسليم/.test(ws));
+    check('B2i', 'the workspace states that work is saved automatically as a private draft that is not evidence', /يُحفظ عملك تلقائيًا مسودةً خاصة بك/.test(ws) && /ليست تسليمًا ولا دليلًا/.test(ws));
+    check('B17a', 'opening a workspace creates no draft, and the file controls are in Arabic', await count('select count(*)::int n from project_draft where project_id = $1', [demoProjectId]) === 0
+      && (await page.locator('.file-pick__button').allInnerTexts()).every((t) => t.trim() === 'اختاري ملفًا') && !/Choose File|No file chosen/.test(ws));
     check('B2j', 'submit is disabled until the mandatory deliverables are present', await page.getByRole('button', { name: /أكملي المطلوب أولًا/ }).isDisabled());
     await shot(page, 'U3-workspace-empty-desktop');
 
@@ -548,6 +550,22 @@ async function run(browser) {
     await uploadInto(page, 'file.test', 'HabitList.test.jsx', 'test("empty", () => {});');
     await uploadInto(page, 'file.component', 'HabitList.jsx', 'export function HabitList() {}');
     await page.locator(fileInput('note.coverage')).fill('غطّت الاختبارات الحالة الفارغة والتحميل والخطأ؛ لم تغطِّ التقسيم إلى صفحات.');
+    await answerQuestionnaire(page);
+    // B17 · FR-U-025: the work is saved as a private draft and comes back after a reload — then the submission removes it.
+    await page.locator('[data-testid="draft-save-state"]').getByText('تم الحفظ').waitFor({ timeout: 15000 });
+    await page.waitForTimeout(1500); await page.locator('[data-testid="draft-save-state"]').getByText('تم الحفظ').waitFor({ timeout: 15000 });
+    const draftRow = (await pool.query('select texts, files, user_id from project_draft where project_id = $1', [demoProjectId])).rows[0];
+    check('B17b', 'the draft is saved: the written answer and both file references, owned by the graduate, with no submission or evidence created',
+      draftRow && draftRow.user_id === u.id && Object.keys(draftRow.files).sort().join(',') === 'file.component,file.test' && /الحالة الفارغة/.test(draftRow.texts['note.coverage'] ?? '')
+      && await count('select count(*)::int n from submission where project_id = $1', [demoProjectId]) === 0 && await count('select count(*)::int n from evidence where user_id = $1', [u.id]) === 0);
+    await page.reload(); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
+    await page.locator(`${fileInput('file.component')}-state`).getByText('مرفوع').waitFor();
+    const restored = await bodyText(page);
+    check('B17c', 'after a reload the work is restored: file names, the written answer and the saved state are shown',
+      /HabitList\.jsx/.test(restored) && /HabitList\.test\.jsx/.test(restored) && (await page.locator(fileInput('note.coverage')).inputValue()).includes('الحالة الفارغة')
+      && /تم الحفظ/.test(restored) && (await page.locator('.file-pick__button').allInnerTexts()).every((t) => t.trim() === 'استبدلي الملف'));
+    await shot(page, 'B17-workspace-restored-desktop');
+    await page.setViewportSize({ width: 390, height: 844 }); await shot(page, 'B17-workspace-restored-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
     await answerQuestionnaire(page);
     await shot(page, 'U3-workspace-ready-desktop');
     const submit = page.getByRole('button', { name: 'تسليم للتقييم' });
@@ -557,6 +575,7 @@ async function run(browser) {
     await page.locator('section.card, .next-action, .banner').first().waitFor();
     demoSubmissionId = new URL(page.url()).searchParams.get('submission');
     const files = (await pool.query(`select a.key, u.declared_name from submission_artifact a join upload u on u.id = a.upload_id where a.submission_id = $1 order by a.key`, [demoSubmissionId])).rows;
+    check('B17d', 'submitting removed the draft (same transaction)', await count('select count(*)::int n from project_draft where project_id = $1', [demoProjectId]) === 0);
     check('B3b', 'files sent in reverse order are bound to the deliverables of their slots', JSON.stringify(files) === JSON.stringify([{ key: 'file.component', declared_name: 'HabitList.jsx' }, { key: 'file.test', declared_name: 'HabitList.test.jsx' }]), JSON.stringify(files));
     check('B3c', 'a double click created exactly one submission', await count('select count(*)::int n from submission where project_id = $1', [demoProjectId]) === 1);
     const keys = (await pool.query(`select key from submission_artifact where submission_id = $1 order by key`, [demoSubmissionId])).rows.map((r) => r.key);

@@ -15,6 +15,7 @@ import { UploadService } from './upload.service';
 import { WithdrawalService } from './withdrawal.service';
 import { ActivityCatalogueService } from './activity-catalogue.service';
 import { AgentService } from '../agents/agent.service';
+import { DraftService } from './draft.service';
 import { Delete } from '@nestjs/common';
 import { workStatus } from '@naqla/domain';
 
@@ -39,6 +40,7 @@ export class Slice1Controller {
     private readonly agents: AgentService,
     private readonly withdrawal: WithdrawalService,
     private readonly activities: ActivityCatalogueService,
+    private readonly drafts: DraftService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -133,6 +135,24 @@ export class Slice1Controller {
     },
   ) {
     return { ok: true, data: await this.submissions.createSubmission(user.id, projectId, body) };
+  }
+
+  /* ───────────────────── workspace drafts (FR-U-025) ───────────────────── */
+
+  @Get('projects/:id/draft')
+  async getDraft(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.drafts.get(user.id, id) };
+  }
+
+  @Put('projects/:id/draft')
+  async saveDraft(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string,
+    @Body() body: { texts?: Record<string, unknown>; files?: Record<string, unknown>; skillIds?: unknown[]; disclosure?: Record<string, unknown>; revision?: number | null }) {
+    return { ok: true, data: await this.drafts.save(user.id, id, body) };
+  }
+
+  @Delete('projects/:id/draft')
+  async clearDraft(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.drafts.clear(user.id, id) };
   }
 
   /* ───────────────────────────── uploads ────────────────────────────── */

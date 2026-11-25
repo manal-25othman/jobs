@@ -47,3 +47,4 @@ export * from './professional-classification.js';
 export const DOMAIN_RULESET_VERSION = '0.21.0';
 export * from './career-claims.js';
 export * from './admin-governance.js';
+export * from './workspace-draft.js';

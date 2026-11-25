@@ -14,6 +14,7 @@ import { ShareService } from './share.service';
 import { UploadService } from './upload.service';
 import { WithdrawalService } from './withdrawal.service';
 import { ActivityCatalogueService } from './activity-catalogue.service';
+import { DraftService } from './draft.service';
 import { UserProvisioningService } from '../auth/user-provisioning.service';
 
 @Module({
@@ -21,7 +22,7 @@ import { UserProvisioningService } from '../auth/user-provisioning.service';
   controllers: [Slice1Controller, PublicReportController],
   providers: [
     UserProvisioningService, CareerService, SubmissionService,
-    EvaluationService, AssetService, ReportService, ShareService, UploadService, WithdrawalService, ActivityCatalogueService,
+    EvaluationService, AssetService, ReportService, ShareService, UploadService, WithdrawalService, ActivityCatalogueService, DraftService,
   ],
 })
 export class Slice1Module {}
