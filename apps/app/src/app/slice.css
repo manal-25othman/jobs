@@ -150,3 +150,7 @@ h2 { font-size: var(--fs-h2); font-weight: 500; margin: 0; }
 .file-pick__input:disabled + .file-pick__button { opacity: .45; cursor: not-allowed; }
 .file-pick__button { cursor: pointer; }
 .save-state { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Phase B package 2 — learning resources on the skill page */
+.resource { padding-block: 4px; }
+.resource--primary { padding-block-start: 0; }

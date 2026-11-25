@@ -357,14 +357,14 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
       if (cur.rowCount && !EDITABLE.includes(cur.rows[0].review_status)) { skippedFrozen.push(`learning_resource ${lr.code}`); continue; }
       const r = await c.query(
         `insert into learning_resource (code, skill_id, title, title_ar, url, language, provenance_class, provenance_source, provider, resource_type, level, duration_minutes, free_or_paid, why_recommended_ar, why_recommended_en,
-           covers_target_level, quality_status, last_checked, practice_activity_spec_id, access_notes_en, drafting_aid, is_demo_fixture)
-         values ($1,$2,$3,$4,$5,$6,'curated',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+           covers_target_level, quality_status, last_checked, practice_activity_spec_id, access_notes_en, drafting_aid, is_demo_fixture, duration_basis)
+         values ($1,$2,$3,$4,$5,$6,'curated',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
          on conflict (code) where is_demo_fixture = ${demo} do update set skill_id = excluded.skill_id, title = excluded.title, title_ar = excluded.title_ar, url = excluded.url, language = excluded.language, provider = excluded.provider, resource_type = excluded.resource_type,
-           level = excluded.level, duration_minutes = excluded.duration_minutes, free_or_paid = excluded.free_or_paid, why_recommended_ar = excluded.why_recommended_ar, why_recommended_en = excluded.why_recommended_en,
+           level = excluded.level, duration_minutes = excluded.duration_minutes, duration_basis = excluded.duration_basis, free_or_paid = excluded.free_or_paid, why_recommended_ar = excluded.why_recommended_ar, why_recommended_en = excluded.why_recommended_en,
            covers_target_level = excluded.covers_target_level, quality_status = excluded.quality_status, last_checked = excluded.last_checked, practice_activity_spec_id = excluded.practice_activity_spec_id, access_notes_en = excluded.access_notes_en
          returning id`,
         [lr.code, sid, lr.title_en, lr.title_ar, lr.url, lr.language, provenanceSource, lr.provider, lr.resource_type, lr.level, lr.duration_minutes, lr.free_or_paid, lr.why_recommended_ar, lr.why_recommended_en,
-         lr.covers_target_level, lr.quality_status, lr.last_checked, act, lr.access_notes_en ?? null, aid, demo]);
+         lr.covers_target_level, lr.quality_status, lr.last_checked, act, lr.access_notes_en ?? null, aid, demo, lr.duration_basis ?? null]);
       bump('learning_resource'); for (const s of lr.source_refs) await sourceRef(c, 'learning_resource', r.rows[0].id, sourceIds.get(s)!);
     }
     /* ── provenance for global registries ── */

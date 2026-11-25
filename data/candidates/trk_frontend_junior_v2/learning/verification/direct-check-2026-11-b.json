@@ -1,0 +1,205 @@
+{
+  "_label": "DIRECT LINK CHECK (second pass, 7 approved hosts) — research record, not an approval",
+  "method": "Second pass over the 9 records with opened=false in direct-check-2026-11.json. Each url from ../resources.candidate.json (matched by code) was requested once with curl (GET, following redirects of that url only, 30 s timeout) through the environment's HTTPS proxy; only the 7 approved hosts (react.dev, google.github.io, github.com, www.gov.uk, cucumber.io, www.atlassian.com, learn.microsoft.com) were contacted. Status code and effective URL from curl; page_title from the served <title>; language_served from the <html lang> attribute; free_access from whether the served HTML contained the article text with no sign-in/paywall prompt; duration only where the page text states one. No scripts were executed, nothing else was downloaded, nothing was crawled. For each host, the licence/terms page linked from the resource page footer was opened once (only if it was on an approved host) and short phrases were quoted. docs.github.com was attempted once and refused by the proxy ('CONNECT tunnel failed, response 403'), so per instructions it was skipped and is not in hosts; its licence remains 'unclear' as in the first pass. hosts_without_terms counts hosts where no licence/terms page could be opened or the page opened was not a terms page.",
+  "environment": "jobs — NAQLA link check (7 hosts)",
+  "checked_at": "2026-11-25T18:44:20Z/2026-11-25T18:45:16Z",
+  "resources": [
+    {
+      "code": "lrc_ui_state_interaction_1",
+      "url": "https://react.dev/learn/reacting-to-input-with-state",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://react.dev/learn/reacting-to-input-with-state",
+      "page_title": "Reacting to Input with State – React",
+      "title_matches": true,
+      "language_served": "en",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:20Z",
+      "notes": "Served title matches title_en; difference is site suffix only. Served HTML contained the article text with no sign-in or paywall prompt. No duration stated."
+    },
+    {
+      "code": "lrc_code_reading_1",
+      "url": "https://google.github.io/eng-practices/review/reviewer/navigate.html",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://google.github.io/eng-practices/review/reviewer/navigate.html",
+      "page_title": "Navigating a CL in review | eng-practices",
+      "title_matches": true,
+      "language_served": "en-US",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:21Z",
+      "notes": "Served title matches title_en in substance; site suffix differs ('eng-practices' vs 'Google Engineering Practices'). Served HTML contained the article text with no sign-in or paywall prompt. No duration stated."
+    },
+    {
+      "code": "lrc_version_control_basics_4",
+      "url": "https://github.com/skills/introduction-to-github",
+      "opened": false,
+      "http_status": 403,
+      "final_url": null,
+      "page_title": null,
+      "title_matches": null,
+      "language_served": null,
+      "free_access": "unknown",
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:21Z",
+      "notes": "Request refused by this session's GitHub proxy with HTTP 403, 'GitHub access to this repository is not enabled for this session'; the 403 is from the proxy, not from github.com. Not worked around."
+    },
+    {
+      "code": "lrc_requirements_reading_1",
+      "url": "https://www.gov.uk/service-manual/agile-delivery/writing-user-stories",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://www.gov.uk/service-manual/agile-delivery/writing-user-stories",
+      "page_title": "Writing user stories - Service Manual - GOV.UK",
+      "title_matches": true,
+      "language_served": "en",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:21Z",
+      "notes": "Served title is identical to title_en. Served HTML contained the article text with no sign-in or paywall prompt. No duration stated."
+    },
+    {
+      "code": "lrc_requirements_reading_2",
+      "url": "https://cucumber.io/docs/gherkin/reference/",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://cucumber.io/docs/gherkin/reference/",
+      "page_title": "Reference | Cucumber",
+      "title_matches": true,
+      "language_served": "en",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:22Z",
+      "notes": "Served <title> is 'Reference | Cucumber'; the page sits under the Gherkin section and its heading area reads 'Gherkin Reference', so it matches title_en 'Reference (Gherkin) — Cucumber' in substance. Served HTML contained the article text with no sign-in or paywall prompt. No duration stated."
+    },
+    {
+      "code": "lrc_requirements_reading_3",
+      "url": "https://cucumber.io/docs/bdd/better-gherkin/",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://cucumber.io/docs/bdd/better-gherkin/",
+      "page_title": "Writing better Gherkin | Cucumber",
+      "title_matches": true,
+      "language_served": "en",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:22Z",
+      "notes": "Served title matches title_en; difference is punctuation only. Served HTML contained the article text with no sign-in or paywall prompt. (The words 'log in' and 'subscribe' appear only inside the article's Gherkin examples.) No duration stated."
+    },
+    {
+      "code": "lrc_requirements_reading_4",
+      "url": "https://www.atlassian.com/work-management/project-management/acceptance-criteria",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://www.atlassian.com/work-management/project-management/acceptance-criteria",
+      "page_title": "What is Acceptance Criteria? Definition, Examples, & Tips",
+      "title_matches": true,
+      "language_served": "en",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:23Z",
+      "notes": "Served title matches title_en (title_en adds the provider name and '(secondary)'). Article text was served; the site header has a generic 'Sign in' link and product promotions, but no sign-in or paywall gate on the article. No duration stated."
+    },
+    {
+      "code": "lrc_technical_explanation_2",
+      "url": "https://google.github.io/eng-practices/review/developer/cl-descriptions.html",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://google.github.io/eng-practices/review/developer/cl-descriptions.html",
+      "page_title": "Writing good CL descriptions | eng-practices",
+      "title_matches": true,
+      "language_served": "en-US",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:23Z",
+      "notes": "Served title matches title_en in substance; site suffix differs. Served HTML contained the article text with no sign-in or paywall prompt. No duration stated."
+    },
+    {
+      "code": "lrc_technical_explanation_4",
+      "url": "https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record",
+      "opened": true,
+      "http_status": 200,
+      "final_url": "https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record",
+      "page_title": "Maintain an architecture decision record (ADR) - Microsoft Azure Well-Architected Framework | Microsoft Learn",
+      "title_matches": true,
+      "language_served": "en-us",
+      "free_access": true,
+      "duration_stated_by_provider": null,
+      "checked_at": "2026-11-25T18:44:23Z",
+      "notes": "Served title matches title_en; difference is punctuation/site suffix only. Article text was served in full; the page also contains Microsoft Learn's standard 'Access to this page requires authorization' template text, which did not gate the article. No duration stated."
+    }
+  ],
+  "hosts": [
+    {
+      "host": "react.dev",
+      "terms_url": "https://lfprojects.org/policies/terms-of-use/",
+      "opened": false,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": null,
+      "checked_at": "2026-11-25T18:44:20Z",
+      "notes": "Resource page footer links 'Terms' to lfprojects.org, which is not one of the approved hosts, so it was not opened. Footer reads 'Copyright © React a Series of LF Projects, LLC and its contributors'; no content licence stated on the page itself."
+    },
+    {
+      "host": "google.github.io",
+      "terms_url": null,
+      "opened": false,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": null,
+      "checked_at": "2026-11-25T18:45:16Z",
+      "notes": "Neither eng-practices page opened here contains a licence notice or a terms/licence link. One attempt at the project's licence file (https://github.com/google/eng-practices/blob/master/LICENSE) was refused by this session's GitHub proxy with HTTP 403; not worked around."
+    },
+    {
+      "host": "github.com",
+      "terms_url": "https://github.com/site/terms",
+      "opened": false,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": null,
+      "checked_at": "2026-11-25T18:45:16Z",
+      "notes": "Refused by this session's GitHub proxy with HTTP 403, 'GitHub access to this repository is not enabled for this session'; the 403 is from the proxy, not from github.com. Not worked around."
+    },
+    {
+      "host": "www.gov.uk",
+      "terms_url": "https://www.gov.uk/help/terms-conditions",
+      "opened": true,
+      "licence_as_stated": "Open Government Licence v3.0",
+      "linking_allowed_note": "'We welcome and encourage other websites to link to GOV.UK.' Permission needed only to charge users to click a link or to imply association/endorsement.",
+      "checked_at": "2026-11-25T18:45:13Z",
+      "notes": "Terms page: most content is 'subject to Crown copyright protection and is published under the Open Government Licence ( OGL )'. The resource page footer names 'Open Government Licence v3.0' and links to nationalarchives.gov.uk (not an approved host, not opened)."
+    },
+    {
+      "host": "cucumber.io",
+      "terms_url": "https://cucumber.io/docs/terms/",
+      "opened": true,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": null,
+      "checked_at": "2026-11-25T18:45:14Z",
+      "notes": "The footer link /docs/terms/ opened with HTTP 200 but is a glossary page titled 'Terminology | Cucumber', not a licence or terms page. Footer reads 'Copyright © 2014-2026 The Cucumber Open Source Project'; no content licence found. Counted as a host without a terms page."
+    },
+    {
+      "host": "www.atlassian.com",
+      "terms_url": "https://www.atlassian.com/legal/cloud-terms-of-service",
+      "opened": true,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": null,
+      "checked_at": "2026-11-25T18:45:15Z",
+      "notes": "Footer 'Terms' link; redirected to /legal/atlassian-customer-agreement ('Atlassian Customer Agreement'). It governs Atlassian products, not the website's article content; no content licence and nothing about linking stated. Footer reads 'Copyright © 2026 Atlassian'."
+    },
+    {
+      "host": "learn.microsoft.com",
+      "terms_url": "https://learn.microsoft.com/en-us/legal/termsofuse",
+      "opened": true,
+      "licence_as_stated": "unclear",
+      "linking_allowed_note": "No statement about others linking to the site; the 'Links to Third-Party Sites' section covers outbound links only.",
+      "checked_at": "2026-11-25T18:45:15Z",
+      "notes": "'Terms of Use | Microsoft Learn' names no content licence. It grants use of Documents provided the copyright notice is kept and use is 'informational and non-commercial or personal use only', and otherwise says 'You may not modify, copy, distribute'."
+    }
+  ],
+  "summary": {
+    "opened": 8,
+    "not_opened": 1,
+    "title_mismatch": 0,
+    "hosts_without_terms": 4
+  }
+}

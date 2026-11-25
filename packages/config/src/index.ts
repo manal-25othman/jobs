@@ -106,6 +106,10 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'Per-user daily cap on agent invocations. Development default 50. REQUIRED in production: the real value is TBD until a provider is connected and cost is measured (D-073).', example: '50',
     validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
 
+  { name: 'LEARNING_CANDIDATE_PREVIEW', scope: 'api', required: false, secret: false,
+    description: 'off (default) or internal. internal shows UNVERIFIED candidate learning resources, labelled and audited, to internal testers in a development deployment that shows demo content. Refused when NODE_ENV=production (Phase B, PO decision 2).',
+    example: 'off', validate: oneOf('off', 'internal') },
+
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
     validate: oneOf('debug', 'info', 'warn', 'error') },
@@ -157,6 +161,9 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
   }
   if (env['NODE_ENV'] === 'production' && env['AGENT_PROVIDER'] === 'local-test') {
     problems.push('AGENT_PROVIDER=local-test is TEST/NON-PRODUCTION and is refused in production (OPEN-023 unresolved)');
+  }
+  if (env['NODE_ENV'] === 'production' && env['LEARNING_CANDIDATE_PREVIEW'] === 'internal') {
+    problems.push('LEARNING_CANDIDATE_PREVIEW=internal shows unverified learning resources and is refused in production (PO decision 2)');
   }
   if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
     problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');

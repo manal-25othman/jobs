@@ -17,9 +17,13 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
+import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { bootApp, newUser, uploadFile, filesFor, memoryStorage, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
 import { loadPilotMaterials, type MaterialLoadReport } from '../src/career-data/material-loader';
 import { readZip } from '../src/career-data/zip';
+import { loadLearningCandidates } from '../src/career-data/learning-candidate-loader';
+import { LearningService } from '../src/readiness/learning.service';
 import { loadCandidate } from '../src/career-data/candidate';
 import { importPack } from '../src/career-data/pipeline';
 import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PILOT_POLICY_DESCRIPTION, type PilotLoadReport } from '../src/career-data/pilot-loader';
@@ -41,6 +45,8 @@ const NON_PILOT = `select md5(string_agg(t, '|' order by t)) as h from (
     union all select concat_ws(',', id, code, practice_activity_spec_id) from learning_resource) x`;
 
 let before0: string; let report: PilotLoadReport; let materials: MaterialLoadReport;
+/** Phase B package 5: the Task B graduate and their reviewed submission, reused by the guidance tests. */
+let taskBRun: { u: TestUser; sid: string } | null = null;
 const MAT = join(DIR, 'materials');
 const MAT_OPTS = { materialsRoot: MAT, byLabel: 'e2e (Phase B materials)', reason: 'Phase B package 3 regression test', production: false };
 before(async () => {
@@ -209,6 +215,7 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
           { key: 'answer.explanation', kind: 'text', valueText: 'التغيير يقرأ الفلترين معًا ثم يعرض القائمة الفارغة رسالةً لا خطأً.', locator: 'notes.md' },
           { key: 'answer.component_explained', kind: 'text', valueText: 'المكوّن يستقبل القائمة المفلترة ويعرض العناصر أو حالة الفراغ.', locator: 'notes.md' },
         ] }).expect(201)).body.data.id as string;
+      taskBRun = { u, sid };
       const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
       assert.equal(ev.outcome, 'needs_human_review', `the activity is human-reviewed (${ev.outcome})`);
       const reviewer = await newUser(); await http.post('/v1/me/bootstrap').set(auth(reviewer)).send({}).expect(201);
@@ -347,5 +354,274 @@ describe('Phase B package 3 — starter materials (PO decisions 3 and 4)', () =>
     await http.get(`/v1/projects/${pid}/materials/${reviewerMat}/download`).set(auth(u)).expect(404);
     await http.get(`/v1/projects/${pid}/materials/00000000-0000-4000-8000-000000000000/download`).set(auth(u)).expect(404);
     await http.get(`/v1/projects/${pid}/materials`).expect(401);
+  });
+});
+
+describe('Phase B package 2 — learning resources, deterministic A07 (PO decision 2)', () => {
+  const LEARN = join(DIR, 'learning');
+  const LOPTS = { candidatesDir: LEARN, byLabel: 'e2e (Phase B learning)', reason: 'Phase B package 2 regression test', production: false };
+  type Learning = { kind: string; agent: string; mode: string; candidatePreview: boolean; grantsLevel: boolean; fallbackAr: string | null; need: { code: string };
+    resource: { code: string; exposure: string; labelAr: string | null; url: string | null; durationMinutes: number | null; durationAr: string; whyAr: string } | null;
+    alternatives: { code: string; exposure: string; labelAr: string | null }[]; practice: { slug: string; startable: boolean; activityId: string } | null };
+  const pilotGraduate = async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const skillOf = async (slug: string) => (await one(`select rr.skill_id from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 and s.slug = $2`, [report.role.id, slug])).skill_id as string;
+  const learningOf = async (u: TestUser, skillId: string) => (await http.get(`/v1/me/track-skills/${skillId}`).set(auth(u)).expect(200)).body.data.learning as Learning;
+  const withPreview = async <T>(fn: () => Promise<T>) => { process.env['LEARNING_CANDIDATE_PREVIEW'] = 'internal'; try { return await fn(); } finally { delete process.env['LEARNING_CANDIDATE_PREVIEW']; } };
+
+  test('the drafts carry no unsupported duration any more (0040 + registry file)', async () => {
+    assert.equal(Number((await one(`select count(*)::int n from learning_resource where duration_minutes is not null and duration_basis is null`)).n), 0);
+  });
+
+  test('an ordinary graduate sees no unverified resource: the fallback and the mandatory practice instead; nothing changes a level', async () => {
+    const u = await pilotGraduate();
+    const l = await learningOf(u, await skillOf('skl_js_fundamentals'));
+    assert.deepEqual([l.kind, l.agent, l.mode, l.candidatePreview, l.grantsLevel], ['LearningPlanProposal', 'A07', 'deterministic', false, false]);
+    assert.equal(l.resource, null); assert.equal(l.alternatives.length, 0); assert.match(l.fallbackAr!, /مورد تعلّم متحقَّق منه/);
+    assert.ok(l.practice && report.activities.some((a) => a.activityId === l.practice!.activityId), 'the practice is an activity of the pilot');
+    assert.equal(l.need.code, 'no_evidence');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning.candidate_preview_served' and user_id = $1`, [u.id])).n), 0);
+  });
+
+  test('the candidate loader: development only; draft, unverified, demo rows in the existing registry within the per-skill pack constraint, each with its source and a pilot practice', async () => {
+    await assert.rejects(() => loadLearningCandidates(pool, { ...LOPTS, production: true }), /never loaded in production/);
+    await assert.rejects(() => loadLearningCandidates(pool, { ...LOPTS, reason: ' ' }), /a name and a reason/);
+    const r = await loadLearningCandidates(pool, LOPTS);
+    // resources_per_skill_max (3) is respected, never changed: the 10 skills with a registry draft take 2 candidates, the 2 without take 3.
+    assert.equal(r.perSkillMax, 3);
+    assert.equal(r.written + r.refreshed, 26); assert.equal(r.overLimit.length, 22);
+    // The recorded direct check (verification/direct-check-2026-11.json, separate research session) is applied to the loaded rows it opened.
+    const check = JSON.parse(readFileSync(join(LEARN, 'verification', 'direct-check-2026-11.json'), 'utf8')) as { resources: { code: string; opened: boolean }[] };
+    const loadedCodes = (await pool.query(`select code from learning_resource where code like 'lrc\\_%'`)).rows.map((x) => x.code as string);
+    assert.equal(r.directChecksApplied, check.resources.filter((x) => x.opened && loadedCodes.includes(x.code)).length);
+    assert.deepEqual(r.flagged, [], 'no opened link failed');
+    const perSkill = (await pool.query(`select s.slug, count(*)::int n from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug`)).rows;
+    assert.ok(perSkill.every((x) => x.n <= 3), JSON.stringify(perSkill));
+    const rows = (await pool.query(`select lr.code, lr.review_status::text as rs, lr.quality_status::text as qs, lr.is_demo_fixture, lr.link_check, lr.duration_minutes, lr.url, lr.drafting_aid::text as aid,
+        exists (select 1 from activity_skill k where k.activity_spec_id = lr.practice_activity_spec_id and k.skill_id = lr.skill_id) as practised,
+        (select a.target_role_id from activity_spec a where a.id = lr.practice_activity_spec_id) as role,
+        exists (select 1 from source_ref s join data_source d on d.id = s.source_id where s.entity_kind = 'learning_resource' and s.entity_id = lr.id and d.code = 'src_naqla_resource_research_2026_11') as sourced
+       from learning_resource lr where lr.code like 'lrc\\_%'`)).rows;
+    assert.equal(rows.length, 26);
+    for (const x of rows) {
+      assert.deepEqual([x.rs, x.qs, x.is_demo_fixture, x.duration_minutes, x.aid], ['draft', 'unverified', true, null, 'ai_assisted'], `${x.code}: never reviewed or approved by a check`);
+      assert.ok(['search_index', 'direct'].includes(x.link_check), x.code);
+      assert.ok(x.practised && x.role === report.role.id && x.sourced && /^https:\/\//.test(x.url), x.code);
+    }
+    const terms = (await pool.query(`select usage_terms_note from learning_resource where code like 'lrc\\_%' and usage_terms_checked is not null`)).rows;
+    assert.ok(terms.every((x) => x.usage_terms_note && !/^unclear/i.test(x.usage_terms_note)), 'an unclear licence never counts as checked terms');
+    const again = await loadLearningCandidates(pool, LOPTS);
+    assert.equal(again.written, 0, 'a second load writes nothing new');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning_resource.candidates_loaded'`)).n) >= 2, true, 'every load is audited');
+  });
+
+  test('without the preview, the candidates stay invisible to a graduate (API and row policy)', async () => {
+    const u = await pilotGraduate();
+    assert.equal((await learningOf(u, await skillOf('skl_html_semantic'))).resource, null);
+    const c = await pool.connect();
+    try {
+      await c.query('begin'); await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [u.id]); await c.query('set local role authenticated');
+      assert.equal(Number((await c.query(`select count(*)::int n from learning_resource where quality_status <> 'approved' and quality_status <> 'sme_reviewed'`)).rows[0].n), 0, 'RLS admits no unverified row');
+    } finally { await c.query('rollback'); c.release(); }
+  });
+
+  test('the internal preview (development only): ONE ranked candidate + at most two, each labelled unverified, with a pilot practice; audited', async () => {
+    const svc = app.get(LearningService);
+    const env = process.env['NODE_ENV'];
+    process.env['LEARNING_CANDIDATE_PREVIEW'] = 'internal'; process.env['NODE_ENV'] = 'production';
+    try { assert.equal(svc.previewRequested(), false, 'never in production'); } finally { process.env['NODE_ENV'] = env; delete process.env['LEARNING_CANDIDATE_PREVIEW']; }
+    const u = await pilotGraduate();
+    const skill = await skillOf('skl_api_data_states');
+    const l = await withPreview(() => learningOf(u, skill));
+    assert.equal(l.candidatePreview, true);
+    assert.ok(l.resource && l.resource.exposure === 'candidate' && l.resource.labelAr && /لم يُتحقَّق منه/.test(l.resource.labelAr));
+    assert.match(l.resource.code, /^lrc_api_data_states_/, 'a candidate with a link ranks before the URL-less registry draft');
+    assert.ok(/^https:\/\//.test(l.resource.url!)); assert.equal(l.resource.durationMinutes, null); assert.equal(l.resource.durationAr, 'المدة غير محددة');
+    assert.ok(l.alternatives.length <= 2 && l.alternatives.every((a) => a.exposure === 'candidate' && a.labelAr));
+    assert.ok(l.practice && report.activities.some((a) => a.activityId === l.practice!.activityId));
+    const again = await withPreview(() => learningOf(u, skill));
+    assert.deepEqual(again, l, 'deterministic');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning.candidate_preview_served' and user_id = $1`, [u.id])).n), 2, 'every preview served is audited');
+    assert.equal(Number((await one(`select count(*)::int n from skill_claim where user_id = $1 and state::text <> 'gap'`, [u.id])).n), 0, 'no level');
+    assert.equal(Number((await one(`select count(*)::int n from evidence where user_id = $1`, [u.id])).n), 0, 'no evidence');
+  });
+
+  test('a recorded direct check is applied as facts only: still a draft candidate (never auto-approved); a failed check flags the row out of the preview', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'naqla-learning-'));
+    copyFileSync(join(LEARN, 'resources.candidate.json'), join(tmp, 'resources.candidate.json'));
+    mkdirSync(join(tmp, 'verification'));
+    writeFileSync(join(tmp, 'verification', 'direct-check-test.json'), JSON.stringify({
+      resources: [{ code: 'lrc_api_data_states_2', opened: true, http_status: 200, title_matches: true, checked_at: '2026-11-25T12:00:00Z' },
+                  { code: 'lrc_api_data_states_1', opened: true, http_status: 404, title_matches: false, checked_at: '2026-11-25T12:00:00Z', notes: 'test: gone' }],
+      hosts: [{ host: 'developer.mozilla.org', opened: true, licence_as_stated: 'CC-BY-SA 2.5 (test fixture)', checked_at: '2026-11-25T12:00:00Z' }] }));
+    const r = await loadLearningCandidates(pool, { ...LOPTS, candidatesDir: tmp });
+    assert.equal(r.directChecksApplied, 2); assert.deepEqual(r.flagged, ['lrc_api_data_states_1']);
+    const ok = await one(`select link_check, last_checked::text as d, usage_terms_checked::text as t, quality_status::text as q, review_status::text as s from learning_resource where code = 'lrc_api_data_states_2' and is_demo_fixture`);
+    assert.deepEqual([ok.link_check, ok.d, ok.t, ok.q, ok.s], ['direct', '2026-11-25', '2026-11-25', 'unverified', 'draft'], 'facts recorded; nothing reviewed or approved');
+    const u = await pilotGraduate();
+    const skill = await skillOf('skl_api_data_states');
+    assert.equal((await learningOf(u, skill)).resource, null, 'a directly checked but unreviewed resource is still not shown to a graduate');
+    const l = await withPreview(() => learningOf(u, skill));
+    assert.ok(![l.resource!, ...l.alternatives].some((x) => x.code === 'lrc_api_data_states_1'), 'a flagged resource leaves the preview');
+  });
+});
+
+describe('Phase B package 5 — A01 next step, A02 Career Snapshot and the three guidance capabilities (test provider only)', () => {
+  type Step = { code: string; textAr: string; whyAr: string; href: string; source: string; sourceRef: string | null; agent: string };
+  const graduate = async (withGoal = true) => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    if (withGoal) await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const step = async (u: TestUser) => (await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data as Step;
+  const counts = async (u: TestUser) => one(`select (select count(*) from evidence where user_id = $1)::int ev, (select count(*) from skill_claim where user_id = $1 and state::text <> 'gap')::int claims,
+    (select count(*) from verification_decision where user_id = $1)::int decisions, (select count(*) from model_call)::int model_calls`, [u.id]);
+
+  test('A01: one next step from the current state; it never assigns an activity', async () => {
+    assert.equal((await step(await graduate(false))).code, 'choose_goal');
+    const u = await graduate();
+    const s0 = await step(u);
+    assert.deepEqual([s0.code, s0.href, s0.sourceRef, s0.agent], ['choose_activity', '/activities', null, 'A01'], 'the catalogue, where the graduate chooses');
+    const taskA = report.activities.find((a) => a.code === 'act_fe_debug_improve')!;
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'صفحة التسجيل', kind: 'platform_activity', activitySpecId: taskA.activityId }).expect(201)).body.data.id as string;
+    const s1 = await step(u);
+    assert.deepEqual([s1.code, s1.href, s1.source, s1.sourceRef], ['continue_work', `/work/${pid}`, 'project', pid]);
+    const other = await graduate();
+    assert.equal((await step(other)).code, 'choose_activity', "another graduate's work never shapes your step");
+  });
+
+  test('A02 Career Snapshot (FR-U-014): strengths, at most three gaps and the next step — each with its source; no invented priority, no level', async () => {
+    const u = await graduate();
+    const before = await counts(u);
+    const s = (await http.get('/v1/me/career-snapshot').set(auth(u)).expect(200)).body.data as { kind: string; strengths: unknown[]; gaps: { source: string; sourceRef: string }[];
+      gapOrderAr: string; nextStep: Step; limitsAr: string[]; role: { source: string } };
+    assert.equal(s.kind, 'CareerSnapshot'); assert.equal(s.strengths.length, 0, 'no evaluated evidence, no strength');
+    assert.equal(s.gaps.length, 3); assert.ok(s.gaps.every((g) => g.source === 'role_requirement' && g.sourceRef));
+    assert.match(s.gapOrderAr, /لا أولوية معتمدة/, 'the pilot classification is not expert-approved: no priority is implied');
+    assert.equal(s.role.source, 'career_goal'); assert.equal(s.nextStep.agent, 'A01');
+    assert.deepEqual(await counts(u), before, 'reading the snapshot writes nothing');
+  });
+
+  test('capability 1 — career guidance: the A01 step and the snapshot gaps as proposals through the gateway (test provider); nothing granted', async () => {
+    const u = await graduate();
+    const before = await counts(u);
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'career_guidance' }).expect(201)).body.data;
+    assert.deepEqual([r.status, r.provider, r.testOnly, r.ruleId, r.agentType], ['ok', 'local-test', true, 'R7-career-guidance-to-recruitment', 'recruitment']);
+    assert.deepEqual(r.contracts, ['A01', 'A02', 'A04']); assert.deepEqual(r.toolsUsed, ['my_progress', 'occupation_profile']);
+    assert.match(r.noticeAr, /لا يعمل نموذج ذكاء اصطناعي حقيقي/);
+    const types = r.proposals.map((p: { proposalType: string }) => p.proposalType);
+    assert.deepEqual(types, ['recruiter_next_action', 'profile_gap', 'profile_gap', 'profile_gap']);
+    assert.equal(r.proposals[0].summary, (await step(u)).textAr, 'the same single next step');
+    const inv = await one(`select orchestration_rule, provider, model from agent_invocation where id = $1`, [r.invocationId]);
+    assert.equal(inv.orchestration_rule, 'R7-career-guidance-to-recruitment'); assert.equal(inv.provider, 'local-test');
+    assert.equal(Number((await one(`select count(*)::int n from agent_usage where invocation_id = $1`, [r.invocationId])).n), 1, 'usage is recorded (budget)');
+    assert.deepEqual(await counts(u), before, 'no evidence, claim, decision or model call');
+    assert.equal((await step(u)).code, 'choose_activity', 'a guidance answer never becomes the next step itself');
+  });
+
+  test('capability 2 — learning guidance: practice and self-check questions for one skill; never a solution; unknown or foreign skills refused', async () => {
+    const u = await graduate();
+    const skill = (await one(`select rr.skill_id from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 and s.slug = 'skl_js_fundamentals'`, [report.role.id])).skill_id as string;
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance', skillId: skill }).expect(201)).body.data;
+    assert.equal(r.ruleId, 'R8-learning-guidance-to-technical', JSON.stringify(r)); assert.deepEqual(r.contracts, ['A07', 'A03']);
+    assert.deepEqual(r.proposals.map((p: { proposalType: string }) => p.proposalType), ['technical_next_action', 'followup_question']);
+    const text = JSON.stringify(r);
+    for (const secret of ['REFERENCE', 'solution/', 'reviewer.zip', 'planted']) assert.ok(!text.includes(secret), `no ${secret} in a learning answer`);
+    const planted = (await pool.query(`select description_en from activity_input where contains_planted_issue and description_en is not null`)).rows.map((x) => String(x.description_en));
+    assert.ok(planted.length > 0 && planted.every((d) => !text.includes(d)), 'no planted-defect description');
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance' }).expect(400);
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance', skillId: '00000000-0000-4000-8000-000000000000' }).expect(404);
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'write_my_cv' }).expect(400);
+  });
+
+  test('capability 3 — assessment feedback: only the owner, only after a result; the recorded criteria explained; nothing changed', async () => {
+    assert.ok(taskBRun, 'the Task B journey ran');
+    const { u, sid } = taskBRun!;
+    const before = await counts(u);
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(201)).body.data;
+    assert.equal(r.ruleId, 'R9-assessment-feedback-to-technical'); assert.deepEqual(r.toolsUsed, ['my_feedback']);
+    // D-076 holds for guidance too: the recorded criteria name a technology this graduate never declared, so the
+    // explanation is WITHHELD and said to be — never shown with an inferred technology.
+    assert.equal(r.status, 'rejected_invalid_output'); assert.equal(r.proposals.length, 0); assert.match(r.withheldAr, /لم يجتز فحوص الدقة/);
+    // Once the graduate declares the technologies of their own work, the same request is explained.
+    await pool.query(`update project set declared_technologies = (select array_agg(term order by term) from technology_term) where id = (select project_id from submission where id = $1)`, [sid]);
+    const r2 = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(201)).body.data;
+    assert.ok(r2.proposals.some((p: { proposalType: string }) => p.proposalType === 'rubric_explanation'), JSON.stringify([r2.status, r2.refused]));
+    assert.equal(r2.withheldAr, null);
+    const text = JSON.stringify(r2);
+    for (const secret of ['REFERENCE.md', 'solution/app.js', 'team-tasks-reviewer.zip']) assert.ok(!text.includes(secret), secret);
+    assert.deepEqual(await counts(u), before, 'explaining the result changes no evidence, level or decision');
+    const other = await graduate();
+    await http.post('/v1/me/guidance').set(auth(other)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(404);
+    // Own work without a result yet: nothing to explain.
+    const taskA = report.activities.find((a) => a.code === 'act_fe_debug_improve')!;
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'محاولة', kind: 'platform_activity', activitySpecId: taskA.activityId }).expect(201)).body.data.id as string;
+    void pid;
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback' }).expect(400);
+  });
+});
+
+describe('FR-U-013 — self-assessment: Observed only, private, never evidence or a level (PO decision 1, post-package-5 review)', () => {
+  const graduate = async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const state = async (u: TestUser) => one(`select (select count(*) from skill_claim where user_id = $1)::int claims, (select count(*) from evidence where user_id = $1)::int ev,
+    (select count(*) from verification_decision where user_id = $1)::int decisions, (select count(*) from skill_progress_event where user_id = $1)::int progress`, [u.id]);
+
+  test('the role\'s 12 skills with the proficiency scale plus «not tried» and «unsure»; the notice says it is not evidence', async () => {
+    const u = await graduate();
+    const v = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data;
+    assert.equal(v.items.length, 12); assert.equal(v.confidence, 'observed');
+    assert.deepEqual(v.scale.map((x: { key: string }) => x.key), ['foundation', 'working', 'independent', 'advanced', 'not_tried', 'unsure']);
+    assert.match(v.noticeAr, /ليس مهارة مُثبتة/); assert.match(v.notEvidenceAr, /لا يُحتسب دليلًا/);
+    assert.ok(v.items.every((i: { latest: unknown }) => i.latest === null));
+  });
+
+  test('saving a self-assessment changes no claim, evidence, decision, progress, level, snapshot strength or next step; history is kept', async () => {
+    const u = await graduate();
+    const skills = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data.items as { skillId: string }[];
+    const before = await state(u);
+    const stepBefore = (await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data;
+    const r = (await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'advanced', note: 'أثق بها كثيرًا' }, { skillId: skills[1]!.skillId, rating: 'unsure' }] }).expect(200)).body.data;
+    assert.equal(r.recorded, 2);
+    assert.deepEqual(await state(u), before, 'nothing in the evidence chain moved');
+    const page = (await http.get('/v1/me/track-skills').set(auth(u)).expect(200)).body.data as { items: { skillId: string; verification: { level: string } }[] };
+    assert.ok(page.items.every((s) => s.verification.level === 'gap'), 'every level is still «no evaluated evidence», even the one self-rated advanced');
+    const detail = (await http.get(`/v1/me/track-skills/${skills[0]!.skillId}`).set(auth(u)).expect(200)).body.data;
+    assert.deepEqual([detail.selfAssessment.rating, detail.selfAssessment.ratingAr, detail.skill.verification.level], ['advanced', 'متقدم', 'gap']);
+    const snap = (await http.get('/v1/me/career-snapshot').set(auth(u)).expect(200)).body.data;
+    assert.equal(snap.strengths.length, 0, 'a self-rating is never a strength');
+    assert.ok(snap.selfAssessed.length === 2 && snap.selfAssessed.every((x: { source: string }) => x.source === 'self_assessment'));
+    assert.deepEqual((await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data, stepBefore, 'the next step is unchanged');
+    // Same values again: nothing new recorded; a change: one new row, the old one kept.
+    assert.equal((await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'advanced', note: 'أثق بها كثيرًا' }] }).expect(200)).body.data.recorded, 0);
+    assert.equal((await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[0]!.skillId, rating: 'working' }] }).expect(200)).body.data.recorded, 1);
+    assert.equal(Number((await one(`select count(*)::int n from skill_self_assessment where user_id = $1 and skill_id = $2`, [u.id, skills[0]!.skillId])).n), 2, 'history kept');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'profile.skills_declared' and user_id = $1`, [u.id])).n), 2, 'audited (no audit for an unchanged save)');
+  });
+
+  test('private: another graduate sees none of it; a skill outside the role and a rating outside the scale are refused; no public or agent path reads it', async () => {
+    const u = await graduate();
+    const skills = (await http.get('/v1/me/self-assessment').set(auth(u)).expect(200)).body.data.items as { skillId: string }[];
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'independent', note: 'ملاحظة خاصة جدًا' }] }).expect(200);
+    const other = await graduate();
+    const ov = (await http.get('/v1/me/self-assessment').set(auth(other)).expect(200)).body.data;
+    assert.ok(ov.items.every((i: { latest: unknown }) => i.latest === null), "another graduate never sees a self-assessment");
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: '00000000-0000-4000-8000-000000000000', rating: 'working' }] }).expect(422);
+    await http.put('/v1/me/self-assessment').set(auth(u)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'expert' }] }).expect(422);
+    const noGoal = await newUser(); await http.post('/v1/me/bootstrap').set(auth(noGoal)).send({}).expect(201);
+    await http.put('/v1/me/self-assessment').set(auth(noGoal)).send({ items: [{ skillId: skills[2]!.skillId, rating: 'working' }] }).expect(409);
+    // Career guidance (the agent path) never receives the private note.
+    const g = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'career_guidance' }).expect(201)).body.data;
+    const inv = await one(`select allowed_context from agent_invocation where id = $1`, [g.invocationId]);
+    assert.ok(!JSON.stringify(g).includes('ملاحظة خاصة جدًا') && !JSON.stringify(inv).includes('selfAssess'), 'no self-assessment reaches an agent');
+    // No public path: the public report and share routes read claims, never this table.
+    const src = (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'report.service.js'), 'utf8') + (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'share.service.js'), 'utf8');
+    assert.ok(!src.includes('skill_self_assessment'), 'public report and share never read self-assessments');
   });
 });

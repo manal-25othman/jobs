@@ -74,6 +74,12 @@ run_proofs "$ROOT/supabase/tests/workspace_drafts.sql" 'PASS|FAIL'
 echo "==> Phase B package 3: activity materials and the start rule (0039)"
 run_proofs "$ROOT/supabase/tests/activity_materials.sql" 'PASS|FAIL'
 
+echo "==> Phase B package 2: learning resources reach a graduate only once verified (0040)"
+run_proofs "$ROOT/supabase/tests/learning_resources.sql" 'PASS|FAIL'
+
+echo "==> FR-U-013: self-assessment is Observed only, private and append-only (0041)"
+run_proofs "$ROOT/supabase/tests/self_assessment.sql" 'PASS|FAIL'
+
 echo "==> historical claimed-skill audit runs read-only and changes nothing"
 before="$(psql "$TARGET" -At -c "select (select count(*) from submission_claimed_skill) || '/' || (select count(*) from evidence) || '/' || (select count(*) from skill_claim)")"
 psql "$TARGET" -X -q -v ON_ERROR_STOP=1 -f "$ROOT/scripts/audit-claimed-skills.sql" >/dev/null
@@ -87,13 +93,15 @@ if psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0026_eng1_p2
 fi
 echo "PASS  0026 rollback refused (per-skill history is never deleted by a rollback)"
 
-echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0039, 0038, 0037, 0036, 0035, 0034, 0033, 0032, 0031, 0030, 0029, 0028, 0027, 0026, 0025) → up"
+echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0041, 0040, 0039, 0038, 0037, 0036, 0035, 0034, 0033, 0032, 0031, 0030, 0029, 0028, 0027, 0026, 0025) → up"
 RT="${DB}_roundtrip"; RTURL="${PGURL%/*}/$RT"
 psql "$PGURL" -v ON_ERROR_STOP=1 -q -c "drop database if exists $RT;" -c "create database $RT;" >/dev/null
 for f in "$ROOT"/supabase/migrations/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 for f in "$ROOT"/supabase/seed/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 shape() { psql "$RTURL" -At -c "select string_agg(table_name||'.'||column_name, ',' order by table_name, column_name) from information_schema.columns where table_schema = 'public'"; }
 after_up="$(shape)"
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0041_skill_self_assessment.down.sql" >/dev/null
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0040_learning_resource_exposure.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0039_activity_materials.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0038_workspace_drafts.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0037_pilot_role_listing.down.sql" >/dev/null
@@ -139,6 +147,8 @@ psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0036_dev_pilot
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0037_pilot_role_listing.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0038_workspace_drafts.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0039_activity_materials.sql" >/dev/null
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0040_learning_resource_exposure.sql" >/dev/null
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0041_skill_self_assessment.sql" >/dev/null
 [[ "$(shape)" == "$after_up" ]] || { echo "FAIL  re-applying 0025/0026 did not restore the same schema" >&2; exit 1; }
 legacy="$(psql "$RTURL" -At -c "select count(*) from rubric_version where activity_spec_version is null")"
 echo "PASS  re-applied: identical schema; $legacy pre-existing rubric version(s) left unbound (legacy rows are never re-bound)"

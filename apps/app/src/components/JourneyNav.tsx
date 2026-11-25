@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/activities', label: 'أنشطة دوري' },
   { href: '/work', label: 'أعمالي' },
   { href: '/skills', label: 'مهارات المسار' },
+  { href: '/snapshot', label: 'لقطة مساري' },
 ] as const;
 
 export function JourneyNav({ current }: { current: (typeof LINKS)[number]['href'] | null }) {

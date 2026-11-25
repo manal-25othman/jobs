@@ -74,6 +74,7 @@ const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
 const { loadPilotCandidate, publishPilotDemo, usePilotPerSkillPolicy } = apiRequire('./dist/src/career-data/pilot-loader');
 const { loadPilotMaterials } = apiRequire('./dist/src/career-data/material-loader');
+const { loadLearningCandidates } = apiRequire('./dist/src/career-data/learning-candidate-loader');
 const { readZip } = apiRequire('./dist/src/career-data/zip');
 let apiStorage = null;
 
@@ -419,6 +420,91 @@ async function scenarioB15(browser) {
       && /لا يرفع المستوى وحده/.test(detailText) && !/فجوة|مادة مُقدَّمة|%|جاهز للعمل/.test(detailText));
     await shot(page, 'B16-skill-detail-desktop');
     await page.setViewportSize({ width: 390, height: 844 }); await shot(page, 'B16-skill-detail-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    // B19 · Phase B package 2 (PO decision 2): «ماذا أتعلّم وأين؟» — a graduate never sees an unverified resource; the
+    // internal preview shows candidates, each labelled; the mandatory practice always follows.
+    const skillUrl = page.url();
+    const card = page.locator('[data-testid="learning-card"]');
+    const plain = await card.innerText();
+    check('B19a', 'learning card (ordinary graduate): the need, the honest fallback and the practice link; no candidate resource is shown',
+      /لا يوجد بعد دليل مُقيَّم/.test(plain) && await page.locator('[data-testid="learning-fallback"]').count() === 1
+      && await page.locator('[data-testid="learning-practice"] a[href^="/activities/"]').count() === 1 && await page.locator('[data-testid="learning-resource"]').count() === 0
+      && /لا يغيّر مستواك/.test(plain));
+    await loadLearningCandidates(pool, { candidatesDir: join(ROOT, 'data/candidates/trk_frontend_junior_v2/learning'), byLabel: 'UI acceptance (Phase B learning)', reason: 'B19 browser journey', production: false });
+    process.env.LEARNING_CANDIDATE_PREVIEW = 'internal';
+    try {
+      await page.goto(skillUrl); await page.locator('[data-testid="learning-preview-label"]').waitFor();
+      const items = page.locator('[data-testid="learning-resource"]');
+      const n = await items.count();
+      const exposures = await items.evaluateAll((xs) => xs.map((x) => x.getAttribute('data-exposure')));
+      const itemTexts = await items.allInnerTexts();
+      const links = await card.locator('a[target="_blank"]').evaluateAll((xs) => xs.map((x) => ({ rel: x.getAttribute('rel') ?? '', href: x.getAttribute('href') ?? '' })));
+      check('B19b', 'internal preview: one candidate and at most two ranked alternatives, each labelled unverified, external links isolated, the practice after them',
+        n >= 1 && n <= 3 && exposures.every((e) => e === 'candidate') && itemTexts.every((t) => /لم يُتحقَّق منه بعد/.test(t) && /المدة غير محددة/.test(t))
+        && links.length >= 1 && links.every((l) => l.rel.includes('noopener') && l.href.startsWith('https://'))
+        && await page.locator('[data-testid="learning-practice"]').count() === 1, `${n} items`);
+      const dir = await card.evaluate((el) => getComputedStyle(el).direction);
+      await shot(page, 'B19-learning-preview-desktop');
+      await page.setViewportSize({ width: 390, height: 844 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      await shot(page, 'B19-learning-preview-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+      check('B19c', 'learning card is right-to-left and fits a 390px phone without horizontal scrolling', dir === 'rtl' && overflow <= 0, `dir=${dir} overflow=${overflow}`);
+    } finally { delete process.env.LEARNING_CANDIDATE_PREVIEW; }
+    // B20 · Phase B package 5: A01 next step, the Career Snapshot (FR-U-014) and two guidance capabilities (test provider only).
+    await page.goto(skillUrl); await page.getByRole('heading', { name: 'مرشد التعلّم' }).waitFor();
+    await page.locator('[data-testid="guidance-learning_guidance"] button').click();
+    await page.locator('[data-testid="guidance-answer"]').waitFor();
+    const learnTypes = await page.locator('[data-testid="guidance-learning_guidance"] [data-testid="guidance-item"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-type')));
+    const learnText = await page.locator('[data-testid="guidance-learning_guidance"]').innerText();
+    check('B20a', 'learning mentor (A07/A03): the practice and self-check questions, with the permanent test-provider notice; no solution',
+      learnTypes.includes('followup_question') && /لا يعمل نموذج ذكاء اصطناعي حقيقي/.test(learnText) && !/REFERENCE|solution\//.test(learnText), learnTypes.join(','));
+    await shot(page, 'B20-learning-mentor-desktop');
+    await page.goto(`${APP}/skills`); await page.locator('[data-testid="a01-next-step"]').waitFor();
+    const stepText = await page.locator('[data-testid="a01-next-step"]').innerText();
+    const stepHref = await page.locator('[data-testid="a01-next-step"] a').getAttribute('href');
+    check('B20b', 'A01: one next step on the skills page, explained; with no work started it points to the catalogue (it never assigns an activity)',
+      /خطوتك التالية/.test(stepText) && /اختاري نشاطًا من أنشطة دورك/.test(stepText) && stepHref === '/activities', stepHref ?? '');
+    await page.goto(`${APP}/snapshot`); await page.locator('[data-testid="snapshot-gaps"] li').first().waitFor();
+    const gapsN = await page.locator('[data-testid="snapshot-gaps"] li').count();
+    const sources = await page.locator('[data-testid="statement-source"]').allInnerTexts();
+    const snapText = await bodyText(page);
+    check('B20c', 'Career Snapshot: role, proven strengths (none yet, said plainly), three gaps with no invented priority, the next step — every statement names its source',
+      gapsN === 3 && sources.length >= 5 && sources.every((x) => x.startsWith('المصدر:')) && /لا أولوية معتمدة/.test(snapText) && /لا توجد بعد/.test(snapText) && /لا تمنح مستوى/.test(snapText) && !/%|جاهز للعمل/.test(snapText), `${gapsN} gaps, ${sources.length} sources`);
+    await page.locator('[data-testid="guidance-career_guidance"] button').click();
+    await page.locator('[data-testid="guidance-career_guidance"] [data-testid="guidance-item"]').first().waitFor();
+    const careerTypes = await page.locator('[data-testid="guidance-career_guidance"] [data-testid="guidance-item"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-type')));
+    check('B20d', 'career guidance (A01/A02/A04, test provider): the same next step and the gaps, labelled as a test template, not real AI',
+      careerTypes[0] === 'recruiter_next_action' && careerTypes.filter((t) => t === 'profile_gap').length === 3 && /لا يعمل نموذج ذكاء اصطناعي حقيقي/.test(await page.locator('[data-testid="guidance-career_guidance"]').innerText()), careerTypes.join(','));
+    await shot(page, 'B20-snapshot-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const snapOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const snapDir = await page.locator('main').evaluate((el) => getComputedStyle(el).direction);
+    await shot(page, 'B20-snapshot-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    check('B20e', 'snapshot and guidance are right-to-left and fit a 390px phone', snapDir === 'rtl' && snapOverflow <= 0, `dir=${snapDir} overflow=${snapOverflow}`);
+    // B21 · FR-U-013: self-assessment is a private starting point (Observed only) — never evidence, a level or a strength.
+    await page.goto(`${APP}/self-assessment`); await page.locator('[data-testid="self-assessment-skill"]').first().waitFor();
+    const saSkills = page.locator('[data-testid="self-assessment-skill"]');
+    const saCount = await saSkills.count();
+    const saNotice = await page.locator('[data-testid="self-assessment-notice"]').innerText();
+    await saSkills.nth(0).getByLabel('متقدم').check();
+    await saSkills.nth(1).getByLabel('لست متأكدة').check();
+    await page.getByRole('button', { name: 'احفظي تقديري' }).click();
+    await page.locator('[data-testid="self-assessment-saved"]').waitFor();
+    const savedText = await page.locator('[data-testid="self-assessment-saved"]').innerText();
+    check('B21a', 'self-assessment page: the 12 skills of the role, the scale plus «لست متأكدة», a notice that it is not evidence; saving says no level changed',
+      saCount === 12 && /لا يُحتسب دليلًا/.test(saNotice) && /لم يتغيّر أي مستوى/.test(savedText), `${saCount} skills · ${savedText}`);
+    await shot(page, 'B21-self-assessment-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const saOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    await shot(page, 'B21-self-assessment-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${APP}/skills`); await page.locator('a.row[href^="/skills/"]').first().waitFor();
+    const rowsAfter = await page.locator('a.row[href^="/skills/"]').allInnerTexts();
+    check('B21b', 'after self-rating «متقدم», every skill still reads «لا يوجد دليل مُقيَّم بعد» — a self-assessment never raises a level; the page fits a phone',
+      rowsAfter.length === 12 && rowsAfter.every((t) => t.includes('لا يوجد دليل مُقيَّم بعد')) && saOverflow <= 0, `overflow=${saOverflow}`);
+    await page.goto(`${APP}/snapshot`); await page.locator('[data-testid="snapshot-self"]').waitFor();
+    const selfItems = await page.locator('[data-testid="snapshot-self"] li').count();
+    const strengthsText = await page.locator('[data-testid="snapshot-strengths"]').innerText();
+    check('B21c', 'snapshot: the self-assessment appears in its own section with its source; strengths stay empty',
+      selfItems === 2 && /لا توجد بعد/.test(strengthsText) && /المصدر: تقييمك الذاتي/.test(await page.locator('[data-testid="snapshot-self"]').innerText()), `${selfItems} self-assessed`);
     await page.goto(`${APP}/activities`); await page.locator('article').first().waitFor();
     check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
       cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));

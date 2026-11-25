@@ -6,7 +6,7 @@ import { api, isNotFound, type EvaluationView, type SkillJourney, type SkillJour
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
-import { CompanionNudge } from '../../components/CompanionNudge';
+import { GuidancePanel } from '../../components/GuidancePanel';
 import { ExperimentalNotice } from '../../components/ExperimentalNotice';
 import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
   hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr,
@@ -363,7 +363,12 @@ function EvaluationInner() {
         </details>
       ) : null}
 
-      <CompanionNudge token={token} />
+      {token && view?.resultId && submissionId ? (
+        <section className="card">
+          <h2>مرشد التحسين</h2>
+          <GuidancePanel token={token} capability="assessment_feedback" submissionId={submissionId} buttonAr="اشرحي لي النتيجة وكيف أتحسّن" />
+        </section>
+      ) : null}
       <p className="body-sm">
         <a className="link" href={workHref}>العودة إلى مكان العمل ←</a> · <a className="link" href="/work">أعمالي ←</a> · <a className="link" href="/skills">مهارات المسار ←</a>
       </p>

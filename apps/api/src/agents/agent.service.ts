@@ -5,7 +5,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import {
   AgentGateway, LocalTestProvider, route, nudgesFor, validateAgainstDomain, assertLifecycle, assertReadyForApproval, ProposalRejected,
-  WORDING_PROPOSAL_TYPES, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
+  WORDING_PROPOSAL_TYPES, type GuidanceCapability, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
   type ProposalLifecycle, type InputReference, type WordingPayload, type TestProviderMode,
 } from '@naqla/agents';
 import {
@@ -85,6 +85,29 @@ export class AgentService {
       this.logger.warn(`agent orchestration failed and was ignored: ${(e as Error).message}`);
       return null;
     }
+  }
+
+  /**
+   * Phase B package 5 — one guidance capability, on the graduate's request. The SAME path as every agent call:
+   * deterministic routing (R7–R9) → full context → gateway (allow-list redaction, budget, schema + domain validation)
+   * → persisted proposals and usage. Only the test provider exists (OPEN-023). Unlike `onEvent`, the outcome is
+   * returned to the caller (budget, provider error or refusal included), never hidden.
+   */
+  async guidance(userId: string, capability: GuidanceCapability, guidanceRequest: Record<string, unknown>, facts: Record<string, unknown>, refs: InputReference[]) {
+    const decision = route({ type: 'user.requested', userId, facts: { ...facts, capability } });
+    if (!decision) throw new BadRequestException(`no route for capability '${capability}'`);
+    const fullContext: Record<string, unknown> = { ...(await this.buildContext(userId, decision.agentType, facts)), guidanceRequest };
+    const domainFacts = await this.domainFacts(userId);
+    const targetRoleId = (fullContext['targetRole'] as { id?: string } | null | undefined)?.id ?? null;
+    const result = await this.gateway.invoke({ agentType: decision.agentType, trigger: 'user.requested', userId, targetRoleId, fullContext, inputReferences: refs, domainFacts, capability });
+    const persisted = await this.persist(userId, result, decision.ruleId);
+    const all = await this.list(userId);
+    return {
+      ruleId: decision.ruleId, agentType: decision.agentType, invocationId: result.invocation.invocationId, status: result.usage.status,
+      provider: result.usage.provider, testOnly: true as const, redactedPaths: result.redactedPaths,
+      rejected: result.rejected.map((r) => r.code), refused: persisted.refused,
+      proposals: all.filter((p) => persisted.stored.includes(p.id)).map((p) => ({ id: p.id, proposalType: p.proposalType, summary: p.summary, structuredPayload: p.structuredPayload, warnings: p.warnings, lifecycle: p.lifecycle })),
+    };
   }
 
   private async buildContext(userId: string, agentType: AgentType, facts: Record<string, unknown>): Promise<Record<string, unknown>> {

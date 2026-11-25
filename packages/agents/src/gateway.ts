@@ -13,6 +13,7 @@ import { agentDefinition, type AgentInvocation, type AgentProposal, type AgentTy
 import { redactForAgent } from './redaction.js';
 import { validateSchema, validateAgainstDomain, ProposalRejected, type DomainFacts } from './validation.js';
 import { agentSpec } from './agents.js';
+import type { GuidanceCapability } from './guidance.js';
 
 export interface GatewayRequest {
   readonly agentType: AgentType;
@@ -22,6 +23,8 @@ export interface GatewayRequest {
   readonly fullContext: Readonly<Record<string, unknown>>;
   readonly inputReferences: readonly InputReference[];
   readonly domainFacts: DomainFacts;
+  /** Phase B package 5: the guidance capability, when the call is a guidance request. */
+  readonly capability?: GuidanceCapability;
 }
 
 export interface GatewayResult {
@@ -61,8 +64,8 @@ export class AgentGateway {
     const invocation: AgentInvocation = {
       invocationId: this.ids.newId(), agentId: def.agentId, agentType: req.agentType, trigger: req.trigger,
       userId: req.userId, targetRoleId: req.targetRoleId, allowedContext: passedPaths,
-      requestedAction: spec.requestedAction(req.trigger), inputReferences: req.inputReferences,
-      outputProposalTypes: spec.expectedProposalTypes(req.trigger),
+      requestedAction: spec.requestedAction(req.trigger, req.capability), inputReferences: req.inputReferences,
+      outputProposalTypes: spec.expectedProposalTypes(req.trigger, req.capability),
       provenance: { class: 'ai_generated', source: `agent:${def.agentId}/provider:${this.provider.name}` },
       modelMetadata: this.provider.testOnly ? null : { provider: this.provider.name, model: 'unknown' },
       createdAt: this.ids.now(),

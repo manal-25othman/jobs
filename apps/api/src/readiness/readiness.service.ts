@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
+import { LearningService } from './learning.service';
+import { SelfAssessmentService } from './self-assessment.service';
 import { emitAuditEvent } from '../infra/audit';
 import { ConfigurationService, governedFromRow, isProduction } from '../configuration/configuration.service';
 import {
@@ -19,7 +21,7 @@ import { professionalLabel, type SkillClassificationEntry } from '@naqla/domain'
  */
 @Injectable()
 export class ReadinessService {
-  constructor(private readonly db: DbService, private readonly config: ConfigurationService) {}
+  constructor(private readonly db: DbService, private readonly config: ConfigurationService, private readonly learningSvc: LearningService, private readonly selfSvc: SelfAssessmentService) {}
 
   /** The rule set in effect for a track: a track-specific active set wins over a global one. Nothing seeded ⇒ none. */
   async resolveRuleSet(c: PoolClient, targetRoleId: string): Promise<{ set: ReadinessRuleSet | null; resolution: ConfigResolution | 'none' }> {
@@ -223,7 +225,11 @@ export class ReadinessService {
         activities: activities.rows.map((r) => ({ id: r.id, slug: r.slug, titleAr: r.title_ar, version: r.version, depth: r.depth })),
       };
     });
-    return { role: list.role, skill: item, ...detail, readinessStatus: list.readiness.status, readinessHeadlineAr: list.readiness.headlineAr, ruleSetValidated: list.readiness.ruleSet ? configIsValidated(list.readiness.ruleSet) : false };
+    // Phase B package 2: what to learn, where, and where to practise it (A07, deterministic; never a level).
+    const learning = await this.learningSvc.forSkill(userId, skillId, list.role?.id ?? null, item.verification.level);
+    // FR-U-013: the graduate's own self-assessment, shown apart from the four state cards (never a level).
+    const selfAssessment = await this.selfSvc.forSkill(userId, skillId);
+    return { role: list.role, skill: item, ...detail, learning, selfAssessment, readinessStatus: list.readiness.status, readinessHeadlineAr: list.readiness.headlineAr, ruleSetValidated: list.readiness.ruleSet ? configIsValidated(list.readiness.ruleSet) : false };
   }
 }
 

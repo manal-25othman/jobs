@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, type TrackSkillsPage } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { JourneyNav } from '../../components/JourneyNav';
+import { CompanionNudge } from '../../components/CompanionNudge';
 
 /**
  * Skills of the current track (Phase 5). Four dimensions, side by side, never
@@ -38,6 +39,7 @@ export default function SkillsPage() {
   return (
     <main className="wrap">
       <JourneyNav current="/skills" />
+      <CompanionNudge token={token} variant="card" />
       <h1>مهارات مسار {page.role.labelAr}</h1>
 
       <section className="card">
@@ -71,7 +73,7 @@ export default function SkillsPage() {
       <section className="card">
         <h2>من أين أبدأ؟</h2>
         <ol className="body-sm" style={{ margin: 0 }}>
-          <li>افتحي أي مهارة لتعرفي معناها، ولماذا يحتاجها الدور، وكيف تبدو في العمل.</li>
+          <li>افتحي أي مهارة لتعرفي معناها، ولماذا يحتاجها الدور، وكيف تبدو في العمل. ويمكنك أن <a className="link" href="/self-assessment">تقيّمي نفسك</a> كنقطة انطلاق، فلا يُحتسب ذلك دليلًا.</li>
           <li>إن كنتِ واثقة منها فانتقلي مباشرة إلى نشاط يتدرّب عليها؛ لا يلزمك أن تتعلّمي أولًا.</li>
           <li>سلّمي عملك في النشاط، فيُقيَّم ويصبح دليلًا مُقيَّمًا إن استوفى المعايير.</li>
         </ol>
