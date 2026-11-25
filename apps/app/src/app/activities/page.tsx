@@ -99,6 +99,7 @@ export default function ActivitiesPage() {
             ) : null}
             <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
               <span className={status ? chipClass(status.tone) : 'chip'}>{status ? status.labelAr : 'لم تبدئيه بعد'}</span>
+              {!a.myLatest && a.startable === false ? <span className="chip chip--attention">غير متاح بعد: مواد البداية لم تُضف</span> : null}
               {a.myLatest && a.myLatest.attempts > 0 ? <span className="micro muted">المحاولات: <span className="num">{a.myLatest.attempts}</span></span> : null}
               <span className="push row" style={{ gap: 12 }}>
                 {a.myLatest ? <a className="link" href={`/work/${encodeURIComponent(a.myLatest.projectId)}`}>تابعي عملك ←</a> : null}

@@ -123,7 +123,10 @@ interface ActivityBase {
   id: string; slug: string; version: string; titleAr: string; titleEn: string; objectiveAr: string | null;
   level: string | null; estimatedMinutes: number | null; aiUsageMode: string; isDemo: boolean; label: string | null;
   skills: ActivitySkill[]; assessment: ActivityAssessment;
+  /** Phase B package 3: false while a required starter material is missing — the activity cannot be started (PO decision 3). */
+  startable?: boolean;
 }
+export interface ActivityMaterial { id: string; fileName: string; sizeBytes: number; version: string; coversInputKeys: string[] }
 export interface ActivitySummary extends ActivityBase {
   deliverableCount: number; fileDeliverableCount: number;
   myLatest: { projectId: string; workStatus: WorkStatus; attempts: number } | null;
@@ -143,6 +146,8 @@ export interface ActivityDetail extends ActivityBase {
   inputs: { key: string; descriptionAr: string | null; descriptionEn: string | null; descriptionWithheld: boolean }[];
   /** Starter materials do not exist yet (Phase 3). Said plainly. */
   materialsAvailable: boolean;
+  /** Phase B package 3: the graduate starter packages (names and sizes only; downloads go through the graduate's own project). */
+  materials?: ActivityMaterial[]; missingMaterialCount?: number;
   myProjects: ProjectStatus[];
 }
 export interface ProjectStatus {
@@ -275,6 +280,11 @@ export async function uploadEvidenceFile(file: File, token: string): Promise<str
   if (!put.ok) throw new Error(`upload failed (${put.status})`);
   await api(`/uploads/${intent.uploadId}/confirm`, { method: 'POST', token });
   return intent.uploadId;
+}
+
+/** Phase B package 3: a short-lived signed URL for a starter package of the graduate's own project. */
+export async function materialDownloadUrl(projectId: string, materialId: string, token: string): Promise<{ url: string; fileName: string; expiresInSeconds: number }> {
+  return api(`/projects/${encodeURIComponent(projectId)}/materials/${encodeURIComponent(materialId)}/download`, { token });
 }
 
 export async function revokeShareLink(id: string, token: string): Promise<void> {

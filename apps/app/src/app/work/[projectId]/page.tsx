@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { questionVisible, deliverableProgress } from '@naqla/domain';
 import {
-  api, isNotFound, uploadEvidenceFile,
-  type ActivityDetail, type ProjectStatus, type EvidenceItem, type DisclosureQuestionnaireView,
+  api, isNotFound, uploadEvidenceFile, materialDownloadUrl,
+  type ActivityDetail, type ActivityMaterial, type ProjectStatus, type EvidenceItem, type DisclosureQuestionnaireView,
 } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner } from '../../../components/Session';
 import { ExperimentalNotice } from '../../../components/ExperimentalNotice';
@@ -61,6 +61,8 @@ export default function WorkspacePage() {
   const restored = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef<string | null>(null);
+  const [materials, setMaterials] = useState<ActivityMaterial[]>([]);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token || !params?.projectId) return;
@@ -80,6 +82,8 @@ export default function WorkspacePage() {
         if (p.activity_spec_id) {
           const a = await api<ActivityDetail>(`/me/activities/${encodeURIComponent(p.activity_spec_id)}`, { token });
           setActivity(a);
+          // Phase B package 3: the starter packages of this project's activity (names only; each download is a fresh signed URL).
+          setMaterials((await api<{ items: ActivityMaterial[] }>(`/projects/${id}/materials`, { token })).items);
           // FR-U-025: restore the private draft, if any; otherwise start from the activity's primary skills.
           const draft = await api<DraftView | null>(`/projects/${id}/draft`, { token });
           if (draft) {
@@ -180,6 +184,17 @@ export default function WorkspacePage() {
     }
   }
 
+  async function downloadMaterial(m: ActivityMaterial) {
+    if (!token || !project) return;
+    setDownloadError(null);
+    try {
+      const d = await materialDownloadUrl(project.id, m.id, token);
+      window.location.assign(d.url);
+    } catch (e) {
+      setDownloadError(friendlyErrorAr((e as Error).message, 'تعذّر تجهيز رابط التنزيل. حاولي مجددًا.').textAr);
+    }
+  }
+
   async function submit() {
     if (!token || !project || submitting.current || problems.length) return;
     submitting.current = true; setSubmitError(null);
@@ -263,11 +278,28 @@ export default function WorkspacePage() {
         {activity.businessContextAr ? <p className="body-sm" style={{ margin: 0 }}>{activity.businessContextAr}</p> : null}
         {activity.objectiveAr ? <p className="body-sm" style={{ margin: 0 }}><strong style={{ fontWeight: 500 }}>المطلوب منك: </strong>{activity.objectiveAr}</p> : null}
         <p className="micro muted" style={{ margin: 0 }}>{AI_USAGE_AR[activity.aiUsageMode] ?? ''}</p>
-        {!activity.materialsAvailable && activity.inputs.length ? (
-          <p className="disclaimer">مواد البداية لهذا النشاط غير متاحة على المنصّة بعد؛ لا نعرض موادّ غير موجودة.</p>
+        {!materials.length && activity.inputs.length && !activity.materialsAvailable ? (
+          <p className="disclaimer">لا ملفات بداية لهذا النشاط على المنصّة؛ ما يُقدَّم لك موصوف في تفاصيل النشاط.</p>
         ) : null}
         <a className="link" href={`/activities/${encodeURIComponent(activity.id)}`}>تفاصيل النشاط وطريقة التقييم ←</a>
       </section>
+
+      {materials.length ? (
+        <section className="card" aria-labelledby="starter">
+          <h2 id="starter">مواد البداية</h2>
+          <p className="body-sm" style={{ margin: 0 }}>نزّلي الملفات، واقرئي <span className="term">README.md</span> أولًا ففيه طريقة التشغيل وما تسلّمينه. اعملي بأدواتك المعتادة، ثم ارفعي ما يُطلب هنا.</p>
+          <div className="rows">
+            {materials.map((m) => (
+              <div key={m.id} className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <span className="grow body-sm"><span className="term">{m.fileName}</span> <span className="micro muted num">{sizeLabel(m.sizeBytes)}</span></span>
+                <button type="button" className="btn btn--secondary btn--sm" onClick={() => void downloadMaterial(m)}>نزّلي الملفات</button>
+              </div>
+            ))}
+          </div>
+          {downloadError ? <p className="field__error" role="alert">{downloadError}</p> : null}
+          <p className="disclaimer">هذه المواد خاصة بك ولهذا النشاط: لا تنشريها في مستودع عام ولا على الإنترنت. رابط التنزيل مؤقت ويُنشأ عند كل نقرة.</p>
+        </section>
+      ) : null}
 
       {!readOnly ? (
         <>

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { activityStartability, STARTER_MATERIALS_MISSING_AR } from '@naqla/domain';
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { SkillProgressEngine } from '../skill-progress/skill-progress-engine.service';
@@ -191,6 +192,13 @@ export class CareerService {
           [input.activitySpecId, userId],
         );
         if (spec.rowCount === 0) throw new NotFoundException('unknown activity spec');
+        // Phase B package 3 (PO decision 3): an activity whose required starter materials are missing is not started.
+        // The same rule is enforced by the database on every new project (0039); this is the explained refusal.
+        const inputs = (await c.query('select key, material_required from activity_input where activity_spec_id = $1', [spec.rows[0].id])).rows;
+        const materials = (await c.query(`select audience, covers_input_keys from activity_material where activity_spec_id = $1`, [spec.rows[0].id])).rows;
+        const start = activityStartability(inputs.map((i) => ({ key: String(i.key), materialRequired: i.material_required === true })),
+          materials.map((m) => ({ audience: m.audience as 'graduate' | 'reviewer', coversInputKeys: m.covers_input_keys as string[] })));
+        if (!start.startable) throw new ConflictException(`[starter_materials_missing] ${STARTER_MATERIALS_MISSING_AR}`);
         specId = spec.rows[0].id;
         specVersion = spec.rows[0].version;
       }

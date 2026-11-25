@@ -15,6 +15,7 @@
  *   claims-reground --operator <uuid> --reason "<why>"   Phase 9: execute (product_owner grant required); reconciliation must pass or nothing changes
  *   claims-public-freeze --operator <uuid> --reason "<why>"   Phase 9: pre-deployment — close direct public paths until re-grounded
  *   pilot-load [dir] --by <name> --reason "<why>"   D-135: DEVELOPMENT ONLY — load the v2 candidate as DEMO pilot content (undecided values stay empty + TBD); refused in production
+ *   pilot-materials --by <name> --reason "<why>"   Phase B package 3: DEVELOPMENT ONLY — store the pilot's starter (graduate) and reference (reviewer) materials in private storage; load before pilot-publish; Supabase storage only
  *   pilot-publish --operator <uuid> --reason "<why>"   D-136: LOCAL DEVELOPMENT ONLY — the authorized Product Owner publishes the loaded DEMO pilot content for internal testing (never production/staging; not SME approval)
  *   pilot-policy <per-skill|baseline> --by <name>   D-135: DEVELOPMENT ONLY — per-skill feedback for the pilot, or restore the D-118 safety baseline
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
@@ -30,6 +31,8 @@ import { reviewTransition, approveRubricValues } from './review';
 import { promoteDemo, completePromotion, recordCorrection } from './promotion';
 import { PackValidationError } from './pack-schema';
 import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PilotLoadError } from './pilot-loader';
+import { loadPilotMaterials, MaterialLoadError } from './material-loader';
+import { SupabaseStorageAdapter } from '../storage/supabase-storage.adapter';
 import { cliApprove, cliActivate, cliCreateTrackVersion, cliCreateReadinessSet, cliRevalidateClaims, cliRegroundAssets, cliGroundingStanding, cliFreezePublicGrounding } from '../configuration/config-admin.service';
 import { readFileSync } from 'node:fs';
 import type { ConfigActivation } from '@naqla/domain';
@@ -73,6 +76,22 @@ export async function main(argv: string[], root: string): Promise<number> {
         console.log(`  written: ${Object.entries(r.written).map(([k, v]) => `${k}=${v}`).join(' ')}`);
         return 0;
       } catch (e) { if (e instanceof PilotLoadError) { console.error(e.message); return 1; } throw e; }
+    }
+    if (cmd === 'pilot-materials') {
+      const by = arg(argv, '--by'); const reason = arg(argv, '--reason');
+      if (!by || !reason) { console.error('pilot-materials needs --by <name> and --reason "<why>"'); return 2; }
+      // The in-memory test storage lives inside one process: materials stored from this CLI would vanish. Real storage only.
+      if ((process.env['STORAGE_DRIVER'] ?? 'supabase') !== 'supabase') { console.error('pilot-materials stores files in Supabase Storage; with the in-memory test driver, load materials inside the process that serves them (test harness)'); return 2; }
+      const url = process.env['NEXT_PUBLIC_SUPABASE_URL']; const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+      if (!url || !key) { console.error('pilot-materials needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY'); return 2; }
+      try {
+        const r = await loadPilotMaterials(pool, new SupabaseStorageAdapter(url, key), { materialsRoot: join(root, 'data', 'candidates', 'trk_frontend_junior_v2', 'materials'), byLabel: by, reason, production });
+        console.log(`pilot materials ${r.version} — DEVELOPMENT ONLY, candidate content, not SME approved`);
+        for (const w of r.written) console.log(`  stored ${w.activity} ${w.audience} ${w.fileName} (${w.files} files, ${w.sizeBytes} bytes, sha256 ${w.checksum.slice(0, 12)}…)`);
+        for (const x of r.skipped) console.log(`  skipped ${x.activity} ${x.audience} ${x.fileName}: ${x.reason}`);
+        console.log(`  starter-file fingerprints recorded: ${r.starterChecksums}`);
+        return 0;
+      } catch (e) { if (e instanceof MaterialLoadError) { console.error(e.message); return 1; } throw e; }
     }
     if (cmd === 'pilot-publish') {
       const operatorId = arg(argv, '--operator'); const reason = arg(argv, '--reason');

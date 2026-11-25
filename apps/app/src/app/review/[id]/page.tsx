@@ -17,10 +17,15 @@ export default function ReviewDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ pendingItems: number; finalized: unknown } | null>(null);
+  const [refs, setRefs] = useState<{ id: string; fileName: string; url: string }[]>([]);
 
   useEffect(() => {
     if (!token || !id) return;
-    void api<ReviewItem>(`/review/items/${id}`, { token }).then(setItem).catch((e: Error) => setError(e.message));
+    void api<ReviewItem>(`/review/items/${id}`, { token }).then((it) => {
+      setItem(it);
+      // Phase B package 3: the reviewer-only references of this activity (reference solution, planted-defect notes).
+      void api<{ items: { id: string; fileName: string; url: string }[] }>(`/review/items/${id}/materials`, { token }).then((r) => setRefs(r.items)).catch(() => setRefs([]));
+    }).catch((e: Error) => setError(e.message));
   }, [token, id]);
 
   async function submit() {
@@ -61,6 +66,9 @@ export default function ReviewDetailPage() {
         <p><strong style={{ fontWeight: 500 }}>{item.activity.titleAr}</strong></p>
         <p className="body-sm">{item.activity.businessContextAr}</p>
         <p className="body-sm muted">{item.activity.objectiveAr}</p>
+        {refs.length ? (
+          <p className="body-sm">مرجع المراجِع (سري، لا يراه الخرّيج): {refs.map((r) => <a key={r.id} className="link" href={r.url} style={{ marginInlineStart: 6 }}><span className="term">{r.fileName}</span></a>)}</p>
+        ) : null}
         <p className="micro muted">نمط استخدام AI في هذا النشاط: <span className="term">{item.activity.aiUsageMode}</span> · الإفصاح المُعلَن: {item.submission.aiDisclosure.declaredUse.join('، ') || 'لا شيء'} — الإفصاح لا يخفض الدرجة.</p>
       </section>
       <section className="card stack" style={{ gap: 8 }}>

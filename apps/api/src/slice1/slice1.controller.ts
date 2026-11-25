@@ -16,6 +16,7 @@ import { WithdrawalService } from './withdrawal.service';
 import { ActivityCatalogueService } from './activity-catalogue.service';
 import { AgentService } from '../agents/agent.service';
 import { DraftService } from './draft.service';
+import { MaterialService } from './material.service';
 import { Delete } from '@nestjs/common';
 import { workStatus } from '@naqla/domain';
 
@@ -41,6 +42,7 @@ export class Slice1Controller {
     private readonly withdrawal: WithdrawalService,
     private readonly activities: ActivityCatalogueService,
     private readonly drafts: DraftService,
+    private readonly materials: MaterialService,
   ) {}
 
   /* ─────────────────────────── identity ─────────────────────────── */
@@ -135,6 +137,18 @@ export class Slice1Controller {
     },
   ) {
     return { ok: true, data: await this.submissions.createSubmission(user.id, projectId, body) };
+  }
+
+  /* ───────────────── activity starter materials (Phase B, package 3) ───────────────── */
+
+  @Get('projects/:id/materials')
+  async listMaterials(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { ok: true, data: await this.materials.listForProject(user.id, id) };
+  }
+
+  @Get('projects/:id/materials/:materialId/download')
+  async downloadMaterial(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Param('materialId') materialId: string) {
+    return { ok: true, data: await this.materials.downloadForProject(user.id, id, materialId) };
   }
 
   /* ───────────────────── workspace drafts (FR-U-025) ───────────────────── */

@@ -116,7 +116,8 @@ async function writePilot(pool: Pool, bundle: ReturnType<typeof loadCandidate>, 
         [a.code, a.version, a.title_ar, a.title_en, a.ai_usage_mode, a.estimated_minutes, roleId, a.level, a.business_context_ar, a.business_context_en, a.objective_ar, a.objective_en,
          a.can_yield_demonstrated, a.is_validation_activity, a.variant_family ?? null, m.drafting_aid])).rows[0].id as string;
       activityIds.set(a.code, id); bump('activity_spec');
-      for (const i of a.inputs) await c.query('insert into activity_input (activity_spec_id, key, description_ar, description_en, is_platform_private, contains_planted_issue) values ($1,$2,$3,$4,$5,$6)',
+      // Phase B package 3 (0039): every pilot input is delivered as a starter material; the activity cannot be started until it is.
+      for (const i of a.inputs) await c.query('insert into activity_input (activity_spec_id, key, description_ar, description_en, is_platform_private, contains_planted_issue, material_required) values ($1,$2,$3,$4,$5,$6,true)',
         [id, i.key, i.description_ar, i.description_en, i.is_platform_private, i.contains_planted_issue]);
       let pos = 0;
       for (const d of a.deliverables) await c.query('insert into activity_deliverable (activity_spec_id, key, format, mandatory, description_ar, description_en, position) values ($1,$2,$3,$4,$5,$6,$7)',

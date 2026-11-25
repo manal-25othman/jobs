@@ -1,0 +1,18 @@
+{
+  "_label": "DEMO / CANDIDATE / NOT SME APPROVED — original starter materials written for the internal pilot (Phase B, PO decision 4). Planted defects follow the candidate specification and await expert confirmation.",
+  "version": "0.1.0",
+  "activities": {
+    "act_fe_debug_improve": {
+      "graduate": { "archive": "workshop-registration-starter.zip", "dir": "act_fe_debug_improve/graduate", "covers": ["repo.registration_page", "report.complaints"] },
+      "reviewer": { "archive": "workshop-registration-reviewer.zip", "dir": "act_fe_debug_improve/reviewer" }
+    },
+    "act_fe_integrated_leave_requests": {
+      "graduate": { "archive": "leave-requests-starter.zip", "dir": "act_fe_integrated_leave_requests/graduate", "covers": ["brief.leave_requests", "repo.starter", "api.mock_requests"] },
+      "reviewer": { "archive": "leave-requests-reviewer.zip", "dir": "act_fe_integrated_leave_requests/reviewer" }
+    },
+    "act_fe_change_request": {
+      "graduate": { "archive": "team-tasks-starter.zip", "dir": "act_fe_change_request/graduate", "covers": ["repo.team_tasks", "request.change", "api.mock_tasks"] },
+      "reviewer": { "archive": "team-tasks-reviewer.zip", "dir": "act_fe_change_request/reviewer" }
+    }
+  }
+}

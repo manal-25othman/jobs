@@ -1,3 +1,4 @@
+import { activityStartability } from '@naqla/domain';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
@@ -7,7 +8,8 @@ import { activityAssessmentMode, workStatus, type WorkStatus } from '@naqla/doma
 
 /** Learner-facing activity columns. Nothing else of activity_spec leaves this service (0024 grants the same set). */
 const ACTIVITY_COLUMNS = `a.id, a.slug, a.version, a.title_ar, a.title_en, a.objective_ar, a.objective_en, a.business_context_ar, a.business_context_en,
-  a.level, a.ai_usage_mode, a.estimated_minutes, a.target_role_id, a.is_demo_fixture, a.can_yield_demonstrated, a.status, a.published_at`;
+  a.level, a.ai_usage_mode, a.estimated_minutes, a.target_role_id, a.is_demo_fixture, a.can_yield_demonstrated, a.status, a.published_at,
+  activity_materials_complete(a.id) as startable`;
 
 export interface ProjectStatusRow {
   id: string; title: string; kind: string; status: string; activitySpecId: string | null; activitySpecVersion: string | null;
@@ -95,7 +97,9 @@ export class ActivityCatalogueService {
         inputs: inputs.rows.map((i) => i.contains_planted_issue
           ? { key: i.key, descriptionAr: null, descriptionEn: null, descriptionWithheld: true }
           : { key: i.key, descriptionAr: i.description_ar, descriptionEn: i.description_en, descriptionWithheld: false }),
-        materialsAvailable: false,
+        // Phase B package 3: the GRADUATE materials of the activity (names and sizes only — never a storage path;
+        // downloads go through the owner's project). Reviewer materials are never listed here.
+        ...(await this.materials(c, activityId)),
         assessment: await this.assessment(c, a),
         policy: await this.policyNote(c),
       };
@@ -104,11 +108,27 @@ export class ActivityCatalogueService {
     return { ...out, myProjects: await this.projectStatuses(userId, activityId) };
   }
 
+  private async materials(c: PoolClient, activityId: string) {
+    const inputs = (await c.query('select key, material_required from activity_input where activity_spec_id = $1', [activityId])).rows;
+    const mats = (await c.query(`select id, audience, covers_input_keys, file_name, size_bytes, material_version from activity_material where activity_spec_id = $1 order by created_at`, [activityId])).rows;
+    const start = activityStartability(inputs.map((i) => ({ key: String(i.key), materialRequired: i.material_required === true })),
+      mats.map((m) => ({ audience: m.audience as 'graduate' | 'reviewer', coversInputKeys: m.covers_input_keys as string[] })));
+    const graduate = mats.filter((m) => m.audience === 'graduate');
+    return {
+      materialsAvailable: graduate.length > 0 && start.startable,
+      startable: start.startable,
+      missingMaterialCount: start.missingInputKeys.length,
+      materials: graduate.map((m) => ({ id: String(m.id), fileName: String(m.file_name), sizeBytes: Number(m.size_bytes), version: String(m.material_version), coversInputKeys: m.covers_input_keys as string[] })),
+    };
+  }
+
   private summary(a: Record<string, any>) {
     return {
       id: a.id, slug: a.slug, version: a.version, titleAr: a.title_ar, titleEn: a.title_en, objectiveAr: a.objective_ar,
       level: a.level, estimatedMinutes: a.estimated_minutes, aiUsageMode: a.ai_usage_mode,
       isDemo: a.is_demo_fixture === true,
+      // Phase B package 3 (PO decision 3): false while a required starter material is missing — the activity cannot be started.
+      startable: a.startable === true,
       // Shown with every demo item: demo content is never reviewed and never supports a level.
       label: a.is_demo_fixture ? 'DEMO — not reviewed' : null,
     };

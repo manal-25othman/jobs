@@ -28,6 +28,11 @@ export interface StoragePort {
   /** Reads the object for measurement. Callers cap the size before calling. */
   read(bucket: string, path: string): Promise<Uint8Array>;
   remove(bucket: string, path: string): Promise<void>;
+  /**
+   * Phase B, package 3: a SERVER-side write of a platform-owned object (activity starter and reviewer materials).
+   * Never exposed to clients; never overwrites (an existing object is an error — materials are versioned, not edited).
+   */
+  putObject(bucket: string, path: string, bytes: Uint8Array, contentType: string): Promise<void>;
 }
 
 export const STORAGE_PORT = Symbol('STORAGE_PORT');

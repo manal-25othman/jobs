@@ -30,7 +30,8 @@
     "eval:agents": "npm run build -w @naqla/domain -w @naqla/agents && node scripts/run-agent-harness.mjs",
     "career:import": "npm run build -w @naqla/api && node scripts/career-data.mjs import trk_frontend_junior",
     "career:validate": "node scripts/career-data.mjs validate",
-    "career:near-duplicates": "node scripts/career-data.mjs near-duplicates trk_frontend_junior"
+    "career:near-duplicates": "node scripts/career-data.mjs near-duplicates trk_frontend_junior",
+    "validate:materials": "node scripts/validate-starter-materials.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

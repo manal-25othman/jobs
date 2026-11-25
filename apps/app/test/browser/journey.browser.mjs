@@ -73,6 +73,9 @@ const { roleSkillVisibility } = apiRequire('./dist/src/career-data/publication-s
 const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
 const { loadPilotCandidate, publishPilotDemo, usePilotPerSkillPolicy } = apiRequire('./dist/src/career-data/pilot-loader');
+const { loadPilotMaterials } = apiRequire('./dist/src/career-data/material-loader');
+const { readZip } = apiRequire('./dist/src/career-data/zip');
+let apiStorage = null;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const one = async (sql, p = []) => (await pool.query(sql, p)).rows[0];
@@ -85,6 +88,16 @@ async function startApi() {
   app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', { exclude: ['health', 'ready', 'public/reports/:id'] });
   const storage = app.get(STORAGE_PORT);
+  apiStorage = storage;
+  // TEST HARNESS ONLY: the memory double's signed download URL becomes an HTTP URL the browser can GET (Phase B package 3).
+  const originalDownload = storage.createSignedDownload.bind(storage);
+  storage.createSignedDownload = async (...args) => (await originalDownload(...args)).replace('memory://download/', `${API}/__test-storage/download/`);
+  app.use('/__test-storage/download/', (req, res) => {
+    try {
+      const bytes = storage.get(`memory://download/${req.url.replace(/^\//, '')}`);
+      res.setHeader('content-type', 'application/zip'); res.setHeader('content-disposition', 'attachment'); res.end(Buffer.from(bytes));
+    } catch (e) { res.statusCode = 404; res.end(String(e)); }
+  });
   // TEST HARNESS ONLY: the memory double's signed upload URL becomes an HTTP URL the browser can PUT to.
   const original = storage.createSignedUpload.bind(storage);
   storage.createSignedUpload = async (...args) => {
@@ -353,6 +366,8 @@ async function scenarioB15(browser) {
   const LABEL = 'محتوى تجريبي غير معتمد مهنيًا';
   const report = await loadPilotCandidate(pool, { candidateDir: join(ROOT, 'data/candidates/trk_frontend_junior_v2'), canonicalRoot: join(ROOT, 'data/career'),
     byLabel: 'UI acceptance (D-135 pilot)', reason: 'B15 browser journey', production: false });
+  // Phase B package 3: the original starter and reviewer materials, loaded while the activities are still draft.
+  const mat = await loadPilotMaterials(pool, apiStorage, { materialsRoot: join(ROOT, 'data/candidates/trk_frontend_junior_v2/materials'), byLabel: 'UI acceptance (Phase B materials)', reason: 'B15 browser journey', production: false });
   const po = await newUser();
   await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'product_owner', 'UI acceptance (TEST FIXTURE Product Owner — not a governance decision)')`, [po.id]);
   await publishPilotDemo(pool, { operatorId: po.id, reason: 'B15 browser journey', nodeEnv: 'test', databaseUrl: process.env.DATABASE_URL });
@@ -422,8 +437,20 @@ async function scenarioB15(browser) {
       /المطلوب منك/.test(brief) && /ما تسلّمينه: ملفان و3 إجابات مكتوبة/.test(brief) && /بعد التسليم/.test(brief) && /مراجِع مختص/.test(brief) && /لا يتغيّر مستوى أي مهارة/.test(brief)
       && await page.locator('.banner').count() === 1, brief.replace(/\n/g, ' | '));
     await shot(page, 'B15-pilot-activity-detail-desktop');
+    // B18 · Phase B package 3: the activity lists its starter package; the workspace delivers it through a signed link.
+    const detailBody = await bodyText(page);
+    check('B18a', 'activity detail: the starter package is listed by name and size, to be downloaded after starting; no reviewer file is named',
+      /مواد البداية: team-tasks-starter\.zip/.test(detailBody) && !/reviewer|REFERENCE|solution/i.test(detailBody) && !/غير متاح بعد/.test(detailBody));
     await page.getByRole('button', { name: 'ابدئي النشاط' }).click();
     await page.waitForURL(/\/work\//); await page.getByRole('heading', { name: 'المخرجات المطلوبة' }).waitFor();
+    await page.getByRole('heading', { name: 'مواد البداية' }).waitFor();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'نزّلي الملفات' }).click()]);
+    const zipBytes = await (async () => { const chunks = []; for await (const c of await download.createReadStream()) chunks.push(c); return new Uint8Array(Buffer.concat(chunks)); })();
+    const names = readZip(zipBytes).map((e) => e.path).sort();
+    check('B18b', 'workspace: «نزّلي الملفات» downloads the graduate package — README, the project, the change request, mock data — and nothing for reviewers',
+      ['README.md', 'CHANGE-REQUEST.md', 'app.js', 'index.html', 'mock-api.js', 'data/tasks.json', 'state-example.json'].every((n) => names.includes(n)) && !names.some((n) => /REFERENCE|solution/i.test(n)), names.join(','));
+    check('B18c', 'the download is audited for this graduate', await count(`select count(*)::int n from audit_event where event_type = 'activity_material.downloaded' and user_id = $1`, [u.id]) === 1);
+    await shot(page, 'B18-workspace-starter-desktop');
     check('B15e', 'the workspace shows the experimental notice', (await bodyText(page)).includes(LABEL) && await page.locator('[data-testid="experimental-notice"]').count() === 1);
     await uploadInto(page, 'file.app_js', 'app.js', 'const state = { tasks: [], filters: { status: "all", owner: "all" } };');
     await uploadInto(page, 'file.index_html', 'index.html', '<main><ul id="tasks"></ul></main>');

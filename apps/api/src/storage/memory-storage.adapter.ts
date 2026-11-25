@@ -63,6 +63,11 @@ export class MemoryStorageAdapter implements StoragePort {
 
   async remove(bucket: string, path: string): Promise<void> { this.objects.delete(this.key(bucket, path)); }
 
+  async putObject(bucket: string, path: string, bytes: Uint8Array, contentType: string): Promise<void> {
+    if (this.objects.has(this.key(bucket, path))) throw new Error('object already exists (materials are versioned, never overwritten)');
+    this.objects.set(this.key(bucket, path), { bytes, contentType });
+  }
+
   /** Direct access is what a raw bucket URL would be. It must never be needed. */
   hasObject(bucket: string, path: string): boolean { return this.objects.has(this.key(bucket, path)); }
 }

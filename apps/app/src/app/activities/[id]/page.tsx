@@ -9,8 +9,9 @@ import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import {
   assessmentCopy, chipClass, workStatusCopy, nextActionFor, friendlyErrorAr, afterSubmissionAr, deliverablesSummaryAr,
-  AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR,
+  AI_USAGE_AR, LEVEL_OF_ACTIVITY_AR, SUBMISSION_IS_NOT_A_LEVEL_AR, sizeLabel,
 } from '../../../lib/journey';
+import { STARTER_MATERIALS_MISSING_AR } from '@naqla/domain';
 
 /**
  * U2 — one activity, learner-safe projection only (GET /me/activities/:id).
@@ -148,11 +149,21 @@ export default function ActivityDetailPage() {
               </p>
             ))}
           </div>
-          {!a.materialsAvailable ? (
-            <p className="disclaimer">
-              مواد البداية لهذا النشاط (الملفات أو البيانات التي يحتاجها) غير متاحة على المنصّة بعد. لا نعرض موادّ غير موجودة؛
-              إن احتاج النشاط إليها فلن تتمكّني من إكماله كما صُمّم حتى تُضاف.
-            </p>
+          {a.materials && a.materials.length ? (
+            <div className="rows">
+              {a.materials.map((m) => (
+                <div key={m.id} className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                  <span className="grow body-sm">مواد البداية: <span className="term">{m.fileName}</span></span>
+                  <span className="micro muted num">{sizeLabel(m.sizeBytes)}</span>
+                </div>
+              ))}
+              <p className="disclaimer" style={{ margin: 0 }}>تنزّلينها من مكان العمل بعد بدء النشاط، وتعملين عليها بأدواتك. هي خاصة بك: لا تنشريها في مستودع عام.</p>
+            </div>
+          ) : null}
+          {a.startable === false ? (
+            <p className="disclaimer">{STARTER_MATERIALS_MISSING_AR}</p>
+          ) : !a.materialsAvailable && !(a.materials?.length) ? (
+            <p className="disclaimer">لا ملفات بداية لهذا النشاط على المنصّة؛ ما يُقدَّم لك موصوف أعلاه.</p>
           ) : null}
         </section>
       ) : null}
@@ -198,8 +209,17 @@ export default function ActivityDetailPage() {
           ) : (
             <>
               <h2>ابدئي النشاط</h2>
-              <p>يُنشأ لك مكان عمل لهذا النشاط. لا يُقيَّم شيء قبل أن تسلّمي.</p>
-              <div><button className="btn btn--on-dark" onClick={start} disabled={busy}>{busy ? 'جارٍ البدء…' : 'ابدئي النشاط'}</button></div>
+              {a.startable === false ? (
+                <>
+                  <p>{STARTER_MATERIALS_MISSING_AR}</p>
+                  <div><button className="btn btn--on-dark" disabled aria-disabled="true">غير متاح بعد</button></div>
+                </>
+              ) : (
+                <>
+                  <p>يُنشأ لك مكان عمل لهذا النشاط، وتنزّلين منه مواد البداية. لا يُقيَّم شيء قبل أن تسلّمي.</p>
+                  <div><button className="btn btn--on-dark" onClick={start} disabled={busy}>{busy ? 'جارٍ البدء…' : 'ابدئي النشاط'}</button></div>
+                </>
+              )}
             </>
           )}
         </div>

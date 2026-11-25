@@ -17,7 +17,9 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
-import { bootApp, newUser, uploadFile, filesFor, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
+import { bootApp, newUser, uploadFile, filesFor, memoryStorage, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
+import { loadPilotMaterials, type MaterialLoadReport } from '../src/career-data/material-loader';
+import { readZip } from '../src/career-data/zip';
 import { loadCandidate } from '../src/career-data/candidate';
 import { importPack } from '../src/career-data/pipeline';
 import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PILOT_POLICY_DESCRIPTION, type PilotLoadReport } from '../src/career-data/pilot-loader';
@@ -38,11 +40,15 @@ const NON_PILOT = `select md5(string_agg(t, '|' order by t)) as h from (
     union all select concat_ws(',', id, slug, review_status, status, version) from skill
     union all select concat_ws(',', id, code, practice_activity_spec_id) from learning_resource) x`;
 
-let before0: string; let report: PilotLoadReport;
+let before0: string; let report: PilotLoadReport; let materials: MaterialLoadReport;
+const MAT = join(DIR, 'materials');
+const MAT_OPTS = { materialsRoot: MAT, byLabel: 'e2e (Phase B materials)', reason: 'Phase B package 3 regression test', production: false };
 before(async () => {
   app = await bootApp(); http = request(app.getHttpServer()); pool = new Pool({ connectionString: process.env['DATABASE_URL'] });
   before0 = (await one(NON_PILOT)).h;
   report = await loadPilotCandidate(pool, OPTS);
+  // Phase B package 3: the original starter and reviewer materials are loaded while the activities are still draft.
+  materials = await loadPilotMaterials(pool, memoryStorage(app), MAT_OPTS);
 });
 after(async () => { await pool?.end(); await app?.close(); });
 
@@ -213,6 +219,14 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
       for (const it of items) {
         await http.post(`/v1/review/queue/${it.id}/assign`).set(auth(reviewer)).send({}).expect(201);
         await http.get(`/v1/review/items/${it.id}`).set(auth(reviewer)).expect(200);
+        if (it === items[0]) {
+          // Phase B package 3: the ASSIGNED reviewer receives the reviewer-only reference; the graduate never does.
+          const refs = (await http.get(`/v1/review/items/${it.id}/materials`).set(auth(reviewer)).expect(200)).body.data.items as { fileName: string; url: string }[];
+          assert.deepEqual(refs.map((r) => r.fileName), ['team-tasks-reviewer.zip']);
+          const names = readZip(memoryStorage(app).get(refs[0]!.url)).map((e) => e.path);
+          assert.ok(names.includes('REFERENCE.md') && names.includes('solution/app.js'), names.join(','));
+          await http.get(`/v1/review/items/${it.id}/materials`).set(auth(u)).expect(403);
+        }
         await http.post(`/v1/review/items/${it.id}/decision`).set(auth(reviewer)).send({ levelKey: it.top, rationale: `لاحظتُ في الملفات المسلّمة: ${it.criterion_key}.` }).expect(201);
       }
       const view = (await http.get(`/v1/submissions/${sid}/evaluation`).set(auth(u)).expect(200)).body.data;
@@ -287,5 +301,51 @@ describe('Phase B package 1 — occupational discovery and skill explanation (PO
     const detail = (await http.get(`/v1/me/track-skills/${first.skillId}`).set(auth(u)).expect(200)).body.data;
     assert.deepEqual(detail.skill.explanation, first.explanation);
     assert.equal(detail.activities.length, first.explanation.activityCount, 'the count matches the related activities shown');
+  });
+});
+
+describe('Phase B package 3 — starter materials (PO decisions 3 and 4)', () => {
+  test('the loader stored one graduate and one reviewer package per activity, and fingerprinted every starter file', async () => {
+    assert.equal(materials.written.length + materials.skipped.length, 6);
+    const rows = (await pool.query(`select a.slug, m.audience, m.file_name, m.covers_input_keys from activity_material m join activity_spec a on a.id = m.activity_spec_id order by a.slug, m.audience`)).rows;
+    assert.deepEqual(rows.map((r) => `${r.slug}:${r.audience}`), ['act_fe_change_request:graduate', 'act_fe_change_request:reviewer', 'act_fe_debug_improve:graduate', 'act_fe_debug_improve:reviewer',
+      'act_fe_integrated_leave_requests:graduate', 'act_fe_integrated_leave_requests:reviewer']);
+    for (const a of report.activities) {
+      const required = (await pool.query('select key from activity_input where activity_spec_id = $1 and material_required order by key', [a.activityId])).rows.map((r) => r.key as string);
+      const covered = rows.filter((r) => r.slug === a.code && r.audience === 'graduate').flatMap((r) => r.covers_input_keys as string[]).sort();
+      assert.deepEqual(covered, required, `${a.code}: every required input is covered`);
+    }
+    const fp = Number((await one(`select count(*)::int n from activity_starter_checksum where activity_spec_id = any($1)`, [report.activities.map((a) => a.activityId)])).n);
+    assert.ok(fp >= materials.written.filter((w) => w.audience === 'graduate').reduce((s, w) => s + w.files, 0), `starter fingerprints recorded (${fp})`);
+    const again = await loadPilotMaterials(pool, memoryStorage(app), MAT_OPTS);
+    assert.equal(again.written.length, 0, 'a second load rewrites nothing');
+    await assert.rejects(() => loadPilotMaterials(pool, memoryStorage(app), { ...MAT_OPTS, production: true }), /never loaded in production/);
+  });
+
+  test('a graduate who started the activity downloads ITS starter package — the graduate folder only, never the reference', async () => {
+    const taskB = report.activities.find((a) => a.code === 'act_fe_change_request')!;
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    const detail = (await http.get(`/v1/me/activities/${taskB.activityId}`).set(auth(u)).expect(200)).body.data;
+    assert.equal(detail.startable, true); assert.equal(detail.materialsAvailable, true);
+    assert.deepEqual(detail.materials.map((m: { fileName: string }) => m.fileName), ['team-tasks-starter.zip'], 'only graduate materials are listed');
+    assert.ok(!JSON.stringify(detail).includes('object_path') && !JSON.stringify(detail).includes('reviewer.zip'));
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'مهام الفريق', kind: 'platform_activity', activitySpecId: taskB.activityId }).expect(201)).body.data.id as string;
+    const list = (await http.get(`/v1/projects/${pid}/materials`).set(auth(u)).expect(200)).body.data.items as { id: string; fileName: string }[];
+    assert.equal(list.length, 1);
+    const dl = (await http.get(`/v1/projects/${pid}/materials/${list[0]!.id}/download`).set(auth(u)).expect(200)).body.data;
+    assert.equal(dl.fileName, 'team-tasks-starter.zip'); assert.ok(dl.expiresInSeconds > 0 && dl.expiresInSeconds <= 3600);
+    const names = readZip(memoryStorage(app).get(dl.url)).map((e) => e.path).sort();
+    assert.deepEqual(names, ['CHANGE-REQUEST.md', 'README.md', 'app.js', 'data/tasks.json', 'index.html', 'mock-api.js', 'state-example.json', 'styles.css']);
+    assert.ok(!names.some((n) => /REFERENCE|solution/i.test(n)), 'no reviewer file is in the graduate package');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'activity_material.downloaded' and user_id = $1`, [u.id])).n), 1, 'the download is audited');
+    // Unauthorized: another graduate, the reviewer package through the graduate route, an unknown id — all "not found".
+    const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+    await http.get(`/v1/projects/${pid}/materials`).set(auth(other)).expect(404);
+    await http.get(`/v1/projects/${pid}/materials/${list[0]!.id}/download`).set(auth(other)).expect(404);
+    const reviewerMat = (await one(`select id from activity_material where activity_spec_id = $1 and audience = 'reviewer'`, [taskB.activityId])).id as string;
+    await http.get(`/v1/projects/${pid}/materials/${reviewerMat}/download`).set(auth(u)).expect(404);
+    await http.get(`/v1/projects/${pid}/materials/00000000-0000-4000-8000-000000000000/download`).set(auth(u)).expect(404);
+    await http.get(`/v1/projects/${pid}/materials`).expect(401);
   });
 });

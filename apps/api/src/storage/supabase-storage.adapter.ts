@@ -59,6 +59,11 @@ export class SupabaseStorageAdapter implements StoragePort {
     return new Uint8Array(await data.arrayBuffer());
   }
 
+  async putObject(bucket: string, path: string, bytes: Uint8Array, contentType: string): Promise<void> {
+    const { error } = await this.client.storage.from(bucket).upload(path, bytes, { contentType, upsert: false });
+    if (error) throw new Error(`upload: ${error.message}`);
+  }
+
   async remove(bucket: string, path: string): Promise<void> {
     await this.client.storage.from(bucket).remove([path]);
   }
