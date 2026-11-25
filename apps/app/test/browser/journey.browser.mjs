@@ -449,6 +449,37 @@ async function scenarioB15(browser) {
       await shot(page, 'B19-learning-preview-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
       check('B19c', 'learning card is right-to-left and fits a 390px phone without horizontal scrolling', dir === 'rtl' && overflow <= 0, `dir=${dir} overflow=${overflow}`);
     } finally { delete process.env.LEARNING_CANDIDATE_PREVIEW; }
+    // B20 · Phase B package 5: A01 next step, the Career Snapshot (FR-U-014) and two guidance capabilities (test provider only).
+    await page.goto(skillUrl); await page.getByRole('heading', { name: 'مرشد التعلّم' }).waitFor();
+    await page.locator('[data-testid="guidance-learning_guidance"] button').click();
+    await page.locator('[data-testid="guidance-answer"]').waitFor();
+    const learnTypes = await page.locator('[data-testid="guidance-learning_guidance"] [data-testid="guidance-item"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-type')));
+    const learnText = await page.locator('[data-testid="guidance-learning_guidance"]').innerText();
+    check('B20a', 'learning mentor (A07/A03): the practice and self-check questions, with the permanent test-provider notice; no solution',
+      learnTypes.includes('followup_question') && /لا يعمل نموذج ذكاء اصطناعي حقيقي/.test(learnText) && !/REFERENCE|solution\//.test(learnText), learnTypes.join(','));
+    await shot(page, 'B20-learning-mentor-desktop');
+    await page.goto(`${APP}/skills`); await page.locator('[data-testid="a01-next-step"]').waitFor();
+    const stepText = await page.locator('[data-testid="a01-next-step"]').innerText();
+    const stepHref = await page.locator('[data-testid="a01-next-step"] a').getAttribute('href');
+    check('B20b', 'A01: one next step on the skills page, explained; with no work started it points to the catalogue (it never assigns an activity)',
+      /خطوتك التالية/.test(stepText) && /اختاري نشاطًا من أنشطة دورك/.test(stepText) && stepHref === '/activities', stepHref ?? '');
+    await page.goto(`${APP}/snapshot`); await page.locator('[data-testid="snapshot-gaps"] li').first().waitFor();
+    const gapsN = await page.locator('[data-testid="snapshot-gaps"] li').count();
+    const sources = await page.locator('[data-testid="statement-source"]').allInnerTexts();
+    const snapText = await bodyText(page);
+    check('B20c', 'Career Snapshot: role, proven strengths (none yet, said plainly), three gaps with no invented priority, the next step — every statement names its source',
+      gapsN === 3 && sources.length >= 5 && sources.every((x) => x.startsWith('المصدر:')) && /لا أولوية معتمدة/.test(snapText) && /لا توجد بعد/.test(snapText) && /لا تمنح مستوى/.test(snapText) && !/%|جاهز للعمل/.test(snapText), `${gapsN} gaps, ${sources.length} sources`);
+    await page.locator('[data-testid="guidance-career_guidance"] button').click();
+    await page.locator('[data-testid="guidance-career_guidance"] [data-testid="guidance-item"]').first().waitFor();
+    const careerTypes = await page.locator('[data-testid="guidance-career_guidance"] [data-testid="guidance-item"]').evaluateAll((xs) => xs.map((x) => x.getAttribute('data-type')));
+    check('B20d', 'career guidance (A01/A02/A04, test provider): the same next step and the gaps, labelled as a test template, not real AI',
+      careerTypes[0] === 'recruiter_next_action' && careerTypes.filter((t) => t === 'profile_gap').length === 3 && /لا يعمل نموذج ذكاء اصطناعي حقيقي/.test(await page.locator('[data-testid="guidance-career_guidance"]').innerText()), careerTypes.join(','));
+    await shot(page, 'B20-snapshot-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const snapOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const snapDir = await page.locator('main').evaluate((el) => getComputedStyle(el).direction);
+    await shot(page, 'B20-snapshot-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    check('B20e', 'snapshot and guidance are right-to-left and fit a 390px phone', snapDir === 'rtl' && snapOverflow <= 0, `dir=${snapDir} overflow=${snapOverflow}`);
     await page.goto(`${APP}/activities`); await page.locator('article').first().waitFor();
     check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
       cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));

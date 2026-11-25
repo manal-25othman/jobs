@@ -358,3 +358,17 @@ export interface ChallengeView {
   status: 'issued' | 'answered' | 'reviewed' | 'expired' | 'withdrawn'; issuedAt: string; dueAt: string | null;
   response: { text?: string; code?: string } | null; respondedAt: string | null; result: { outcome: string; observations: string; reviewedAt: string } | null;
 }
+
+/* ───────────── Phase B package 5: A01 next step, A02 snapshot, guidance (test provider only) ───────────── */
+export interface NextStep { code: string; textAr: string; whyAr: string; href: string; source: string; sourceRef: string | null; agent: 'A01' }
+export interface SourcedStatement { textAr: string; source: string; sourceRef: string | null }
+export interface CareerSnapshot {
+  kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[];
+  gapOrderAr: string; nextStep: NextStep; limitsAr: string[];
+}
+export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback';
+export interface GuidanceAnswer {
+  capability: GuidanceCapability; labelAr: string; contracts: string[]; toolsUsed: string[]; noticeAr: string; withheldAr: string | null;
+  status: string; provider: string; testOnly: true; ruleId: string;
+  proposals: { id: string; proposalType: string; summary: string; structuredPayload: Record<string, unknown>; warnings: string[]; lifecycle: string }[];
+}

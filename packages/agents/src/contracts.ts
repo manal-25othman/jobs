@@ -64,6 +64,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'claimRequest',
       // Phase 7b: the recorded facts (ids, kinds, values) behind new evidence, so a draft can declare its plan.
       'claimFacts',
+      // Phase B package 5: a guidance request (career_guidance) — the A01 next step and the A02 snapshot facts.
+      'guidanceRequest',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },
@@ -74,6 +76,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'deterministicResults', 'userExplanation', 'aiDisclosure', 'existingEvidence', 'ambiguity',
       // Career Data Foundation: the structured activity (deliverables, skills, tasks, rubric criteria).
       'activityContext',
+      // Phase B package 5: a guidance request (learning_guidance / assessment_feedback) — learner-visible facts only.
+      'guidanceRequest',
     ],
     proposalTypes: TECHNICAL_PROPOSAL_TYPES,
   },

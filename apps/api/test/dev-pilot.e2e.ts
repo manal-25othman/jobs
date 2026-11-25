@@ -45,6 +45,8 @@ const NON_PILOT = `select md5(string_agg(t, '|' order by t)) as h from (
     union all select concat_ws(',', id, code, practice_activity_spec_id) from learning_resource) x`;
 
 let before0: string; let report: PilotLoadReport; let materials: MaterialLoadReport;
+/** Phase B package 5: the Task B graduate and their reviewed submission, reused by the guidance tests. */
+let taskBRun: { u: TestUser; sid: string } | null = null;
 const MAT = join(DIR, 'materials');
 const MAT_OPTS = { materialsRoot: MAT, byLabel: 'e2e (Phase B materials)', reason: 'Phase B package 3 regression test', production: false };
 before(async () => {
@@ -213,6 +215,7 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
           { key: 'answer.explanation', kind: 'text', valueText: 'التغيير يقرأ الفلترين معًا ثم يعرض القائمة الفارغة رسالةً لا خطأً.', locator: 'notes.md' },
           { key: 'answer.component_explained', kind: 'text', valueText: 'المكوّن يستقبل القائمة المفلترة ويعرض العناصر أو حالة الفراغ.', locator: 'notes.md' },
         ] }).expect(201)).body.data.id as string;
+      taskBRun = { u, sid };
       const ev = (await http.post(`/v1/submissions/${sid}/evaluate`).set(auth(u)).expect(201)).body.data;
       assert.equal(ev.outcome, 'needs_human_review', `the activity is human-reviewed (${ev.outcome})`);
       const reviewer = await newUser(); await http.post('/v1/me/bootstrap').set(auth(reviewer)).send({}).expect(201);
@@ -463,5 +466,100 @@ describe('Phase B package 2 — learning resources, deterministic A07 (PO decisi
     assert.equal((await learningOf(u, skill)).resource, null, 'a directly checked but unreviewed resource is still not shown to a graduate');
     const l = await withPreview(() => learningOf(u, skill));
     assert.ok(![l.resource!, ...l.alternatives].some((x) => x.code === 'lrc_api_data_states_1'), 'a flagged resource leaves the preview');
+  });
+});
+
+describe('Phase B package 5 — A01 next step, A02 Career Snapshot and the three guidance capabilities (test provider only)', () => {
+  type Step = { code: string; textAr: string; whyAr: string; href: string; source: string; sourceRef: string | null; agent: string };
+  const graduate = async (withGoal = true) => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    if (withGoal) await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const step = async (u: TestUser) => (await http.get('/v1/me/next-step').set(auth(u)).expect(200)).body.data as Step;
+  const counts = async (u: TestUser) => one(`select (select count(*) from evidence where user_id = $1)::int ev, (select count(*) from skill_claim where user_id = $1 and state::text <> 'gap')::int claims,
+    (select count(*) from verification_decision where user_id = $1)::int decisions, (select count(*) from model_call)::int model_calls`, [u.id]);
+
+  test('A01: one next step from the current state; it never assigns an activity', async () => {
+    assert.equal((await step(await graduate(false))).code, 'choose_goal');
+    const u = await graduate();
+    const s0 = await step(u);
+    assert.deepEqual([s0.code, s0.href, s0.sourceRef, s0.agent], ['choose_activity', '/activities', null, 'A01'], 'the catalogue, where the graduate chooses');
+    const taskA = report.activities.find((a) => a.code === 'act_fe_debug_improve')!;
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'صفحة التسجيل', kind: 'platform_activity', activitySpecId: taskA.activityId }).expect(201)).body.data.id as string;
+    const s1 = await step(u);
+    assert.deepEqual([s1.code, s1.href, s1.source, s1.sourceRef], ['continue_work', `/work/${pid}`, 'project', pid]);
+    const other = await graduate();
+    assert.equal((await step(other)).code, 'choose_activity', "another graduate's work never shapes your step");
+  });
+
+  test('A02 Career Snapshot (FR-U-014): strengths, at most three gaps and the next step — each with its source; no invented priority, no level', async () => {
+    const u = await graduate();
+    const before = await counts(u);
+    const s = (await http.get('/v1/me/career-snapshot').set(auth(u)).expect(200)).body.data as { kind: string; strengths: unknown[]; gaps: { source: string; sourceRef: string }[];
+      gapOrderAr: string; nextStep: Step; limitsAr: string[]; role: { source: string } };
+    assert.equal(s.kind, 'CareerSnapshot'); assert.equal(s.strengths.length, 0, 'no evaluated evidence, no strength');
+    assert.equal(s.gaps.length, 3); assert.ok(s.gaps.every((g) => g.source === 'role_requirement' && g.sourceRef));
+    assert.match(s.gapOrderAr, /لا أولوية معتمدة/, 'the pilot classification is not expert-approved: no priority is implied');
+    assert.equal(s.role.source, 'career_goal'); assert.equal(s.nextStep.agent, 'A01');
+    assert.deepEqual(await counts(u), before, 'reading the snapshot writes nothing');
+  });
+
+  test('capability 1 — career guidance: the A01 step and the snapshot gaps as proposals through the gateway (test provider); nothing granted', async () => {
+    const u = await graduate();
+    const before = await counts(u);
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'career_guidance' }).expect(201)).body.data;
+    assert.deepEqual([r.status, r.provider, r.testOnly, r.ruleId, r.agentType], ['ok', 'local-test', true, 'R7-career-guidance-to-recruitment', 'recruitment']);
+    assert.deepEqual(r.contracts, ['A01', 'A02', 'A04']); assert.deepEqual(r.toolsUsed, ['my_progress', 'occupation_profile']);
+    assert.match(r.noticeAr, /لا يعمل نموذج ذكاء اصطناعي حقيقي/);
+    const types = r.proposals.map((p: { proposalType: string }) => p.proposalType);
+    assert.deepEqual(types, ['recruiter_next_action', 'profile_gap', 'profile_gap', 'profile_gap']);
+    assert.equal(r.proposals[0].summary, (await step(u)).textAr, 'the same single next step');
+    const inv = await one(`select orchestration_rule, provider, model from agent_invocation where id = $1`, [r.invocationId]);
+    assert.equal(inv.orchestration_rule, 'R7-career-guidance-to-recruitment'); assert.equal(inv.provider, 'local-test');
+    assert.equal(Number((await one(`select count(*)::int n from agent_usage where invocation_id = $1`, [r.invocationId])).n), 1, 'usage is recorded (budget)');
+    assert.deepEqual(await counts(u), before, 'no evidence, claim, decision or model call');
+    assert.equal((await step(u)).code, 'choose_activity', 'a guidance answer never becomes the next step itself');
+  });
+
+  test('capability 2 — learning guidance: practice and self-check questions for one skill; never a solution; unknown or foreign skills refused', async () => {
+    const u = await graduate();
+    const skill = (await one(`select rr.skill_id from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 and s.slug = 'skl_js_fundamentals'`, [report.role.id])).skill_id as string;
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance', skillId: skill }).expect(201)).body.data;
+    assert.equal(r.ruleId, 'R8-learning-guidance-to-technical', JSON.stringify(r)); assert.deepEqual(r.contracts, ['A07', 'A03']);
+    assert.deepEqual(r.proposals.map((p: { proposalType: string }) => p.proposalType), ['technical_next_action', 'followup_question']);
+    const text = JSON.stringify(r);
+    for (const secret of ['REFERENCE', 'solution/', 'reviewer.zip', 'planted']) assert.ok(!text.includes(secret), `no ${secret} in a learning answer`);
+    const planted = (await pool.query(`select description_en from activity_input where contains_planted_issue and description_en is not null`)).rows.map((x) => String(x.description_en));
+    assert.ok(planted.length > 0 && planted.every((d) => !text.includes(d)), 'no planted-defect description');
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance' }).expect(400);
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'learning_guidance', skillId: '00000000-0000-4000-8000-000000000000' }).expect(404);
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'write_my_cv' }).expect(400);
+  });
+
+  test('capability 3 — assessment feedback: only the owner, only after a result; the recorded criteria explained; nothing changed', async () => {
+    assert.ok(taskBRun, 'the Task B journey ran');
+    const { u, sid } = taskBRun!;
+    const before = await counts(u);
+    const r = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(201)).body.data;
+    assert.equal(r.ruleId, 'R9-assessment-feedback-to-technical'); assert.deepEqual(r.toolsUsed, ['my_feedback']);
+    // D-076 holds for guidance too: the recorded criteria name a technology this graduate never declared, so the
+    // explanation is WITHHELD and said to be — never shown with an inferred technology.
+    assert.equal(r.status, 'rejected_invalid_output'); assert.equal(r.proposals.length, 0); assert.match(r.withheldAr, /لم يجتز فحوص الدقة/);
+    // Once the graduate declares the technologies of their own work, the same request is explained.
+    await pool.query(`update project set declared_technologies = (select array_agg(term order by term) from technology_term) where id = (select project_id from submission where id = $1)`, [sid]);
+    const r2 = (await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(201)).body.data;
+    assert.ok(r2.proposals.some((p: { proposalType: string }) => p.proposalType === 'rubric_explanation'), JSON.stringify([r2.status, r2.refused]));
+    assert.equal(r2.withheldAr, null);
+    const text = JSON.stringify(r2);
+    for (const secret of ['REFERENCE.md', 'solution/app.js', 'team-tasks-reviewer.zip']) assert.ok(!text.includes(secret), secret);
+    assert.deepEqual(await counts(u), before, 'explaining the result changes no evidence, level or decision');
+    const other = await graduate();
+    await http.post('/v1/me/guidance').set(auth(other)).send({ capability: 'assessment_feedback', submissionId: sid }).expect(404);
+    // Own work without a result yet: nothing to explain.
+    const taskA = report.activities.find((a) => a.code === 'act_fe_debug_improve')!;
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'محاولة', kind: 'platform_activity', activitySpecId: taskA.activityId }).expect(201)).body.data.id as string;
+    void pid;
+    await http.post('/v1/me/guidance').set(auth(u)).send({ capability: 'assessment_feedback' }).expect(400);
   });
 });

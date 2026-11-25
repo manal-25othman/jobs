@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, type TrackSkillsPage } from '../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../components/Session';
 import { JourneyNav } from '../../components/JourneyNav';
+import { CompanionNudge } from '../../components/CompanionNudge';
 
 /**
  * Skills of the current track (Phase 5). Four dimensions, side by side, never
@@ -38,6 +39,7 @@ export default function SkillsPage() {
   return (
     <main className="wrap">
       <JourneyNav current="/skills" />
+      <CompanionNudge token={token} variant="card" />
       <h1>مهارات مسار {page.role.labelAr}</h1>
 
       <section className="card">

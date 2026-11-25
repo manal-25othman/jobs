@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { api, type TrackSkillDetail, type LearningPlan, type RecommendedResource } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../../components/Session';
 import { LEVEL_AR, EVIDENCE_STEPS_AR } from '../../../lib/journey';
+import { GuidancePanel } from '../../../components/GuidancePanel';
 
 /**
  * Skill detail. Phase B, package 1: the graduate's six questions first (what it is, why the role needs it, what it
@@ -32,7 +33,7 @@ export default function SkillDetailPage() {
     <main className="wrap">
       <p className="body-sm"><a className="link" href="/skills">← مهارات المسار</a></p>
       <h1>{s.labelAr} <span className="term muted" lang="en">{s.labelEn}</span></h1>
-      <SkillExplained d={d} />
+      <SkillExplained d={d} token={token} />
 
       <h2 style={{ marginTop: 8 }}>حالتك في هذه المهارة</h2>
       <section className="card">
@@ -111,7 +112,7 @@ export default function SkillDetailPage() {
 }
 
 /** The six graduate questions, answered only from content that exists; a missing answer is said plainly. */
-function SkillExplained({ d }: { d: TrackSkillDetail }) {
+function SkillExplained({ d, token }: { d: TrackSkillDetail; token: string | null }) {
   const x = d.skill.explanation;
   return (
     <>
@@ -141,6 +142,12 @@ function SkillExplained({ d }: { d: TrackSkillDetail }) {
       ) : null}
 
       <LearningCard plan={d.learning} />
+      {token ? (
+        <section className="card">
+          <h2>مرشد التعلّم</h2>
+          <GuidancePanel token={token} capability="learning_guidance" skillId={d.skill.skillId} buttonAr="اقترحي عليّ كيف أتدرّب على هذه المهارة" labelFor={(id) => (id === d.skill.skillId ? d.skill.labelAr : null)} />
+        </section>
+      ) : null}
 
       <section className="card">
         <h2>كيف أتدرّب عليها؟</h2>

@@ -285,3 +285,13 @@ describe('Phase B package 1: how a skill is demonstrated', () => {
     assert.ok(!/%|جاهز للعمل|موثّقة/.test(all), 'no percentage, readiness verdict or Verified label');
   });
 });
+
+describe('Phase B package 5 — one next-step rule (A01)', () => {
+  test('the work-list action and the A01 domain rule are identical for every work status', async () => {
+    const { workNextAction, WORK_STATUSES } = await import('@naqla/domain');
+    for (const s of [...WORK_STATUSES, 'unknown']) for (const sub of ['sub-1', null]) {
+      const p = { projectId: 'p-1', workStatus: s, latestSubmissionId: sub };
+      assert.deepEqual(nextActionFor(p), workNextAction(p), `${s}/${sub}`);
+    }
+  });
+});
