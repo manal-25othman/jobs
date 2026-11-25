@@ -17,7 +17,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
-import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { bootApp, newUser, uploadFile, filesFor, memoryStorage, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
 import { loadPilotMaterials, type MaterialLoadReport } from '../src/career-data/material-loader';
@@ -389,7 +389,12 @@ describe('Phase B package 2 — learning resources, deterministic A07 (PO decisi
     const r = await loadLearningCandidates(pool, LOPTS);
     // resources_per_skill_max (3) is respected, never changed: the 10 skills with a registry draft take 2 candidates, the 2 without take 3.
     assert.equal(r.perSkillMax, 3);
-    assert.equal(r.written + r.refreshed, 26); assert.equal(r.overLimit.length, 22); assert.equal(r.directChecksApplied, 0);
+    assert.equal(r.written + r.refreshed, 26); assert.equal(r.overLimit.length, 22);
+    // The recorded direct check (verification/direct-check-2026-11.json, separate research session) is applied to the loaded rows it opened.
+    const check = JSON.parse(readFileSync(join(LEARN, 'verification', 'direct-check-2026-11.json'), 'utf8')) as { resources: { code: string; opened: boolean }[] };
+    const loadedCodes = (await pool.query(`select code from learning_resource where code like 'lrc\\_%'`)).rows.map((x) => x.code as string);
+    assert.equal(r.directChecksApplied, check.resources.filter((x) => x.opened && loadedCodes.includes(x.code)).length);
+    assert.deepEqual(r.flagged, [], 'no opened link failed');
     const perSkill = (await pool.query(`select s.slug, count(*)::int n from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug`)).rows;
     assert.ok(perSkill.every((x) => x.n <= 3), JSON.stringify(perSkill));
     const rows = (await pool.query(`select lr.code, lr.review_status::text as rs, lr.quality_status::text as qs, lr.is_demo_fixture, lr.link_check, lr.duration_minutes, lr.url, lr.drafting_aid::text as aid,
@@ -399,9 +404,12 @@ describe('Phase B package 2 — learning resources, deterministic A07 (PO decisi
        from learning_resource lr where lr.code like 'lrc\\_%'`)).rows;
     assert.equal(rows.length, 26);
     for (const x of rows) {
-      assert.deepEqual([x.rs, x.qs, x.is_demo_fixture, x.link_check, x.duration_minutes, x.aid], ['draft', 'unverified', true, 'search_index', null, 'ai_assisted'], x.code);
+      assert.deepEqual([x.rs, x.qs, x.is_demo_fixture, x.duration_minutes, x.aid], ['draft', 'unverified', true, null, 'ai_assisted'], `${x.code}: never reviewed or approved by a check`);
+      assert.ok(['search_index', 'direct'].includes(x.link_check), x.code);
       assert.ok(x.practised && x.role === report.role.id && x.sourced && /^https:\/\//.test(x.url), x.code);
     }
+    const terms = (await pool.query(`select usage_terms_note from learning_resource where code like 'lrc\\_%' and usage_terms_checked is not null`)).rows;
+    assert.ok(terms.every((x) => x.usage_terms_note && !/^unclear/i.test(x.usage_terms_note)), 'an unclear licence never counts as checked terms');
     const again = await loadLearningCandidates(pool, LOPTS);
     assert.equal(again.written, 0, 'a second load writes nothing new');
     assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning_resource.candidates_loaded'`)).n) >= 2, true, 'every load is audited');

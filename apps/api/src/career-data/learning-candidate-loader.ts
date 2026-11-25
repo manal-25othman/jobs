@@ -101,12 +101,13 @@ export async function loadLearningCandidates(pool: Pool, opts: { candidatesDir: 
       if (check?.opened) {
         const host = checks!.hosts.find((h) => h.host === r.host);
         const ok = (check.http_status ?? 0) >= 200 && (check.http_status ?? 0) < 400 && check.title_matches !== false;
-        const termsChecked = host?.opened && host.licence_as_stated ? (host.checked_at ?? check.checked_at)?.slice(0, 10) ?? null : null;
+        const licence = host?.opened && host.licence_as_stated && !/^unclear/i.test(host.licence_as_stated.trim()) ? host.licence_as_stated : null;
+        const termsChecked = licence ? (host!.checked_at ?? check.checked_at)?.slice(0, 10) ?? null : null;
         await c.query(
           `update learning_resource set link_check = 'direct', last_checked = $2, usage_terms_checked = $3, usage_terms_note = $4, quality_status = $5,
              access_notes_en = $6 where id = $1`,
           [row.id, (check.checked_at ?? r.link_checked_on).slice(0, 10), termsChecked,
-           host?.licence_as_stated ? `${host.licence_as_stated}${host.linking_allowed_note ? ` — ${host.linking_allowed_note}` : ''}${host.terms_url ? ` (${host.terms_url})` : ''}` : null,
+           licence ? `${licence}${host!.linking_allowed_note ? ` — ${host!.linking_allowed_note}` : ''}${host!.terms_url ? ` (${host!.terms_url})` : ''}` : null,
            ok ? 'unverified' : 'flagged',
            `Opened directly on ${(check.checked_at ?? '').slice(0, 10)} (HTTP ${check.http_status ?? '?'}). ${ok ? 'Reachable and matching.' : 'FAILED the direct check: flagged.'} ${check.notes ?? ''} Not reviewed: still a candidate.`.trim()]);
         directChecksApplied++; if (!ok) flagged.push(r.code);
