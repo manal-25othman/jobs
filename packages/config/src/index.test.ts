@@ -74,6 +74,17 @@ describe('config validation', () => {
     }
   });
 
+  test('PO decision 2: the unverified learning-resource preview is refused in production', () => {
+    try {
+      loadEnv({ scope: 'api', env: { ...base, NODE_ENV: 'production', SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z',
+        AGENT_BUDGET_CALLS_PER_DAY: '5', LEARNING_CANDIDATE_PREVIEW: 'internal' } });
+      assert.fail('expected ConfigError');
+    } catch (e) {
+      assert.ok(e instanceof ConfigError);
+      assert.ok(e.problems.some((p) => p.includes('LEARNING_CANDIDATE_PREVIEW=internal')));
+    }
+  });
+
   test('D-073: the agent budget has no production default', () => {
     try {
       loadEnv({ scope: 'api', env: { ...base, NODE_ENV: 'production', SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z' } });

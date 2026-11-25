@@ -74,6 +74,7 @@ const { promoteDemo } = apiRequire('./dist/src/career-data/promotion');
 const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-data/review');
 const { loadPilotCandidate, publishPilotDemo, usePilotPerSkillPolicy } = apiRequire('./dist/src/career-data/pilot-loader');
 const { loadPilotMaterials } = apiRequire('./dist/src/career-data/material-loader');
+const { loadLearningCandidates } = apiRequire('./dist/src/career-data/learning-candidate-loader');
 const { readZip } = apiRequire('./dist/src/career-data/zip');
 let apiStorage = null;
 
@@ -419,6 +420,35 @@ async function scenarioB15(browser) {
       && /لا يرفع المستوى وحده/.test(detailText) && !/فجوة|مادة مُقدَّمة|%|جاهز للعمل/.test(detailText));
     await shot(page, 'B16-skill-detail-desktop');
     await page.setViewportSize({ width: 390, height: 844 }); await shot(page, 'B16-skill-detail-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    // B19 · Phase B package 2 (PO decision 2): «ماذا أتعلّم وأين؟» — a graduate never sees an unverified resource; the
+    // internal preview shows candidates, each labelled; the mandatory practice always follows.
+    const skillUrl = page.url();
+    const card = page.locator('[data-testid="learning-card"]');
+    const plain = await card.innerText();
+    check('B19a', 'learning card (ordinary graduate): the need, the honest fallback and the practice link; no candidate resource is shown',
+      /لا يوجد بعد دليل مُقيَّم/.test(plain) && await page.locator('[data-testid="learning-fallback"]').count() === 1
+      && await page.locator('[data-testid="learning-practice"] a[href^="/activities/"]').count() === 1 && await page.locator('[data-testid="learning-resource"]').count() === 0
+      && /لا يغيّر مستواك/.test(plain));
+    await loadLearningCandidates(pool, { candidatesDir: join(ROOT, 'data/candidates/trk_frontend_junior_v2/learning'), byLabel: 'UI acceptance (Phase B learning)', reason: 'B19 browser journey', production: false });
+    process.env.LEARNING_CANDIDATE_PREVIEW = 'internal';
+    try {
+      await page.goto(skillUrl); await page.locator('[data-testid="learning-preview-label"]').waitFor();
+      const items = page.locator('[data-testid="learning-resource"]');
+      const n = await items.count();
+      const exposures = await items.evaluateAll((xs) => xs.map((x) => x.getAttribute('data-exposure')));
+      const itemTexts = await items.allInnerTexts();
+      const links = await card.locator('a[target="_blank"]').evaluateAll((xs) => xs.map((x) => ({ rel: x.getAttribute('rel') ?? '', href: x.getAttribute('href') ?? '' })));
+      check('B19b', 'internal preview: one candidate and at most two ranked alternatives, each labelled unverified, external links isolated, the practice after them',
+        n >= 1 && n <= 3 && exposures.every((e) => e === 'candidate') && itemTexts.every((t) => /لم يُتحقَّق منه بعد/.test(t) && /المدة غير محددة/.test(t))
+        && links.length >= 1 && links.every((l) => l.rel.includes('noopener') && l.href.startsWith('https://'))
+        && await page.locator('[data-testid="learning-practice"]').count() === 1, `${n} items`);
+      const dir = await card.evaluate((el) => getComputedStyle(el).direction);
+      await shot(page, 'B19-learning-preview-desktop');
+      await page.setViewportSize({ width: 390, height: 844 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      await shot(page, 'B19-learning-preview-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+      check('B19c', 'learning card is right-to-left and fits a 390px phone without horizontal scrolling', dir === 'rtl' && overflow <= 0, `dir=${dir} overflow=${overflow}`);
+    } finally { delete process.env.LEARNING_CANDIDATE_PREVIEW; }
     await page.goto(`${APP}/activities`); await page.locator('article').first().waitFor();
     check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
       cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));

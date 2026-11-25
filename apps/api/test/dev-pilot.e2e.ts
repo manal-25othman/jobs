@@ -17,9 +17,13 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
+import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { bootApp, newUser, uploadFile, filesFor, memoryStorage, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
 import { loadPilotMaterials, type MaterialLoadReport } from '../src/career-data/material-loader';
 import { readZip } from '../src/career-data/zip';
+import { loadLearningCandidates } from '../src/career-data/learning-candidate-loader';
+import { LearningService } from '../src/readiness/learning.service';
 import { loadCandidate } from '../src/career-data/candidate';
 import { importPack } from '../src/career-data/pipeline';
 import { loadPilotCandidate, usePilotPerSkillPolicy, restoreSafetyBaseline, publishPilotDemo, PILOT_POLICY_DESCRIPTION, type PilotLoadReport } from '../src/career-data/pilot-loader';
@@ -347,5 +351,109 @@ describe('Phase B package 3 — starter materials (PO decisions 3 and 4)', () =>
     await http.get(`/v1/projects/${pid}/materials/${reviewerMat}/download`).set(auth(u)).expect(404);
     await http.get(`/v1/projects/${pid}/materials/00000000-0000-4000-8000-000000000000/download`).set(auth(u)).expect(404);
     await http.get(`/v1/projects/${pid}/materials`).expect(401);
+  });
+});
+
+describe('Phase B package 2 — learning resources, deterministic A07 (PO decision 2)', () => {
+  const LEARN = join(DIR, 'learning');
+  const LOPTS = { candidatesDir: LEARN, byLabel: 'e2e (Phase B learning)', reason: 'Phase B package 2 regression test', production: false };
+  type Learning = { kind: string; agent: string; mode: string; candidatePreview: boolean; grantsLevel: boolean; fallbackAr: string | null; need: { code: string };
+    resource: { code: string; exposure: string; labelAr: string | null; url: string | null; durationMinutes: number | null; durationAr: string; whyAr: string } | null;
+    alternatives: { code: string; exposure: string; labelAr: string | null }[]; practice: { slug: string; startable: boolean; activityId: string } | null };
+  const pilotGraduate = async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    return u;
+  };
+  const skillOf = async (slug: string) => (await one(`select rr.skill_id from role_requirement rr join skill s on s.id = rr.skill_id where rr.target_role_id = $1 and s.slug = $2`, [report.role.id, slug])).skill_id as string;
+  const learningOf = async (u: TestUser, skillId: string) => (await http.get(`/v1/me/track-skills/${skillId}`).set(auth(u)).expect(200)).body.data.learning as Learning;
+  const withPreview = async <T>(fn: () => Promise<T>) => { process.env['LEARNING_CANDIDATE_PREVIEW'] = 'internal'; try { return await fn(); } finally { delete process.env['LEARNING_CANDIDATE_PREVIEW']; } };
+
+  test('the drafts carry no unsupported duration any more (0040 + registry file)', async () => {
+    assert.equal(Number((await one(`select count(*)::int n from learning_resource where duration_minutes is not null and duration_basis is null`)).n), 0);
+  });
+
+  test('an ordinary graduate sees no unverified resource: the fallback and the mandatory practice instead; nothing changes a level', async () => {
+    const u = await pilotGraduate();
+    const l = await learningOf(u, await skillOf('skl_js_fundamentals'));
+    assert.deepEqual([l.kind, l.agent, l.mode, l.candidatePreview, l.grantsLevel], ['LearningPlanProposal', 'A07', 'deterministic', false, false]);
+    assert.equal(l.resource, null); assert.equal(l.alternatives.length, 0); assert.match(l.fallbackAr!, /مورد تعلّم متحقَّق منه/);
+    assert.ok(l.practice && report.activities.some((a) => a.activityId === l.practice!.activityId), 'the practice is an activity of the pilot');
+    assert.equal(l.need.code, 'no_evidence');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning.candidate_preview_served' and user_id = $1`, [u.id])).n), 0);
+  });
+
+  test('the candidate loader: development only; draft, unverified, demo rows in the existing registry within the per-skill pack constraint, each with its source and a pilot practice', async () => {
+    await assert.rejects(() => loadLearningCandidates(pool, { ...LOPTS, production: true }), /never loaded in production/);
+    await assert.rejects(() => loadLearningCandidates(pool, { ...LOPTS, reason: ' ' }), /a name and a reason/);
+    const r = await loadLearningCandidates(pool, LOPTS);
+    // resources_per_skill_max (3) is respected, never changed: the 10 skills with a registry draft take 2 candidates, the 2 without take 3.
+    assert.equal(r.perSkillMax, 3);
+    assert.equal(r.written + r.refreshed, 26); assert.equal(r.overLimit.length, 22); assert.equal(r.directChecksApplied, 0);
+    const perSkill = (await pool.query(`select s.slug, count(*)::int n from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug`)).rows;
+    assert.ok(perSkill.every((x) => x.n <= 3), JSON.stringify(perSkill));
+    const rows = (await pool.query(`select lr.code, lr.review_status::text as rs, lr.quality_status::text as qs, lr.is_demo_fixture, lr.link_check, lr.duration_minutes, lr.url, lr.drafting_aid::text as aid,
+        exists (select 1 from activity_skill k where k.activity_spec_id = lr.practice_activity_spec_id and k.skill_id = lr.skill_id) as practised,
+        (select a.target_role_id from activity_spec a where a.id = lr.practice_activity_spec_id) as role,
+        exists (select 1 from source_ref s join data_source d on d.id = s.source_id where s.entity_kind = 'learning_resource' and s.entity_id = lr.id and d.code = 'src_naqla_resource_research_2026_11') as sourced
+       from learning_resource lr where lr.code like 'lrc\\_%'`)).rows;
+    assert.equal(rows.length, 26);
+    for (const x of rows) {
+      assert.deepEqual([x.rs, x.qs, x.is_demo_fixture, x.link_check, x.duration_minutes, x.aid], ['draft', 'unverified', true, 'search_index', null, 'ai_assisted'], x.code);
+      assert.ok(x.practised && x.role === report.role.id && x.sourced && /^https:\/\//.test(x.url), x.code);
+    }
+    const again = await loadLearningCandidates(pool, LOPTS);
+    assert.equal(again.written, 0, 'a second load writes nothing new');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning_resource.candidates_loaded'`)).n) >= 2, true, 'every load is audited');
+  });
+
+  test('without the preview, the candidates stay invisible to a graduate (API and row policy)', async () => {
+    const u = await pilotGraduate();
+    assert.equal((await learningOf(u, await skillOf('skl_html_semantic'))).resource, null);
+    const c = await pool.connect();
+    try {
+      await c.query('begin'); await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [u.id]); await c.query('set local role authenticated');
+      assert.equal(Number((await c.query(`select count(*)::int n from learning_resource where quality_status <> 'approved' and quality_status <> 'sme_reviewed'`)).rows[0].n), 0, 'RLS admits no unverified row');
+    } finally { await c.query('rollback'); c.release(); }
+  });
+
+  test('the internal preview (development only): ONE ranked candidate + at most two, each labelled unverified, with a pilot practice; audited', async () => {
+    const svc = app.get(LearningService);
+    const env = process.env['NODE_ENV'];
+    process.env['LEARNING_CANDIDATE_PREVIEW'] = 'internal'; process.env['NODE_ENV'] = 'production';
+    try { assert.equal(svc.previewRequested(), false, 'never in production'); } finally { process.env['NODE_ENV'] = env; delete process.env['LEARNING_CANDIDATE_PREVIEW']; }
+    const u = await pilotGraduate();
+    const skill = await skillOf('skl_api_data_states');
+    const l = await withPreview(() => learningOf(u, skill));
+    assert.equal(l.candidatePreview, true);
+    assert.ok(l.resource && l.resource.exposure === 'candidate' && l.resource.labelAr && /لم يُتحقَّق منه/.test(l.resource.labelAr));
+    assert.match(l.resource.code, /^lrc_api_data_states_/, 'a candidate with a link ranks before the URL-less registry draft');
+    assert.ok(/^https:\/\//.test(l.resource.url!)); assert.equal(l.resource.durationMinutes, null); assert.equal(l.resource.durationAr, 'المدة غير محددة');
+    assert.ok(l.alternatives.length <= 2 && l.alternatives.every((a) => a.exposure === 'candidate' && a.labelAr));
+    assert.ok(l.practice && report.activities.some((a) => a.activityId === l.practice!.activityId));
+    const again = await withPreview(() => learningOf(u, skill));
+    assert.deepEqual(again, l, 'deterministic');
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'learning.candidate_preview_served' and user_id = $1`, [u.id])).n), 2, 'every preview served is audited');
+    assert.equal(Number((await one(`select count(*)::int n from skill_claim where user_id = $1 and state::text <> 'gap'`, [u.id])).n), 0, 'no level');
+    assert.equal(Number((await one(`select count(*)::int n from evidence where user_id = $1`, [u.id])).n), 0, 'no evidence');
+  });
+
+  test('a recorded direct check is applied as facts only: still a draft candidate (never auto-approved); a failed check flags the row out of the preview', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'naqla-learning-'));
+    copyFileSync(join(LEARN, 'resources.candidate.json'), join(tmp, 'resources.candidate.json'));
+    mkdirSync(join(tmp, 'verification'));
+    writeFileSync(join(tmp, 'verification', 'direct-check-test.json'), JSON.stringify({
+      resources: [{ code: 'lrc_api_data_states_2', opened: true, http_status: 200, title_matches: true, checked_at: '2026-11-25T12:00:00Z' },
+                  { code: 'lrc_api_data_states_1', opened: true, http_status: 404, title_matches: false, checked_at: '2026-11-25T12:00:00Z', notes: 'test: gone' }],
+      hosts: [{ host: 'developer.mozilla.org', opened: true, licence_as_stated: 'CC-BY-SA 2.5 (test fixture)', checked_at: '2026-11-25T12:00:00Z' }] }));
+    const r = await loadLearningCandidates(pool, { ...LOPTS, candidatesDir: tmp });
+    assert.equal(r.directChecksApplied, 2); assert.deepEqual(r.flagged, ['lrc_api_data_states_1']);
+    const ok = await one(`select link_check, last_checked::text as d, usage_terms_checked::text as t, quality_status::text as q, review_status::text as s from learning_resource where code = 'lrc_api_data_states_2' and is_demo_fixture`);
+    assert.deepEqual([ok.link_check, ok.d, ok.t, ok.q, ok.s], ['direct', '2026-11-25', '2026-11-25', 'unverified', 'draft'], 'facts recorded; nothing reviewed or approved');
+    const u = await pilotGraduate();
+    const skill = await skillOf('skl_api_data_states');
+    assert.equal((await learningOf(u, skill)).resource, null, 'a directly checked but unreviewed resource is still not shown to a graduate');
+    const l = await withPreview(() => learningOf(u, skill));
+    assert.ok(![l.resource!, ...l.alternatives].some((x) => x.code === 'lrc_api_data_states_1'), 'a flagged resource leaves the preview');
   });
 });

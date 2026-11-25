@@ -326,6 +326,19 @@ export interface TrackSkillDetail {
   decisions: { id: string; decision: string; previousState: string; proposedState: string | null; resultingState: string; policy: string; policyStatus: string; policyResolution: string | null; trackConfigVersionId: string | null; decidedAt: string }[];
   journeyEvents: { trigger: string; from: string; to: string | null; applied: boolean; outcome: string; reason: string; at: string }[];
   activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];
+  /** Phase B package 2: the deterministic A07 recommendation (registry only, mandatory practice, never a level). */
+  learning?: LearningPlan;
+}
+export interface RecommendedResource {
+  id: string; code: string; titleAr: string; titleEn: string; provider: string | null; typeAr: string; languageAr: string; costAr: string;
+  url: string | null; whyAr: string; durationMinutes: number | null; durationAr: string; exposure: 'verified' | 'candidate'; labelAr: string | null; linkStatusAr: string;
+}
+export interface LearningPlan {
+  kind: 'LearningPlanProposal'; agent: 'A07'; mode: 'deterministic';
+  need: { code: 'no_evidence' | 'practiced_not_demonstrated' | 'strengthen'; textAr: string };
+  resource: RecommendedResource | null; alternatives: RecommendedResource[];
+  practice: { activityId: string; slug: string; titleAr: string; startable: boolean; whyAr: string } | null;
+  fallbackAr: string | null; candidatePreview: boolean; grantsLevel: false;
 }
 
 /* ───────────────────────── AI usage & integrity (Phase 6) ───────────────────────── */
