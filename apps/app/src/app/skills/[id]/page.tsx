@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api, type TrackSkillDetail } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../../components/Session';
+import { LEVEL_AR, EVIDENCE_STEPS_AR } from '../../../lib/journey';
 
-/** Skill detail (Phase 5): the four dimensions in four cards; the true state is never softened or merged. */
+/**
+ * Skill detail. Phase B, package 1: the graduate's six questions first (what it is, why the role needs it, what it
+ * looks like at work, what to learn, how to practise, how to demonstrate it) from existing content; then the four
+ * dimensions of their own state (Phase 5), in four cards — never softened or merged.
+ */
 const BADGE_AR: Record<string, string> = { must: 'إلزامية', core: 'أساسية', supporting: 'مساندة', pending_expert_validation: 'التصنيف قيد اعتماد الخبراء', disabled: 'غير مفعَّلة' };
-const LEVEL_AR: Record<string, string> = { gap: 'فجوة', self_reported: 'مُعلنة ذاتيًا', practiced: 'ظهرت في مشروع', demonstrated: 'مُثبتة بدليل', verified: 'موثّقة' };
 
 export default function SkillDetailPage() {
   const { token, loading } = useSession();
@@ -28,7 +32,9 @@ export default function SkillDetailPage() {
     <main className="wrap">
       <p className="body-sm"><a className="link" href="/skills">← مهارات المسار</a></p>
       <h1>{s.labelAr} <span className="term muted" lang="en">{s.labelEn}</span></h1>
+      <SkillExplained d={d} />
 
+      <h2 style={{ marginTop: 8 }}>حالتك في هذه المهارة</h2>
       <section className="card">
         <h2>١ · رحلة المهارة</h2>
         <p className="body-sm"><span className="chip chip--info">{s.progress ? s.progress.labelAr : 'لم تبدأ'}</span></p>
@@ -62,7 +68,7 @@ export default function SkillDetailPage() {
 
       <section className="card">
         <h2>٣ · الأدلة</h2>
-        <p className="body-sm">دليل مُقيَّم قائم: <span className="num">{s.evidence.standingEvaluatedCount}</span> · مادة مُقدَّمة: <span className="num">{s.evidence.submittedMaterialCount}</span></p>
+        <p className="body-sm">دليل مُقيَّم قائم: <span className="num">{s.evidence.standingEvaluatedCount}</span> · ما سلّمتِه: <span className="num">{s.evidence.submittedMaterialCount}</span></p>
         {d.materials.length ? (
           <div className="rows">
             {d.materials.slice(0, 8).map((m) => (
@@ -73,8 +79,8 @@ export default function SkillDetailPage() {
               </div>
             ))}
           </div>
-        ) : <p className="body-sm muted">لا مادة مُقدَّمة لهذه المهارة بعد.</p>}
-        <p className="disclaimer">المادة المُقدَّمة ليست دليلًا مُقيَّمًا؛ الدليل المُقيَّم ينشأ من التقييم وحده.</p>
+        ) : <p className="body-sm muted">لم تسلّمي عملًا لهذه المهارة بعد.</p>}
+        <p className="disclaimer">ما تسلّمينه ليس دليلًا مُقيَّمًا بذاته؛ الدليل المُقيَّم ينشأ من التقييم وحده.</p>
       </section>
 
       <section className="card">
@@ -100,12 +106,64 @@ export default function SkillDetailPage() {
         <p className="disclaimer">تظهر هنا قواعد الإعداد التي تسمّي هذه المهارة كما هي؛ لا نسبة ولا حكم قبل اعتماد معيار الجاهزية.</p>
       </section>
 
-      {d.activities.length ? (
+    </main>
+  );
+}
+
+/** The six graduate questions, answered only from content that exists; a missing answer is said plainly. */
+function SkillExplained({ d }: { d: TrackSkillDetail }) {
+  const x = d.skill.explanation;
+  return (
+    <>
+      <section className="card">
+        <h2>ما هذه المهارة؟</h2>
+        {x?.descriptionAr ? <p className="body-sm">{x.descriptionAr}</p> : <p className="body-sm muted">لا يوجد وصف لهذه المهارة بعد.</p>}
+        <h3 className="body-sm" style={{ fontWeight: 500, margin: '8px 0 4px' }}>لماذا يحتاجها هذا الدور؟</h3>
+        {x?.whyRequiredAr ? <p className="body-sm" style={{ margin: 0 }}>{x.whyRequiredAr}</p> : <p className="body-sm muted" style={{ margin: 0 }}>لم يُكتب سبب الحاجة إليها بعد.</p>}
+      </section>
+
+      {x && (x.indicatorsAr.length || x.commonMistakesAr.length) ? (
         <section className="card">
-          <h2>الأنشطة المرتبطة</h2>
-          <div className="rows">{d.activities.map((a) => <div key={a.id} className="row" style={{ gap: 10 }}><a className="link grow" href={`/activities/${encodeURIComponent(a.id)}`}>{a.titleAr}</a><span className="chip">{a.depth === 'primary' ? 'رئيسية' : 'مساندة'}</span></div>)}</div>
+          <h2>كيف تبدو في العمل؟</h2>
+          {x.indicatorsAr.length ? (
+            <>
+              <p className="body-sm" style={{ fontWeight: 500, margin: 0 }}>علامات إتقانها</p>
+              <ul className="body-sm">{x.indicatorsAr.map((i) => <li key={i}>{i}</li>)}</ul>
+            </>
+          ) : null}
+          {x.commonMistakesAr.length ? (
+            <>
+              <p className="body-sm" style={{ fontWeight: 500, margin: 0 }}>أخطاء شائعة</p>
+              <ul className="body-sm">{x.commonMistakesAr.map((i) => <li key={i}>{i}</li>)}</ul>
+            </>
+          ) : null}
         </section>
       ) : null}
-    </main>
+
+      <section className="card">
+        <h2>ماذا أتعلّم وأين؟</h2>
+        <p className="body-sm muted">مصادر التعلّم لهذه المهارة قيد التحقق من روابطها ومراجعتها، وتظهر هنا بعد ذلك. التعلّم اختياري دائمًا: إن كنتِ واثقة من المهارة فانتقلي مباشرة إلى التدرّب عليها.</p>
+      </section>
+
+      <section className="card">
+        <h2>كيف أتدرّب عليها؟</h2>
+        {d.activities.length ? (
+          <div className="rows">
+            {d.activities.map((a) => (
+              <div key={a.id} className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <a className="link grow" href={`/activities/${encodeURIComponent(a.id)}`}>{a.titleAr}</a>
+                <span className="chip">{a.depth === 'primary' ? 'رئيسية' : 'مساندة'}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="body-sm muted">لا نشاط متاح لهذه المهارة في مسارك بعد.</p>}
+        <p className="disclaimer">«رئيسية»: النشاط يقيس هذه المهارة بعمق. «مساندة»: تظهر فيه دون أن تكون محوره.</p>
+      </section>
+
+      <section className="card">
+        <h2>كيف أُثبتها؟</h2>
+        <ol className="body-sm" style={{ margin: 0 }}>{EVIDENCE_STEPS_AR.map((step) => <li key={step}>{step}</li>)}</ol>
+      </section>
+    </>
   );
 }

@@ -18,13 +18,53 @@ export class CareerService {
    * labelled) WITH consumable content (a visible requirement or a catalogue activity). Drafts, test roles and
    * empty shells are not listed. The rule is the database's (`graduate_role_listed`, 0024), not a client filter.
    */
-  async listTargetRoles(_userId: string) {
+  async listTargetRoles(userId: string) {
     return this.db.asService(async (c) => {
+      // Offered roles (0024 + 0037), plus the graduate's OWN current goal when it is still visible but no longer
+      // offered (PO decision 1: existing associations are preserved; the legacy role is shown as theirs, not as a choice).
       const { rows } = await c.query(
-        `select id, slug, label_ar, label_en, review_status, source_label, is_demo_fixture
-           from target_role where graduate_role_listed(id) order by is_demo_fixture, label_en`,
-      );
-      return rows.map((r) => ({ ...r, isDemo: r.is_demo_fixture === true, label: r.is_demo_fixture ? 'DEMO — not reviewed' : null }));
+        `select r.id, r.slug, r.label_ar, r.label_en, r.review_status, r.source_label, r.is_demo_fixture,
+                r.description_ar, r.mission_statement_ar, r.typical_responsibilities_ar, r.expected_outputs_ar,
+                r.expected_from_junior_ar, r.not_expected_from_junior_ar,
+                graduate_role_listed(r.id) as offered,
+                exists (select 1 from pilot_content_load l where l.target_role_id = r.id) as is_pilot
+           from target_role r
+          where graduate_role_listed(r.id)
+             or (graduate_role_visible(r.id) and exists (select 1 from career_goal g where g.user_id = $1 and g.is_current and g.target_role_id = r.id))
+          order by graduate_role_listed(r.id) desc, is_demo_fixture, label_en`, [userId]);
+      const ids = rows.map((r) => r.id);
+      // Main skill areas: the role's graduate-visible, enabled requirements (names only; no class is implied).
+      const skills = ids.length ? (await c.query(
+        `select rr.target_role_id as role_id, s.label_ar from role_requirement rr join skill s on s.id = rr.skill_id
+          where rr.target_role_id = any($1) and rr.enabled and s.status = 'active'
+            and graduate_content_visible(rr.review_status, rr.is_demo_fixture) and graduate_content_visible(s.review_status, s.is_demo_fixture)
+          order by rr.display_order nulls last, s.label_ar`, [ids])).rows : [];
+      // Sources recorded for the role definition (provenance as recorded; never upgraded here).
+      const sources = ids.length ? (await c.query(
+        `select sr.entity_id as role_id, d.source_name, d.publisher, d.source_type::text as source_type, d.url, d.url_verified
+           from source_ref sr join data_source d on d.id = sr.source_id
+          where sr.entity_kind = 'target_role' and sr.entity_id = any($1) order by d.source_name`, [ids])).rows : [];
+      const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+      return rows.map((r) => ({
+        id: r.id, slug: r.slug, label_ar: r.label_ar, label_en: r.label_en, review_status: r.review_status, source_label: r.source_label,
+        is_demo_fixture: r.is_demo_fixture, isDemo: r.is_demo_fixture === true, label: r.is_demo_fixture ? 'DEMO — not reviewed' : null,
+        isPilot: r.is_pilot === true,
+        /** false only for the graduate's own legacy goal that is no longer offered to new choices. */
+        offered: r.offered === true,
+        profile: {
+          descriptionAr: r.description_ar ?? null,
+          missionAr: r.mission_statement_ar ?? null,
+          responsibilitiesAr: arr(r.typical_responsibilities_ar),
+          outputsAr: arr(r.expected_outputs_ar),
+          expectedFromJuniorAr: arr(r.expected_from_junior_ar),
+          notExpectedFromJuniorAr: arr(r.not_expected_from_junior_ar),
+          skillAreasAr: skills.filter((s) => s.role_id === r.id).map((s) => String(s.label_ar)),
+          sources: sources.filter((s) => s.role_id === r.id).map((s) => ({
+            name: String(s.source_name), publisher: s.publisher ?? null, type: String(s.source_type), url: s.url ?? null, urlVerified: s.url_verified === true,
+          })),
+          reviewed: r.review_status === 'published' && r.is_demo_fixture !== true,
+        },
+      }));
     });
   }
 

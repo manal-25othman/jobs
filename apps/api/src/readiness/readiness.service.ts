@@ -86,6 +86,26 @@ export class ReadinessService {
     return map ? { classification: [...map.values()] } : {};
   }
 
+  /**
+   * Phase B, package 1: the explanation a graduate needs to understand each skill of the role — content that already
+   * exists on the skill and its role requirement (description, observable indicators, common mistakes, why the role
+   * needs it) and the number of catalogue activities that practise it. Read-only; the same visibility rule as the facts
+   * (0024). It never changes a level, a class or readiness, and it states no expected level.
+   */
+  private async explanations(c: PoolClient, roleId: string): Promise<Map<string, SkillExplanation>> {
+    const { rows } = await c.query(
+      `select rr.skill_id, s.description_ar, s.observable_indicators_ar, s.common_failure_modes_ar, rr.why_required_ar,
+              (select count(*)::int from activity_skill k where k.skill_id = rr.skill_id and graduate_activity_in_catalogue(k.activity_spec_id, $1)) as activity_count
+         from role_requirement rr join skill s on s.id = rr.skill_id
+        where rr.target_role_id = $1 and s.status = 'active'
+          and graduate_content_visible(rr.review_status, rr.is_demo_fixture) and graduate_content_visible(s.review_status, s.is_demo_fixture)`, [roleId]);
+    const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+    return new Map(rows.map((r) => [String(r.skill_id), {
+      descriptionAr: r.description_ar ?? null, whyRequiredAr: r.why_required_ar ?? null,
+      indicatorsAr: arr(r.observable_indicators_ar), commonMistakesAr: arr(r.common_failure_modes_ar), activityCount: Number(r.activity_count),
+    }]));
+  }
+
   private async goalRole(c: PoolClient, userId: string): Promise<{ id: string; labelAr: string; labelEn: string } | null> {
     const { rows } = await c.query('select tr.id, tr.label_ar, tr.label_en from career_goal g join target_role tr on tr.id = g.target_role_id where g.user_id = $1 and g.is_current', [userId]);
     return rows[0] ? { id: rows[0].id, labelAr: rows[0].label_ar, labelEn: rows[0].label_en } : null;
@@ -148,10 +168,12 @@ export class ReadinessService {
       const states = (await c.query('select code, label_ar, label_en from skill_progress_state')).rows as { code: string; label_ar: string; label_en: string }[];
       const cls = await classificationEntriesInEffect(c, role.id);
       const claims = (await c.query('select skill_id, state, state_reason from skill_claim where user_id = $1', [userId])).rows as { skill_id: string; state: string; state_reason: string }[];
+      const explain = await this.explanations(c, role.id);
       const items = await Promise.all(facts.map(async (f) => {
         const materials = await c.query(`select count(*)::int as n from evidence_item_skill l join evidence_item i on i.id = l.evidence_item_id where l.user_id = $1 and l.skill_id = $2 and i.status = 'submitted'`, [userId, f.skillId]);
         const st = states.find((s) => s.code === f.progressState);
-        return this.present(f, report, claims.find((x) => x.skill_id === f.skillId) ?? null, st ?? null, Number(materials.rows[0].n), professionalLabel(await entryFor(c, cls, f.skillId)));
+        return { ...this.present(f, report, claims.find((x) => x.skill_id === f.skillId) ?? null, st ?? null, Number(materials.rows[0].n), professionalLabel(await entryFor(c, cls, f.skillId))),
+          explanation: explain.get(f.skillId) ?? emptyExplanation() };
       }));
       return { role, items, readiness: report };
     });
@@ -204,3 +226,9 @@ export class ReadinessService {
     return { role: list.role, skill: item, ...detail, readinessStatus: list.readiness.status, readinessHeadlineAr: list.readiness.headlineAr, ruleSetValidated: list.readiness.ruleSet ? configIsValidated(list.readiness.ruleSet) : false };
   }
 }
+
+/** Phase B, package 1: the graduate-facing explanation of a skill (existing content, read-only). */
+export interface SkillExplanation {
+  descriptionAr: string | null; whyRequiredAr: string | null; indicatorsAr: string[]; commonMistakesAr: string[]; activityCount: number;
+}
+function emptyExplanation(): SkillExplanation { return { descriptionAr: null, whyRequiredAr: null, indicatorsAr: [], commonMistakesAr: [], activityCount: 0 }; }

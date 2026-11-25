@@ -367,6 +367,18 @@ async function scenarioB15(browser) {
     await page.goto(`${APP}/goal`); await page.getByRole('heading', { name: 'هدفك المهني' }).waitFor();
     await page.locator(`input[type=radio][value="${report.role.id}"]`).waitFor();
     const goalText = await bodyText(page);
+    // Phase B package 1 (PO decision 1): the pilot is the role offered on its track; nothing is pre-selected; its profile is shown.
+    const offered = await page.locator('input[type=radio][name=role]').evaluateAll((xs) => xs.map((x) => ({ v: x.value, c: x.checked })));
+    const legacyOnTrack = (await pool.query(`select id::text from target_role where track_id = (select track_id from target_role where id = $1) and is_demo_fixture and id <> $1`, [report.role.id])).rows.map((r) => r.id);
+    check('B16a', 'goal page: the pilot is offered and the older DEMO roles of its track are not; no role is pre-selected',
+      offered.some((o) => o.v === report.role.id) && offered.every((o) => !legacyOnTrack.includes(o.v)) && offered.every((o) => !o.c), `${offered.length} offered`);
+    await page.getByText('ما الذي يفعله صاحب هذا الدور؟').first().click();
+    const profileText = await bodyText(page);
+    check('B16b', 'goal page: the role profile shows its purpose, responsibilities, junior expectations, skill areas and an honest source line, marked as a draft',
+      /الغاية من الدور/.test(profileText) && /مسؤوليات العمل المعتادة/.test(profileText) && /المتوقع من المبتدئ/.test(profileText) && /مجالات المهارة الرئيسية/.test(profileText)
+      && /لم يُرفق مصدر موثَّق بهذا الوصف بعد/.test(profileText) && /وصف مسودة لم يعتمده خبير بعد/.test(profileText));
+    await shot(page, 'B16-goal-profile-desktop');
+    await page.setViewportSize({ width: 390, height: 844 }); await shot(page, 'B16-goal-profile-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
     await page.locator(`input[type=radio][value="${report.role.id}"]`).check();
     await page.getByRole('button', { name: /هذا هو هدفي المهني/ }).click();
     await page.waitForURL(`${APP}/activities`); await page.locator('article').first().waitFor();
@@ -376,6 +388,23 @@ async function scenarioB15(browser) {
     check('B15c', 'the internal graduate sees all three pilot activities, each marked «محتوى تجريبي غير معتمد مهنيًا»',
       cardTexts.length === 3 && cardTexts.every((t) => t.includes(LABEL)) && await page.locator('[data-testid="experimental-chip"]').count() === 3, `${cardTexts.length} cards`);
     await shot(page, 'B15-pilot-activities-desktop');
+    // Phase B package 1: the skill map explains each skill, uses accurate wording, and the detail answers the graduate's questions.
+    await page.goto(`${APP}/skills`); await page.getByRole('heading', { name: 'المهارات' }).waitFor(); await page.waitForLoadState('networkidle');
+    const skillRows = await page.locator('a.row[href^="/skills/"]').allInnerTexts();
+    const skillsText = await bodyText(page);
+    check('B16c', 'skill map: 12 skills, each with its short description and how many activities practise it; «لا يوجد دليل مُقيَّم بعد» and «ما سلّمتِه» replace «فجوة» and «مادة»',
+      skillRows.length === 12 && skillRows.every((t) => t.split('\n').length >= 3 && /تتدرّبين عليها في|لا نشاط متاح بعد/.test(t) && t.includes('لا يوجد دليل مُقيَّم بعد') && t.includes('ما سلّمتِه'))
+      && !/فجوة|مادة/.test(skillsText) && /من أين أبدأ؟/.test(skillsText), `${skillRows.length} rows`);
+    await shot(page, 'B16-skill-map-desktop');
+    await page.locator('a.row[href^="/skills/"]').first().click(); await page.locator('h1').first().waitFor(); await page.waitForLoadState('networkidle');
+    await page.getByRole('heading', { name: 'كيف أُثبتها؟' }).waitFor();
+    const detailText = await bodyText(page);
+    check('B16d', 'skill detail answers: what it is, why the role needs it, how it looks at work, what to learn, how to practise, how to demonstrate it — then the four state cards',
+      ['ما هذه المهارة؟', 'لماذا يحتاجها هذا الدور؟', 'كيف تبدو في العمل؟', 'ماذا أتعلّم وأين؟', 'كيف أتدرّب عليها؟', 'كيف أُثبتها؟', 'حالتك في هذه المهارة', '١ · رحلة المهارة'].every((h) => detailText.includes(h))
+      && /لا يرفع المستوى وحده/.test(detailText) && !/فجوة|مادة مُقدَّمة|%|جاهز للعمل/.test(detailText));
+    await shot(page, 'B16-skill-detail-desktop');
+    await page.setViewportSize({ width: 390, height: 844 }); await shot(page, 'B16-skill-detail-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${APP}/activities`); await page.locator('article').first().waitFor();
     check('B15p', 'UX: each card says, in three short lines, what to do, what to hand in and what happens after — with one experimental label and no second demo chip',
       cardTexts.every((t) => /المطلوب/.test(t) && /تسلّمين/.test(t) && /بعد التسليم/.test(t) && !t.includes('تجريبي — غير مراجَع') && t.split(LABEL).length === 2));
     // Every activity page carries the notice.
@@ -699,7 +728,7 @@ async function run(browser) {
       const forms = page.locator('[data-testid="skill-result"]', { hasText: FORMS_AR });
       const htmlText = await html.innerText(); const formsText = await forms.innerText();
       check('B13b', 'mixed result in ONE activity: HTML met with a recorded level change; form validation not met with no level change',
-        /استوفت معاييرها/.test(htmlText) && /تغيّر المستوى: فجوة ← مُثبتة بدليل/.test(htmlText) && /لم تُستوفَ معاييرها بعد/.test(formsText) && /لم يتغيّر المستوى/.test(formsText), `${htmlText} || ${formsText}`);
+        /استوفت معاييرها/.test(htmlText) && /تغيّر المستوى: بلا دليل مُقيَّم ← مُثبتة بدليل/.test(htmlText) && /لم تُستوفَ معاييرها بعد/.test(formsText) && /لم يتغيّر المستوى/.test(formsText), `${htmlText} || ${formsText}`);
       check('B13c', 'assessment outcome and level change are shown as two separate lines per skill, under a summary that counts recorded changes only',
         (await html.locator('[data-testid="skill-outcome"]').count()) === 1 && (await html.locator('[data-testid="skill-level"]').count()) === 1 && /تغيّر مستوى 1 من 2/.test(after) && /اكتمال النشاط لا يعني استيفاء كل مهارة/.test(after));
       check('B13d', 'no failure wording, no reviewer-only rubric values or internals, never Verified', NO_FAILURE(after) && NO_INTERNALS(after) && !/← موثّقة/.test(after));

@@ -138,7 +138,16 @@ describe('A4 — graduate-visible roles, skills and role-skill mappings', () => 
     const roles = ok(await http.get('/v1/target-roles').set(auth(u))).body.data as { id: string; isDemo: boolean; label: string | null }[];
     const ids = roles.map((r) => r.id);
     assert.ok(ids.includes(publishedRoleId), 'a published role with a published requirement is listed');
-    assert.ok(ids.includes(FIXTURE.roleId), 'the demo role is listed outside production');
+    // 0037 (PO decision 1): where a development pilot is loaded on the demo role's track, the pilot is the role offered
+    // and the older demo role is not offered for a new choice — but it stays visible (existing goals keep it).
+    const superseded = (await pool.query('select graduate_role_superseded_by_pilot($1) as s', [FIXTURE.roleId])).rows[0].s === true;
+    if (superseded) {
+      assert.ok(!ids.includes(FIXTURE.roleId), 'a demo role superseded by a loaded pilot is not offered to a new choice');
+      assert.equal((await pool.query('select graduate_role_visible($1) as v', [FIXTURE.roleId])).rows[0].v, true, 'it stays visible');
+      assert.ok(roles.some((r) => r.isDemo), 'the pilot (demo) role is offered instead');
+    } else {
+      assert.ok(ids.includes(FIXTURE.roleId), 'the demo role is listed outside production');
+    }
     assert.ok(roles.filter((r) => r.isDemo).every((r) => r.label === 'DEMO — not reviewed'), 'demo is always labelled');
     assert.ok(!ids.includes(draftRoleId), 'a draft / test role is never listed');
     assert.ok(!ids.includes(emptyRoleId), 'an empty published shell is not offered');

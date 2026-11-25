@@ -48,7 +48,8 @@ export function ErrorBanner({ message }: { message: string }) {
 /** Evidence state shown with a shape AND a label, never colour alone (§13). */
 export function EvidenceState({ state }: { state: string }) {
   const label: Record<string, string> = {
-    gap: 'فجوة',
+    // Phase B, PO decision 8: «gap» means no assessed evidence yet — never a proven lack of competence. Display only.
+    gap: 'لا يوجد دليل مُقيَّم بعد',
     self_reported: 'مُعلنة ذاتيًا',
     practiced: 'ظهرت في مشروع',
     demonstrated: 'مُثبتة بدليل',

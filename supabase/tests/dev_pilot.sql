@@ -127,5 +127,23 @@ select dp_must_fail(dp_opt('', 'a1000000-0000-4000-8000-000000000061'), $$update
   '0036: real (non-demo) content still publishes only after SME approval, even with the pilot opt-in and a PO grant (0007, unchanged)', 'only an approved record');
 drop function dp_opt(text, text);
 
+-- ─────────────────────── 0037 (Phase B, PO decision 1): the pilot is the role OFFERED; legacy roles stay visible ───────────────────────
+insert into target_role (id, slug, label_ar, label_en, track_id, source_label, provenance_class, provenance_source, is_demo_fixture) values
+  ('a1000000-0000-4000-8000-000000000043', 'dp-legacy-demo', 'r', 'r', 'dp', '0037 proof', 'curated', '0037 proof', true),
+  ('a1000000-0000-4000-8000-000000000044', 'dp-other-track-demo', 'r', 'r', 'dp-other', '0037 proof', 'curated', '0037 proof', true);
+do $$ begin
+  if not graduate_role_superseded_by_pilot('a1000000-0000-4000-8000-000000000043') then raise exception 'FAIL  0037: a legacy DEMO role of the pilot track is still offered'; end if;
+  if graduate_role_superseded_by_pilot('a1000000-0000-4000-8000-000000000041') then raise exception 'FAIL  0037: the pilot role itself is hidden'; end if;
+  if graduate_role_superseded_by_pilot('a1000000-0000-4000-8000-000000000042') then raise exception 'FAIL  0037: a real (non-demo) role is hidden by a pilot'; end if;
+  if graduate_role_superseded_by_pilot('a1000000-0000-4000-8000-000000000044') then raise exception 'FAIL  0037: a DEMO role of another track is hidden'; end if;
+  if graduate_role_listed('a1000000-0000-4000-8000-000000000043') then raise exception 'FAIL  0037: graduate_role_listed still offers the superseded legacy role'; end if;
+  if exists (select 1 from target_role where id = 'a1000000-0000-4000-8000-000000000043' and review_status in ('superseded', 'rejected')) then
+    raise exception 'FAIL  0037: the legacy role was re-statused'; end if;
+  raise notice 'PASS  0037: a legacy DEMO role of the pilot track is not offered; the pilot, real roles and other tracks are unaffected; no row re-statused';
+end $$;
+select dp_ok($$select set_config('naqla.config_actor', 'proof', true), set_config('naqla.config_reason', '0037 proof: demo content shown', true); update platform_deployment set demo_content_visible = true$$,
+  $q$do $x$ begin if not graduate_role_visible('a1000000-0000-4000-8000-000000000043') then raise exception 'legacy role no longer visible'; end if; end $x$$q$,
+  '0037: a superseded legacy role stays VISIBLE (existing goals, projects and evidence keep reading it)');
+
 -- Fixtures stay (content rows are never deleted); they are demo/draft and named dp-*.
 drop function dp_must_fail(text, text, text, text); drop function dp_ok(text, text, text); drop function dp_crit(text, text, text); drop function dp_load(text);

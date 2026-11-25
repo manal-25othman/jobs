@@ -69,21 +69,35 @@ export default function SkillsPage() {
       </section>
 
       <section className="card">
+        <h2>من أين أبدأ؟</h2>
+        <ol className="body-sm" style={{ margin: 0 }}>
+          <li>افتحي أي مهارة لتعرفي معناها، ولماذا يحتاجها الدور، وكيف تبدو في العمل.</li>
+          <li>إن كنتِ واثقة منها فانتقلي مباشرة إلى نشاط يتدرّب عليها؛ لا يلزمك أن تتعلّمي أولًا.</li>
+          <li>سلّمي عملك في النشاط، فيُقيَّم ويصبح دليلًا مُقيَّمًا إن استوفى المعايير.</li>
+        </ol>
+        <p className="disclaimer">لا ترتيب إلزاميًا للمهارات: يمكنك البدء بأي نشاط في <a className="link" href="/activities">أنشطة دورك</a>.</p>
+      </section>
+
+      <section className="card">
         <h2>المهارات</h2>
         <div className="rows">
           {page.items.map((s) => (
             <a key={s.skillId} className="row" href={`/skills/${s.skillId}`} style={{ gap: 10, flexWrap: 'wrap', textDecoration: 'none' }}>
-              <span className="grow body-sm" style={{ fontWeight: 500 }}>{s.labelAr}</span>
+              <span className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+                <span className="body-sm" style={{ fontWeight: 500 }}>{s.labelAr}</span>
+                {s.explanation?.descriptionAr ? <span className="micro muted">{s.explanation.descriptionAr}</span> : null}
+              </span>
               <span className="chip">{BADGE_AR[s.readiness.badge]}</span>
               {s.readiness.classSource === 'po_default' ? <span className="chip chip--attention">تصنيف افتراضي من مالك المنتج، غير معتمد من الخبراء</span> : null}
               <span className="chip chip--info">{s.progress ? s.progress.labelAr : 'لم تبدأ'}</span>
               <EvidenceState state={s.verification.level} />
-              <span className="chip">دليل مُقيَّم <span className="num">{s.evidence.standingEvaluatedCount}</span> · مادة <span className="num">{s.evidence.submittedMaterialCount}</span></span>
+              <span className="chip">دليل مُقيَّم <span className="num">{s.evidence.standingEvaluatedCount}</span> · ما سلّمتِه <span className="num">{s.evidence.submittedMaterialCount}</span></span>
+              {s.explanation ? <span className="chip chip--info">{s.explanation.activityCount === 0 ? 'لا نشاط متاح بعد' : <>تتدرّبين عليها في <span className="num">{s.explanation.activityCount}</span> {s.explanation.activityCount === 1 ? 'نشاط' : 'أنشطة'}</>}</span> : null}
             </a>
           ))}
         </div>
         <p className="disclaimer">
-          لكل مهارة أربعة أبعاد منفصلة: حالة الرحلة · مستوى التحقق · الأدلة · مساهمتها في الجاهزية. التصنيف (إلزامية/أساسية/مساندة) لا يُعرض قبل اعتماده، ويُذكر مصدره حين يكون افتراضيًا من مالك المنتج.
+          لكل مهارة أربعة أبعاد منفصلة: حالة الرحلة · مستوى التحقق · الأدلة · مساهمتها في الجاهزية. «لا يوجد دليل مُقيَّم بعد» تعني أن عملك لم يُقيَّم بعد، لا أنك تفتقدين المهارة. التصنيف (إلزامية/أساسية/مساندة) لا يُعرض قبل اعتماده، ويُذكر مصدره حين يكون افتراضيًا من مالك المنتج.
         </p>
       </section>
       <p className="body-sm"><a className="link" href="/activities">← أنشطة دورك</a> · <a className="link" href="/work">أعمالي</a></p>

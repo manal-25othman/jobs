@@ -239,3 +239,53 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
     } finally { await restoreSafetyBaseline(pool, { byLabel: 'e2e (D-136)' }); }
   });
 });
+
+describe('Phase B package 1 — occupational discovery and skill explanation (PO decisions 1 and 8)', () => {
+  type Role = { id: string; slug: string; offered: boolean; isPilot: boolean; isDemo: boolean; label: string | null;
+    profile: { descriptionAr: string | null; missionAr: string | null; responsibilitiesAr: string[]; expectedFromJuniorAr: string[]; skillAreasAr: string[]; sources: unknown[]; reviewed: boolean } };
+  const trackOf = async (id: string) => (await one('select track_id from target_role where id = $1', [id])).track_id as string;
+
+  test('a new graduate is offered the pilot, not the older DEMO roles of the same track; the pilot carries its recorded profile', async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    const roles = (await http.get('/v1/target-roles').set(auth(u)).expect(200)).body.data as Role[];
+    const pilot = roles.find((r) => r.id === report.role.id)!;
+    assert.ok(pilot && pilot.offered && pilot.isPilot && pilot.isDemo && pilot.label === 'DEMO — not reviewed');
+    const track = await trackOf(report.role.id);
+    const sameTrack = (await pool.query(`select id from target_role where track_id = $1 and is_demo_fixture and id <> $2`, [track, report.role.id])).rows.map((r) => r.id as string);
+    assert.ok(sameTrack.length > 0, 'fixture has legacy roles on the pilot track');
+    assert.ok(roles.every((r) => !sameTrack.includes(r.id)), 'no legacy DEMO role of the pilot track is offered to a new choice');
+    assert.ok(pilot.profile.descriptionAr && pilot.profile.missionAr, 'the existing description and mission are exposed');
+    assert.ok(pilot.profile.responsibilitiesAr.length > 0 && pilot.profile.expectedFromJuniorAr.length > 0);
+    assert.equal(pilot.profile.skillAreasAr.length, 12, 'the 12 candidate skills are named as skill areas (no class implied)');
+    assert.equal(pilot.profile.reviewed, false, 'a DEMO draft is never presented as reviewed');
+    assert.deepEqual(pilot.profile.sources, [], 'no source is invented: none is recorded for the pilot role');
+  });
+
+  test('a graduate whose goal is a legacy role keeps it: listed to them as theirs (not offered), still readable, goal intact', async () => {
+    const legacy = (await one(`select id from target_role where track_id = $1 and is_demo_fixture and id <> $2 order by slug limit 1`, [await trackOf(report.role.id), report.role.id])).id as string;
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: legacy, confirmed: true }).expect(200);
+    const roles = (await http.get('/v1/target-roles').set(auth(u)).expect(200)).body.data as Role[];
+    const mine = roles.find((r) => r.id === legacy);
+    assert.ok(mine && mine.offered === false, 'their own legacy goal is shown, marked as no longer offered');
+    assert.equal((await http.get('/v1/me/career-goal').set(auth(u)).expect(200)).body.data.targetRoleId, legacy);
+    const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+    assert.ok(!((await http.get('/v1/target-roles').set(auth(other)).expect(200)).body.data as Role[]).some((r) => r.id === legacy), 'another graduate is not offered it');
+  });
+
+  test('skills carry their existing explanation; the explanation changes no level, class or readiness', async () => {
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    const page = (await http.get('/v1/me/track-skills').set(auth(u)).expect(200)).body.data as { items: { skillId: string; verification: { level: string }; readiness: { badge: string };
+      explanation: { descriptionAr: string | null; whyRequiredAr: string | null; indicatorsAr: string[]; commonMistakesAr: string[]; activityCount: number } }[] };
+    assert.equal(page.items.length, 12);
+    assert.ok(page.items.every((s) => s.explanation.descriptionAr && s.explanation.whyRequiredAr), 'every skill has its description and why the role needs it');
+    assert.ok(page.items.every((s) => s.explanation.indicatorsAr.length > 0 && s.explanation.commonMistakesAr.length > 0));
+    assert.ok(page.items.every((s) => s.verification.level === 'gap' && s.readiness.badge === 'pending_expert_validation'), 'no level and no class is implied');
+    assert.ok(page.items.some((s) => s.explanation.activityCount > 0), 'activity counts come from the catalogue rule');
+    const first = page.items[0]!;
+    const detail = (await http.get(`/v1/me/track-skills/${first.skillId}`).set(auth(u)).expect(200)).body.data;
+    assert.deepEqual(detail.skill.explanation, first.explanation);
+    assert.equal(detail.activities.length, first.explanation.activityCount, 'the count matches the related activities shown');
+  });
+});

@@ -25,8 +25,21 @@ export function chipClass(tone: Tone): string {
 /* ───────────────────────────── evidence levels ───────────────────────────── */
 
 export const LEVEL_AR: Readonly<Record<string, string>> = {
-  gap: 'فجوة', self_reported: 'مُعلنة ذاتيًا', practiced: 'ظهرت في مشروع', demonstrated: 'مُثبتة بدليل', verified: 'موثّقة',
+  gap: 'بلا دليل مُقيَّم', self_reported: 'مُعلنة ذاتيًا', practiced: 'ظهرت في مشروع', demonstrated: 'مُثبتة بدليل', verified: 'موثّقة',
 };
+
+/**
+ * Phase B, package 1: how a skill is demonstrated — the existing evidence path in plain Arabic. Learning, uploading
+ * or self-reporting never verifies a skill; only an assessment creates assessed evidence, and only an independent
+ * verification decision raises the verification level.
+ */
+export const EVIDENCE_STEPS_AR: readonly string[] = [
+  'ابدئي نشاطًا يتدرّب على هذه المهارة، ونفّذيه بأدواتك.',
+  'سلّمي المخرجات المطلوبة؛ التسليم يُسجَّل ولا يرفع المستوى وحده.',
+  'يُقيَّم عملك بمعايير النشاط، مع مراجعة بشرية حين يتطلبها النشاط، وتصلك ملاحظات على كل معيار.',
+  'إن استوفى عملك المعايير يُسجَّل دليلًا مُقيَّمًا لهذه المهارة.',
+  'يرتفع مستوى التحقق فقط حين يكفي الدليل وفق سياسة التحقق المعتمدة؛ القراءة أو التقييم الذاتي لا تكفي.',
+];
 
 /* ─────────────────────────── what an activity can do ─────────────────────────── */
 

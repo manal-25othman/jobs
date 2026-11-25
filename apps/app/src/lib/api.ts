@@ -47,6 +47,16 @@ export interface TargetRole {
   review_status: string; is_demo_fixture: boolean;
   /** D-119: demo roles are listed only where demo content is visible, always labelled. */
   isDemo?: boolean; label?: string | null;
+  /** D-135 pilot role; `offered` is false only for the graduate's own legacy goal that is no longer offered (0037). */
+  isPilot?: boolean; offered?: boolean;
+  /** Phase B package 1: the existing role definition, as recorded (draft unless `reviewed`). */
+  profile?: RoleProfile;
+}
+export interface RoleProfile {
+  descriptionAr: string | null; missionAr: string | null; responsibilitiesAr: string[]; outputsAr: string[];
+  expectedFromJuniorAr: string[]; notExpectedFromJuniorAr: string[]; skillAreasAr: string[];
+  sources: { name: string; publisher: string | null; type: string; url: string | null; urlVerified: boolean }[];
+  reviewed: boolean;
 }
 
 export interface CareerGoal {
@@ -294,7 +304,10 @@ export interface TrackSkillView {
     /** DM-7b / P-3: the professional class in effect (development only); null = legacy. A `po_default` class is not expert-approved. */
     professionalClass?: 'must' | 'core' | 'supporting' | null; classSource?: 'sme' | 'po_default' | null; expertApproved?: boolean | null; category: string | null; displayOrder: number | null; enabled: boolean };
   verificationEffectOfReadiness: 'none';
+  /** Phase B package 1: existing explanation content (never a level, a class or readiness). */
+  explanation?: SkillExplanation;
 }
+export interface SkillExplanation { descriptionAr: string | null; whyRequiredAr: string | null; indicatorsAr: string[]; commonMistakesAr: string[]; activityCount: number }
 export interface TrackSkillsPage { role: { id: string; labelAr: string; labelEn: string } | null; items: TrackSkillView[]; readiness: ReadinessReport }
 export interface TrackSkillDetail {
   role: TrackSkillsPage['role']; skill: TrackSkillView; readinessStatus: ReadinessStatus; readinessHeadlineAr: string; ruleSetValidated: boolean;

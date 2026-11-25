@@ -75,7 +75,7 @@ describe('evaluation page state', () => {
 describe('a level is shown only when the backend recorded one', () => {
   const t = { from: 'gap', to: 'demonstrated', evidenceId: 'e1' };
   test('level_recorded with a transition: shown', () => {
-    assert.deepEqual(levelChangeToShow({ workStatus: 'level_recorded', transition: t }), { fromAr: 'فجوة', toAr: 'مُثبتة بدليل', to: 'demonstrated', evidenceId: 'e1' });
+    assert.deepEqual(levelChangeToShow({ workStatus: 'level_recorded', transition: t }), { fromAr: 'بلا دليل مُقيَّم', toAr: 'مُثبتة بدليل', to: 'demonstrated', evidenceId: 'e1' });
   });
   test('a pass that is pending validation, feedback, a missing transition, or Verified: never shown', () => {
     for (const ws of ['pending_validation', 'feedback_ready', 'under_human_review', 'submitted']) assert.equal(levelChangeToShow({ workStatus: ws, transition: t }), null, ws);
@@ -191,7 +191,7 @@ describe('P5 — per-skill results are shown skill by skill, assessment apart fr
   });
   test('a level change is shown only from a decision that recorded one with standing evidence — never Verified', () => {
     const raised = skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: { id: 'e1', withdrawn: false } }));
-    assert.equal(raised.kind, 'raised'); assert.equal(raised.evidenceId, 'e1'); assert.match(raised.labelAr, /فجوة ← مُثبتة بدليل/);
+    assert.equal(raised.kind, 'raised'); assert.equal(raised.evidenceId, 'e1'); assert.match(raised.labelAr, /بلا دليل مُقيَّم ← مُثبتة بدليل/);
     assert.equal(skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: null })).kind, 'unchanged', 'no evidence, no change shown');
     assert.equal(skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'demonstrated', resultingState: 'verified' }, evidence: { id: 'e', withdrawn: false } })).kind, 'unchanged');
     const w = skillLevelLine(sk({ decision: { decision: 'accepted', previousState: 'gap', resultingState: 'demonstrated' }, evidence: { id: 'e1', withdrawn: true } }));
@@ -272,5 +272,16 @@ describe('UX pass — plain summaries and separate judgements', () => {
     assert.equal(sharedSkillExplanationAr([tbd] as never), null, 'one skill keeps its own text');
     assert.equal(sharedCriterionStatus([tbd, tbd] as never), 'threshold_unapproved');
     assert.equal(sharedCriterionStatus([tbd, met] as never), null);
+  });
+});
+
+describe('Phase B package 1: how a skill is demonstrated', () => {
+  test('the evidence steps never promise verification from learning, uploading or self-reporting', async () => {
+    const { EVIDENCE_STEPS_AR } = await import('../src/lib/journey.ts');
+    const all = EVIDENCE_STEPS_AR.join(' ');
+    assert.ok(EVIDENCE_STEPS_AR.length >= 4);
+    assert.match(all, /لا يرفع المستوى وحده/);
+    assert.match(all, /القراءة أو التقييم الذاتي لا تكفي/);
+    assert.ok(!/%|جاهز للعمل|موثّقة/.test(all), 'no percentage, readiness verdict or Verified label');
   });
 });
