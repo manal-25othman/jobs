@@ -9,7 +9,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
-import { loadEnv, ConfigError } from '@naqla/config';
+import { loadEnv, ConfigError, corsOrigins } from '@naqla/config';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './infra/domain-exception.filter';
 
@@ -28,7 +28,8 @@ async function bootstrap(): Promise<void> {
     throw e;
   }
 
-  const app = await NestFactory.create(AppModule, { cors: true });
+  // S0 / P0-3: an explicit origin allow-list in production (CORS_ALLOWED_ORIGINS); any origin only outside production.
+  const app = await NestFactory.create(AppModule, { cors: { origin: corsOrigins(env) } });
   app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', {
     // A share link may live for 90 days; it must not break on a version bump.
