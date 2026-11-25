@@ -76,6 +76,11 @@ export function validateSchema(agentType: AgentType, raw: unknown): Omit<AgentPr
       }
     }
   }
+  if (proposalType === 'manager_turn') {
+    const m = p as unknown as Record<string, unknown>;
+    if (m['kind'] !== 'manager_turn' || !isStr(m['replyAr']) || !(m['replyAr'] as string).trim() || !isStr(m['interventionKey'])) throw new ProposalRejected('schema', 'manager_turn needs a manager_turn payload with replyAr');
+    if (!['clarification', 'refusal', 'no_detail'].includes(String(m['basis']))) throw new ProposalRejected('schema', 'manager_turn basis must be clarification, refusal or no_detail');
+  }
   const requiresUserApproval = WORDING_PROPOSAL_TYPES.has(proposalType) ? true : c['requiresUserApproval'] === true;
 
   return {
@@ -355,9 +360,28 @@ export function validateAgainstDomain(
     if (fail) throw new ProposalRejected('domain', fail);
   }
 
+  // A11 (FR-A-002): the manager never gives code or solution steps, never hints at a score or criterion.
+  if (payload.kind === 'manager_turn') {
+    const v = managerTurnViolation(payload.replyAr);
+    if (v) throw new ProposalRejected('domain', `A11 guard: ${v}`);
+  }
+
   if (payload.kind === 'validation_activity' && payload.wouldPropose) {
     // A recommendation only. It may not name a state above the ceiling, and
     // it is never executed here — the domain's transition guard decides later.
     if (payload.wouldPropose.to === 'verified') throw new ProposalRejected('domain', 'an agent may not recommend Verified (D-059)');
   }
+}
+
+/**
+ * A11 guard (FR-A-002, contract A11 «Forbidden Actions»): what a virtual manager may never say, whatever produced the
+ * words. Returns the reason, or null. Applied to every manager turn at the gateway; the scenario's private
+ * never-reveal phrases are checked again by the service (they never reach an agent).
+ */
+export function managerTurnViolation(text: string): string | null {
+  if (text.length > 700) return 'a manager turn is short (≤ 700 characters)';
+  if (/[{};`]|=>|<\/?[a-z][a-z0-9]*[\s>/]|\b(function|const|let|var|return|document|querySelector|addEventListener|console)\b/i.test(text)) return 'code or code-like content';
+  if (/(الحل هو|الحل:|خطوات الحل|الخطوة الأولى|اكتبي الكود|غيّري السطر|غيري السطر|استخدمي الدالة|عدّلي الملف|عدلي الملف)/.test(text)) return 'solution steps';
+  if (/(درجة|درجتك|الدرجات|علامة|علامتك|معيار|المعايير|ربريك|رُبريك|ستنجحين|ستجتازين|اجتياز|تقييمك|نقاطك)/.test(text) || /\b(score|grade|rubric|pass(ed)?)\b/i.test(text)) return 'a hint about the score or the criteria';
+  return null;
 }

@@ -53,6 +53,8 @@ export class LocalTestProvider implements AgentProvider {
       candidates = recruitmentCandidates(req.context);
     } else if (req.agentType === 'technical') {
       candidates = technicalCandidates(req.context);
+    } else if (req.agentType === 'virtual_manager') {
+      candidates = managerCandidates(req.context);
     } else {
       candidates = [];
     }
@@ -438,4 +440,41 @@ function learningGuidanceCandidates(g: LearningGuidanceRequest): unknown[] {
     });
   }
   return out;
+}
+
+/* ───────────── A11 virtual manager (test provider): answers ONLY from the scenario's clarifications ───────────── */
+
+interface ManagerContext {
+  readonly projectId: string;
+  readonly interventionKey: string;
+  readonly personaAr: string;
+  readonly clarifications: readonly { readonly topicAr: string; readonly keywordsAr: readonly string[]; readonly answerAr: string }[];
+  readonly graduateMessage: string;
+}
+const foldAr = (t: string) => t.replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي');
+/** Requests the manager refuses in persona: a solution, code, steps, or a verdict on the work or the score. */
+const SOLUTION_OR_SCORE_REQUEST = /(الحل|حلّ|كود|اكتب(ي)? لي|اعطني|اعطيني|كيف ابرمج|كيف اكتب|خطوات|درجة|درجتي|سانجح|هل نجحت|هل عملي صحيح|التقييم|المعايير|معيار|علامة|علامتي)/;
+export const MANAGER_REFUSAL_AR = 'هذا قرار تقني يعود إليك، ولا أستطيع الحكم على العمل قبل تسليمه. ما الذي تحتاجين أن أوضّحه في المطلوب نفسه؟';
+export const MANAGER_NO_DETAIL_AR = 'لا أملك تفاصيل أكثر مما في الطلب. اتخذي القرار الذي ترينه مناسبًا، واذكري سببه في ملاحظاتك.';
+
+function managerCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const m = ctx['managerContext'] as ManagerContext | undefined;
+  if (!m) return [];
+  const msg = foldAr(m.graduateMessage);
+  let basis: 'clarification' | 'refusal' | 'no_detail' = 'no_detail'; let reply = MANAGER_NO_DETAIL_AR; let topic: string | null = null;
+  if (SOLUTION_OR_SCORE_REQUEST.test(msg)) { basis = 'refusal'; reply = MANAGER_REFUSAL_AR; }
+  else {
+    let best = 0;
+    for (const c of m.clarifications) {
+      const hits = c.keywordsAr.filter((k) => msg.includes(foldAr(k))).length;
+      if (hits > best) { best = hits; basis = 'clarification'; reply = c.answerAr; topic = c.topicAr; }
+    }
+  }
+  return [{
+    proposalType: 'manager_turn', subjectType: 'project', subjectId: m.projectId,
+    summary: reply.length > 140 ? `${reply.slice(0, 137)}…` : reply,
+    structuredPayload: { kind: 'manager_turn', interventionKey: m.interventionKey, replyAr: reply, basis, clarificationTopic: topic },
+    evidenceRefs: [], sourceRefs: [], warnings: [], requiresUserApproval: false,
+    rationale: basis === 'clarification' ? 'a clarification the scenario allows, restated' : basis === 'refusal' ? 'a solution, code or score request is refused in persona (A11)' : 'nothing in the scenario answers this; the decision is left to the graduate',
+  }];
 }

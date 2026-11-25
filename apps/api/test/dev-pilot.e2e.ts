@@ -17,12 +17,13 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { join } from 'node:path';
-import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, copyFileSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { bootApp, newUser, uploadFile, filesFor, memoryStorage, COMPONENT_BYTES, TEST_BYTES, type TestUser } from './helpers';
 import { loadPilotMaterials, type MaterialLoadReport } from '../src/career-data/material-loader';
 import { readZip } from '../src/career-data/zip';
 import { loadLearningCandidates } from '../src/career-data/learning-candidate-loader';
+import { loadPilotManagerScenarios } from '../src/career-data/manager-scenario-loader';
 import { LearningService } from '../src/readiness/learning.service';
 import { loadCandidate } from '../src/career-data/candidate';
 import { importPack } from '../src/career-data/pipeline';
@@ -47,6 +48,8 @@ const NON_PILOT = `select md5(string_agg(t, '|' order by t)) as h from (
 let before0: string; let report: PilotLoadReport; let materials: MaterialLoadReport;
 /** Phase B package 5: the Task B graduate and their reviewed submission, reused by the guidance tests. */
 let taskBRun: { u: TestUser; sid: string } | null = null;
+const MGR_OPTS = { scenariosFile: join(DIR, 'manager', 'scenarios.candidate.json'), byLabel: 'e2e (A11 M1)', reason: 'A11 virtual manager regression test', production: false };
+let managerLoad: { version: string; written: string[]; skipped: string[] };
 const MAT = join(DIR, 'materials');
 const MAT_OPTS = { materialsRoot: MAT, byLabel: 'e2e (Phase B materials)', reason: 'Phase B package 3 regression test', production: false };
 before(async () => {
@@ -55,6 +58,8 @@ before(async () => {
   report = await loadPilotCandidate(pool, OPTS);
   // Phase B package 3: the original starter and reviewer materials are loaded while the activities are still draft.
   materials = await loadPilotMaterials(pool, memoryStorage(app), MAT_OPTS);
+  // A11 M1: the candidate virtual-manager scenarios are content, loaded while the activities are still draft.
+  managerLoad = await loadPilotManagerScenarios(pool, MGR_OPTS);
 });
 after(async () => { await pool?.end(); await app?.close(); });
 
@@ -207,6 +212,9 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
       const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
       await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
       const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'تعديل قائمة المهام', kind: 'platform_activity', activitySpecId: taskB.activityId }).expect(201)).body.data.id as string;
+      // A11: the manager's first message arrives with the work; the graduate asks one question before submitting.
+      const mv = (await http.get(`/v1/projects/${pid}/manager`).set(auth(u)).expect(200)).body.data;
+      await http.post(`/v1/projects/${pid}/manager/messages`).set(auth(u)).send({ interventionKey: mv.interventions[0].key, body: 'هل نحتاج إطار عمل جديدًا؟' }).expect(201);
       const primaries = (await pool.query(`select skill_id from activity_skill where activity_spec_id = $1 and depth = 'primary' order by skill_id`, [taskB.activityId])).rows.map((r) => r.skill_id as string);
       const f1 = await uploadFile(app, http, u, 'app.js', TEST_BYTES); const f2 = await uploadFile(app, http, u, 'index.html', COMPONENT_BYTES, 'text/plain');
       const sid = (await http.post(`/v1/projects/${pid}/submissions`).set(auth(u)).send({ skillIds: primaries, files: filesFor([f1, f2], ['file.app_js', 'file.index_html']),
@@ -233,6 +241,11 @@ describe('D-136 — development-only DEMO publication of the pilot (an authorize
           const names = readZip(memoryStorage(app).get(refs[0]!.url)).map((e) => e.path);
           assert.ok(names.includes('REFERENCE.md') && names.includes('solution/app.js'), names.join(','));
           await http.get(`/v1/review/items/${it.id}/materials`).set(auth(u)).expect(403);
+          // A11: the assigned reviewer reads the manager conversation made before the submission; it is not scored.
+          const mt = (await http.get(`/v1/review/items/${it.id}/manager-turns`).set(auth(reviewer)).expect(200)).body.data;
+          assert.deepEqual(mt.turns.map((t: { kind: string }) => t.kind), ['intervention', 'message', 'reply']);
+          assert.match(mt.notScoredAr, /لا تُقيَّم/);
+          await http.get(`/v1/review/items/${it.id}/manager-turns`).set(auth(u)).expect(403);
         }
         await http.post(`/v1/review/items/${it.id}/decision`).set(auth(reviewer)).send({ levelKey: it.top, rationale: `لاحظتُ في الملفات المسلّمة: ${it.criterion_key}.` }).expect(201);
       }
@@ -394,9 +407,12 @@ describe('Phase B package 2 — learning resources, deterministic A07 (PO decisi
     assert.equal(r.perSkillMax, 3);
     assert.equal(r.written + r.refreshed, 26); assert.equal(r.overLimit.length, 22);
     // The recorded direct check (verification/direct-check-2026-11.json, separate research session) is applied to the loaded rows it opened.
-    const check = JSON.parse(readFileSync(join(LEARN, 'verification', 'direct-check-2026-11.json'), 'utf8')) as { resources: { code: string; opened: boolean }[] };
+    // Every recorded pass counts (verification/direct-check-*.json): a resource is applied when any pass opened it.
+    const passes = readdirSync(join(LEARN, 'verification')).filter((f) => /^direct-check-.*\.json$/.test(f))
+      .map((f) => JSON.parse(readFileSync(join(LEARN, 'verification', f), 'utf8')) as { resources: { code: string; opened: boolean }[] });
+    const opened = new Set(passes.flatMap((x) => x.resources.filter((y) => y.opened).map((y) => y.code)));
     const loadedCodes = (await pool.query(`select code from learning_resource where code like 'lrc\\_%'`)).rows.map((x) => x.code as string);
-    assert.equal(r.directChecksApplied, check.resources.filter((x) => x.opened && loadedCodes.includes(x.code)).length);
+    assert.equal(r.directChecksApplied, loadedCodes.filter((c) => opened.has(c)).length);
     assert.deepEqual(r.flagged, [], 'no opened link failed');
     const perSkill = (await pool.query(`select s.slug, count(*)::int n from learning_resource lr join skill s on s.id = lr.skill_id group by s.slug`)).rows;
     assert.ok(perSkill.every((x) => x.n <= 3), JSON.stringify(perSkill));
@@ -623,5 +639,89 @@ describe('FR-U-013 — self-assessment: Observed only, private, never evidence o
     // No public path: the public report and share routes read claims, never this table.
     const src = (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'report.service.js'), 'utf8') + (await import('node:fs')).readFileSync(join(__dirname, '..', 'src', 'slice1', 'share.service.js'), 'utf8');
     assert.ok(!src.includes('skill_self_assessment'), 'public report and share never read self-assessments');
+  });
+});
+
+describe('A11 virtual manager, M1–M2 (FR-U-026 / FR-A-002; test provider)', () => {
+  type View = { available: boolean; labelAr: string; notScoredAr: string; personaAr: string; interventions: { key: string; purposeAr: string; remaining: number }[];
+    turns: { interventionKey: string; author: string; kind: string; body: string }[]; cap: { used: number; total: number; reached: boolean } };
+  const start = async (code = 'act_fe_debug_improve') => {
+    const a = report.activities.find((x) => x.code === code)!;
+    const u = await newUser(); await http.post('/v1/me/bootstrap').set(auth(u)).send({}).expect(201);
+    await http.put('/v1/me/career-goal').set(auth(u)).send({ targetRoleId: report.role.id, confirmed: true }).expect(200);
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'عمل', kind: 'platform_activity', activitySpecId: a.activityId }).expect(201)).body.data.id as string;
+    return { u, pid };
+  };
+  const view = async (u: TestUser, pid: string) => (await http.get(`/v1/projects/${pid}/manager`).set(auth(u)).expect(200)).body.data as View;
+  const say = (u: TestUser, pid: string, key: string, body: string) => http.post(`/v1/projects/${pid}/manager/messages`).set(auth(u)).send({ interventionKey: key, body });
+
+  test('the scenarios load only in development, once per version; they are service-only (private assessment design)', async () => {
+    assert.equal(managerLoad.written.length + managerLoad.skipped.length, 3);
+    await assert.rejects(() => loadPilotManagerScenarios(pool, { ...MGR_OPTS, production: true }), /never loaded in production/);
+    assert.deepEqual((await loadPilotManagerScenarios(pool, MGR_OPTS)).written, [], 'a second load writes nothing');
+    const c = await pool.connect();
+    try { await c.query('begin'); await c.query('set local role authenticated'); await assert.rejects(() => c.query('select 1 from manager_scenario'), /permission denied/); }
+    finally { await c.query('rollback'); c.release(); }
+  });
+
+  test('the first intervention arrives with the work, labelled as a system; the second at the first saved draft; never the private phrases', async () => {
+    const { u, pid } = await start();
+    const v1 = await view(u, pid);
+    assert.equal(v1.available, true); assert.equal(v1.labelAr, 'مدير افتراضي: نظام آلي، لا إنسان'); assert.match(v1.notScoredAr, /لا تُقيَّم/);
+    assert.deepEqual(v1.turns.map((t) => [t.interventionKey, t.kind]), [['kickoff', 'intervention']]);
+    assert.equal(v1.interventions[0]!.purposeAr, 'التعامل مع الغموض');
+    assert.equal((await view(u, pid)).turns.length, 1, 'delivered once');
+    await http.put(`/v1/projects/${pid}/draft`).set(auth(u)).send({ texts: { 'note.root_causes': 'بدأت بالزر' }, files: {}, skillIds: [], revision: null }).expect(200);
+    const v2 = await view(u, pid);
+    assert.deepEqual(v2.turns.map((t) => t.interventionKey), ['kickoff', 'change']);
+    const text = JSON.stringify(v2);
+    for (const secret of ['btn-register', 'indexOf', 'overflow-x', 'neverReveal', 'clarifications', 'keywordsAr']) assert.ok(!text.includes(secret), secret);
+    assert.equal(Number((await one(`select count(*)::int n from audit_event where event_type = 'manager.intervened' and payload->>'projectId' = $1`, [pid])).n), 2);
+  });
+
+  test('a question gets the scenario clarification; a request for the solution or the score is refused in persona; nothing is scored', async () => {
+    const { u, pid } = await start();
+    await view(u, pid);
+    const before = await one(`select (select count(*) from evidence where user_id = $1)::int ev, (select count(*) from skill_claim where user_id = $1)::int c, (select count(*) from model_call)::int mc`, [u.id]);
+    const a = (await say(u, pid, 'kickoff', 'ما الأهم أولًا؟').expect(201)).body.data as View;
+    assert.deepEqual(a.turns.slice(-2).map((t) => [t.author, t.kind]), [['graduate', 'message'], ['manager', 'reply']]);
+    assert.match(a.turns.at(-1)!.body, /يكتمل التسجيل لكل شخص/);
+    const b = (await say(u, pid, 'kickoff', 'أعطني الحل لو سمحت، وهل سأنجح؟').expect(201)).body.data as View;
+    assert.equal(b.turns.at(-1)!.kind, 'refusal'); assert.match(b.turns.at(-1)!.body, /قرار تقني يعود إليك/);
+    const inv = await one(`select agent_type::text as t, orchestration_rule as r, provider from agent_invocation where user_id = $1 order by created_at desc limit 1`, [u.id]);
+    assert.deepEqual([inv.t, inv.r, inv.provider], ['virtual_manager', 'R10-manager-message-to-virtual-manager', 'local-test']);
+    assert.deepEqual(await one(`select (select count(*) from evidence where user_id = $1)::int ev, (select count(*) from skill_claim where user_id = $1)::int c, (select count(*) from model_call)::int mc`, [u.id]), before);
+    const proposals = (await http.get('/v1/me/proposals').set(auth(u)).expect(200)).body.data.items as { proposalType: string }[];
+    assert.ok(proposals.every((p) => p.proposalType !== 'manager_turn'), 'manager turns live in the manager panel, not the proposals page');
+  });
+
+  test('the A19 cap: per intervention and per activity; the cap is said once; then refused', async () => {
+    const { u, pid } = await start('act_fe_change_request');
+    await view(u, pid);
+    await say(u, pid, 'kickoff', 'ما الأهم؟').expect(201);
+    const v = (await say(u, pid, 'kickoff', 'هل نعيد كتابة الصفحة؟').expect(201)).body.data as View;
+    assert.equal(v.interventions.find((i) => i.key === 'kickoff')!.remaining, 0);
+    const refused = await say(u, pid, 'kickoff', 'سؤال ثالث').expect(409);
+    assert.match(refused.body.error?.message ?? JSON.stringify(refused.body), /manager_cap_reached/);
+    await say(u, pid, 'kickoff', 'سؤال رابع').expect(409);
+    const after = await view(u, pid);
+    assert.equal(after.turns.filter((t) => t.kind === 'cap_reached').length, 1, 'the cap is announced once');
+    await say(u, pid, 'unknown', 'x').expect(404);
+    await say(u, pid, 'kickoff', '   ').expect(422);
+  });
+
+  test('private: another graduate sees nothing (API and row security); a project without a scenario has no manager', async () => {
+    const { u, pid } = await start();
+    await view(u, pid);
+    const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+    await http.get(`/v1/projects/${pid}/manager`).set(auth(other)).expect(404);
+    await say(other, pid, 'kickoff', 'مرحبا').expect(404);
+    const c = await pool.connect();
+    try {
+      await c.query('begin'); await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [other.id]); await c.query('set local role authenticated');
+      assert.equal(Number((await c.query('select count(*)::int n from manager_turn where project_id = $1', [pid])).rows[0].n), 0);
+      await c.query(`select set_config('request.jwt.claim.sub', $1, true)`, [u.id]);
+      assert.equal(Number((await c.query('select count(*)::int n from manager_turn where project_id = $1', [pid])).rows[0].n), 1, 'the owner reads their own conversation');
+    } finally { await c.query('rollback'); c.release(); }
   });
 });

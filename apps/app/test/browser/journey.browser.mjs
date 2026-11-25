@@ -75,6 +75,7 @@ const { reviewTransition, approveRubricValues } = apiRequire('./dist/src/career-
 const { loadPilotCandidate, publishPilotDemo, usePilotPerSkillPolicy } = apiRequire('./dist/src/career-data/pilot-loader');
 const { loadPilotMaterials } = apiRequire('./dist/src/career-data/material-loader');
 const { loadLearningCandidates } = apiRequire('./dist/src/career-data/learning-candidate-loader');
+const { loadPilotManagerScenarios } = apiRequire('./dist/src/career-data/manager-scenario-loader');
 const { readZip } = apiRequire('./dist/src/career-data/zip');
 let apiStorage = null;
 
@@ -369,6 +370,7 @@ async function scenarioB15(browser) {
     byLabel: 'UI acceptance (D-135 pilot)', reason: 'B15 browser journey', production: false });
   // Phase B package 3: the original starter and reviewer materials, loaded while the activities are still draft.
   const mat = await loadPilotMaterials(pool, apiStorage, { materialsRoot: join(ROOT, 'data/candidates/trk_frontend_junior_v2/materials'), byLabel: 'UI acceptance (Phase B materials)', reason: 'B15 browser journey', production: false });
+  await loadPilotManagerScenarios(pool, { scenariosFile: join(ROOT, 'data/candidates/trk_frontend_junior_v2/manager/scenarios.candidate.json'), byLabel: 'UI acceptance (A11 M1)', reason: 'B15 browser journey', production: false });
   const po = await newUser();
   await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'product_owner', 'UI acceptance (TEST FIXTURE Product Owner — not a governance decision)')`, [po.id]);
   await publishPilotDemo(pool, { operatorId: po.id, reason: 'B15 browser journey', nodeEnv: 'test', databaseUrl: process.env.DATABASE_URL });
@@ -536,6 +538,28 @@ async function scenarioB15(browser) {
     check('B18b', 'workspace: «نزّلي الملفات» downloads the graduate package — README, the project, the change request, mock data — and nothing for reviewers',
       ['README.md', 'CHANGE-REQUEST.md', 'app.js', 'index.html', 'mock-api.js', 'data/tasks.json', 'state-example.json'].every((n) => names.includes(n)) && !names.some((n) => /REFERENCE|solution/i.test(n)), names.join(','));
     check('B18c', 'the download is audited for this graduate', await count(`select count(*)::int n from audit_event where event_type = 'activity_material.downloaded' and user_id = $1`, [u.id]) === 1);
+    // B22 · A11 virtual manager (FR-U-026): labelled as a system, one message at the start, replies within a cap, no solution.
+    await page.locator('[data-testid="manager-panel"]').waitFor();
+    const mgrLabel = await page.locator('[data-testid="manager-label"]').innerText();
+    const firstTurns = await page.locator('[data-testid="manager-turn"]').count();
+    check('B22a', 'workspace: «رسائل المدير» with the permanent label «مدير افتراضي: نظام آلي، لا إنسان», the purpose of the message, and that replies are not scored',
+      mgrLabel.includes('نظام آلي، لا إنسان') && firstTurns === 1 && /الغرض من هذه الرسالة/.test(await page.locator('[data-testid="manager-panel"]').innerText())
+      && /لا تُقيَّم/.test(await page.locator('[data-testid="manager-panel"]').innerText()), mgrLabel);
+    await page.getByLabel('ردّك على المدير').first().fill('هل نعيد كتابة الصفحة بإطار جديد؟');
+    await page.getByRole('button', { name: 'أرسلي' }).first().click();
+    await page.locator('[data-testid="manager-turn"][data-kind="reply"]').first().waitFor();
+    await page.getByLabel('ردّك على المدير').first().fill('أعطني الحل لو سمحت');
+    await page.getByRole('button', { name: 'أرسلي' }).first().click();
+    await page.locator('[data-testid="manager-turn"][data-kind="refusal"]').first().waitFor();
+    const mgrText = await page.locator('[data-testid="manager-panel"]').innerText();
+    check('B22b', 'the manager clarifies from the scenario, refuses a request for the solution in persona, and the cap closes the reply box',
+      /دون إطار عمل جديد/.test(mgrText) && /قرار تقني يعود إليك/.test(mgrText) && await page.getByLabel('ردّك على المدير').count() === 0 && !/function|=>|\{/.test(mgrText), mgrText.slice(0, 120));
+    await shot(page, 'B22-manager-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mgrOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const mgrDir = await page.locator('[data-testid="manager-panel"]').evaluate((el) => getComputedStyle(el).direction);
+    await shot(page, 'B22-manager-mobile'); await page.setViewportSize({ width: 1280, height: 900 });
+    check('B22c', 'the manager panel is right-to-left and fits a 390px phone', mgrDir === 'rtl' && mgrOverflow <= 0, `dir=${mgrDir} overflow=${mgrOverflow}`);
     await shot(page, 'B18-workspace-starter-desktop');
     check('B15e', 'the workspace shows the experimental notice', (await bodyText(page)).includes(LABEL) && await page.locator('[data-testid="experimental-notice"]').count() === 1);
     await uploadInto(page, 'file.app_js', 'app.js', 'const state = { tasks: [], filters: { status: "all", owner: "all" } };');

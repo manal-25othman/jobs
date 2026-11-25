@@ -15,6 +15,7 @@ import { AdminModule } from './admin/admin.module';
 import { ReadinessModule } from './readiness/readiness.module';
 import { IntegrityModule } from './integrity/integrity.module';
 import { GuidanceModule } from './guidance/guidance.module';
+import { ManagerModule } from './manager/manager.module';
 
 /**
  * Vertical Slice 1 only.
@@ -23,7 +24,7 @@ import { GuidanceModule } from './guidance/guidance.module';
  * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
-  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule, AdminModule, GuidanceModule],
+  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule, AdminModule, GuidanceModule, ManagerModule],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

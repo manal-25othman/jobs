@@ -36,7 +36,15 @@ export const TechnicalAgent: AgentSpec = {
     : ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'],
 };
 
+/** A11 Virtual Manager: one reply in the persona, from the learner-facing scenario only. */
+export const VirtualManagerAgent: AgentSpec = {
+  agentType: 'virtual_manager',
+  requestedAction: () => 'reply once as the virtual manager of this work simulation: clarify partially from the scenario, never a solution, never a score hint (A11)',
+  expectedProposalTypes: () => ['manager_turn'],
+};
+
 export function agentSpec(type: AgentType): AgentSpec {
+  if (type === 'virtual_manager') return VirtualManagerAgent;
   if (type === 'recruitment') return RecruitmentAgent;
   if (type === 'technical') return TechnicalAgent;
   throw new Error(`agent '${type}' is an extension contract only; it is not implemented`);

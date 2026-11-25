@@ -89,6 +89,13 @@ export const RULES: readonly Rule[] = [
     route: { ruleId: 'R9-assessment-feedback-to-technical', agentType: 'technical',
       requestedAction: 'explain the recorded evaluation and the way to improve (A13/A15)', expectedProposalTypes: ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'] },
   },
+  {
+    // A11 (FR-U-026): the graduate writes to the virtual manager of their work simulation; the cap is checked before.
+    ruleId: 'R10-manager-message-to-virtual-manager',
+    when: (e) => e.type === 'user.requested' && e.facts['managerTurn'] === true,
+    route: { ruleId: 'R10-manager-message-to-virtual-manager', agentType: 'virtual_manager',
+      requestedAction: 'reply once in the persona of the virtual manager (A11)', expectedProposalTypes: ['manager_turn'] },
+  },
 ];
 
 /** First matching rule wins. Returns null when no agent should run. */

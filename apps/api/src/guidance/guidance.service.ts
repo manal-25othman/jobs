@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ConflictException } from '@nestjs/comm
 import { nextStep, careerSnapshot, type NextStep, type CareerSnapshot } from '@naqla/domain';
 import { capabilitySpec, technologiesMentioned, GUIDANCE_CAPABILITIES, GUIDANCE_TEST_PROVIDER_NOTICE_AR, type GuidanceCapability } from '@naqla/agents';
 import { loadDomainFacts } from '../agents/domain-facts';
+import { loadHiddenTexts } from '../agents/hidden-texts';
 import { DbService } from '../infra/db.service';
 import { AgentService } from '../agents/agent.service';
 import { GuidanceTools } from './guidance.tools';
@@ -78,15 +79,7 @@ export class GuidanceService {
     return { capability, labelAr: spec.labelAr, contracts: spec.contracts, toolsUsed, noticeAr: GUIDANCE_TEST_PROVIDER_NOTICE_AR, withheldAr, ...out };
   }
 
-  /** Assessment-design strings that must never reach a graduate (planted-input descriptions, reviewer material names). */
-  private async hiddenTexts(): Promise<string[]> {
-    return this.db.asService(async (c) => {
-      const rows = (await c.query(`select description_en as t from activity_input where contains_planted_issue and description_en is not null
-                                    union all select description_ar from activity_input where contains_planted_issue and description_ar is not null
-                                    union all select file_name from activity_material where audience = 'reviewer'`)).rows;
-      return rows.map((r) => String(r.t)).filter((t) => t.trim().length >= 12);
-    });
-  }
+  private hiddenTexts(): Promise<string[]> { return this.db.asService((c) => loadHiddenTexts(c)); }
 
   /** For tests and the report: the capability map (registry contracts, agent, tools). */
   capabilities() { return GUIDANCE_CAPABILITIES.map((c) => capabilitySpec(c)); }

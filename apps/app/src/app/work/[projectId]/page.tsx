@@ -12,6 +12,7 @@ import { ExperimentalNotice } from '../../../components/ExperimentalNotice';
 import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import { DisclosureField } from '../../../components/DisclosureField';
+import { ManagerPanel } from '../../../components/ManagerPanel';
 import {
   buildFileMapping, buildTextArtifacts, attemptsOf, workStatusCopy, chipClass, friendlyErrorAr, sizeLabel,
   assessmentCopy, AI_USAGE_AR, SUBMISSION_IS_NOT_A_LEVEL_AR,
@@ -299,6 +300,10 @@ export default function WorkspacePage() {
           {downloadError ? <p className="field__error" role="alert">{downloadError}</p> : null}
           <p className="disclaimer">هذه المواد خاصة بك ولهذا النشاط: لا تنشريها في مستودع عام ولا على الإنترنت. رابط التنزيل مؤقت ويُنشأ عند كل نقرة.</p>
         </section>
+      ) : null}
+
+      {token && params?.projectId ? (
+        <ManagerPanel token={token} projectId={params.projectId} readOnly={readOnly} refreshKey={save.kind === 'saved' ? String(revision.current) : null} />
       ) : null}
 
       {!readOnly ? (

@@ -110,6 +110,22 @@ export class AgentService {
     };
   }
 
+  /**
+   * A11 (FR-U-026) — one virtual-manager reply through the same gateway (R10). The agent sees ONLY `managerContext`
+   * (the learner-facing scenario of the intervention and the graduate's message). The proposal is persisted like every
+   * agent output (invocation, usage, budget); the manager panel shows it, not the proposals page.
+   */
+  async managerTurn(userId: string, managerContext: Record<string, unknown>) {
+    const decision = route({ type: 'user.requested', userId, facts: { managerTurn: true } });
+    if (!decision || decision.agentType !== 'virtual_manager') throw new BadRequestException('no route for the virtual manager');
+    const result = await this.gateway.invoke({ agentType: 'virtual_manager', trigger: 'user.requested', userId, targetRoleId: null,
+      fullContext: { managerContext }, inputReferences: [{ kind: 'project', id: String(managerContext['projectId']) }], domainFacts: await this.domainFacts(userId) });
+    const persisted = await this.persist(userId, result, decision.ruleId);
+    const p = persisted.stored[0] ? result.proposals.find((x) => x.proposalId === persisted.stored[0]) ?? null : null;
+    return { status: result.usage.status, invocationId: result.invocation.invocationId, proposalId: p?.proposalId ?? null,
+      payload: (p?.structuredPayload ?? null) as { replyAr: string; basis: string; clarificationTopic: string | null } | null, rejected: result.rejected.map((r) => r.reason) };
+  }
+
   private async buildContext(userId: string, agentType: AgentType, facts: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.db.asService(async (c) => {
       const goal = await c.query(`select tr.id, tr.label_en, tr.review_status from career_goal cg join target_role tr on tr.id = cg.target_role_id where cg.user_id = $1 and cg.is_current`, [userId]);
@@ -339,7 +355,7 @@ export class AgentService {
     return this.db.asUser(userId, async (c) => {
       const { rows } = await c.query(`select id, agent_type, proposal_type, subject_type, subject_id, summary, structured_payload, evidence_refs, source_refs,
         rationale, warnings, requires_user_approval, lifecycle, version, previewed_at, approved_at, approved_body, rejected_at, rejection_reason, superseded_by, resulting_asset_id, created_at
-        from agent_proposal order by created_at desc`);
+        from agent_proposal where agent_type::text <> 'virtual_manager' order by created_at desc`);
       return rows.map(this.row);
     });
   }
