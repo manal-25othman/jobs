@@ -13,6 +13,7 @@ import { Steps } from '../../../components/Steps';
 import { JourneyNav, Crumbs } from '../../../components/JourneyNav';
 import { DisclosureField } from '../../../components/DisclosureField';
 import { ManagerPanel } from '../../../components/ManagerPanel';
+import { GitHubSourcePanel, type GitHubSource } from '../../../components/GitHubSourcePanel';
 import {
   buildFileMapping, buildTextArtifacts, attemptsOf, workStatusCopy, chipClass, friendlyErrorAr, sizeLabel,
   assessmentCopy, AI_USAGE_AR, SUBMISSION_IS_NOT_A_LEVEL_AR,
@@ -57,6 +58,7 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<{ textAr: string; detail: string } | null>(null);
   const submitting = useRef(false);
+  const [ghSource, setGhSource] = useState<GitHubSource | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const revision = useRef<number | null>(null);
   const restored = useRef(false);
@@ -116,9 +118,11 @@ export default function WorkspacePage() {
   const unanswered = visibleQuestions.filter((q) => q.required && (answers[q.key] === undefined || answers[q.key] === '' || (Array.isArray(answers[q.key]) && (answers[q.key] as unknown[]).length === 0)));
   const anyUploading = Object.values(slots).some((s) => s.status === 'uploading');
   const descOf = (key: string) => { const d = activity?.deliverables.find((x) => x.key === key); return d?.descriptionAr ?? d?.descriptionEn ?? key; };
+  // Phase C round 2: from GitHub, the commit supplies the files, its SHA and the PR link.
+  const fromCommit = (k: string) => ghSource !== null && (k.startsWith('file.') || k === 'text.head_sha' || k === 'link.pull_request');
   const problems: string[] = [
-    ...fileMap.missing.map((k) => `أرفقي: ${descOf(k)}`),
-    ...textMap.missing.map((k) => `اكتبي: ${descOf(k)}`),
+    ...fileMap.missing.filter((k) => !fromCommit(k)).map((k) => `أرفقي: ${descOf(k)}`),
+    ...textMap.missing.filter((k) => !fromCommit(k)).map((k) => `اكتبي: ${descOf(k)}`),
     ...(skills.length === 0 ? ['اختاري مهارة واحدة على الأقل يُظهرها هذا العمل'] : []),
     ...(unanswered.length ? ['أجيبي عن الأسئلة المطلوبة في «طريقة عملك»'] : []),
     ...(anyUploading ? ['انتظري اكتمال رفع الملفات'] : []),
@@ -202,17 +206,24 @@ export default function WorkspacePage() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     try {
       setBusy('جارٍ التسليم…');
-      const sub = await api<{ id: string }>(`/projects/${encodeURIComponent(project.id)}/submissions`, {
-        method: 'POST', token,
-        body: {
-          skillIds: skills,
-          artifacts: textMap.artifacts,
-          files: fileMap.files, // explicit: each upload bound to its declared deliverable key
-          aiDisclosure: questionnaire
-            ? { questionnaireId: questionnaire.id, answers: Object.fromEntries(Object.entries(answers).filter(([k]) => visibleQuestions.some((q) => q.key === k))) }
-            : { declaredUse: [], explanation: null },
-        },
-      });
+      const aiDisclosure = questionnaire
+        ? { questionnaireId: questionnaire.id, answers: Object.fromEntries(Object.entries(answers).filter(([k]) => visibleQuestions.some((q) => q.key === k))) }
+        : { declaredUse: [], explanation: null };
+      const sub = ghSource
+        ? await api<{ submissionId: string }>(`/projects/${encodeURIComponent(project.id)}/submissions/from-github`, {
+          method: 'POST', token,
+          body: { repoId: ghSource.repoId, commitSha: ghSource.commitSha, pullRequestNumber: ghSource.pullRequestNumber, skillIds: skills,
+            artifacts: textMap.artifacts.filter((a: { key: string }) => !fromCommit(a.key)), aiDisclosure },
+        }).then((r) => ({ id: r.submissionId }))
+        : await api<{ id: string }>(`/projects/${encodeURIComponent(project.id)}/submissions`, {
+          method: 'POST', token,
+          body: {
+            skillIds: skills,
+            artifacts: textMap.artifacts,
+            files: fileMap.files, // explicit: each upload bound to its declared deliverable key
+            aiDisclosure,
+          },
+        });
       setBusy('جارٍ بدء التقييم…');
       // The explicit act of submitting also asks for the evaluation. If that request fails, the evaluation page
       // offers the same explicit action; it never starts one by itself.
@@ -302,9 +313,11 @@ export default function WorkspacePage() {
         </section>
       ) : null}
 
-      {token && params?.projectId ? (
+      {token && params?.projectId ? (<>
+        <GitHubSourcePanel token={token} readOnly={readOnly} value={ghSource} onChange={setGhSource}
+          required={deliverables.some((d) => d.mandatory && d.key === 'link.pull_request')} />
         <ManagerPanel token={token} projectId={params.projectId} readOnly={readOnly} refreshKey={save.kind === 'saved' ? String(revision.current) : null} />
-      ) : null}
+      </>) : null}
 
       {!readOnly ? (
         <>

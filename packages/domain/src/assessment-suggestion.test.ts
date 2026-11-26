@@ -16,12 +16,15 @@ test('shadow stage: every suggestion escalates, whatever the confidence', () => 
   assert.doesNotThrow(() => assertSuggestionGrounded(s, base));
 });
 
-test('failed tests suggest unmet and cite the failed test; a human criterion is never suggested met/unmet', () => {
+test('failed tests suggest unmet and cite the failed test; a human criterion gets a capped suggestion only where tests observe it', () => {
   const failing = { ...base, tests: tests('some_failed'), testLabels: [...base.testLabels, { labelAr: 'العمود الجانبي على 1024', outcome: 'fail', mode: 'automated' }] };
   const s = suggestCriterion(failing, shadow);
   assert.equal(s.suggestion, 'unmet'); assert.equal(s.excerptAr, 'العمود الجانبي على 1024');
   const h = suggestCriterion({ ...base, evaluatorType: 'human' }, shadow);
-  assert.equal(h.suggestion, 'uncertain'); assert.equal(h.confidence, 0); assert.ok(h.escalationReasons.includes('human_criterion'));
+  assert.equal(h.suggestion, 'met', 'tests observe it, so a suggestion is offered'); assert.ok(h.confidence <= 0.4, 'capped for a mandatory human criterion');
+  assert.ok(h.escalationReasons.includes('human_criterion'));
+  const hNone = suggestCriterion({ ...base, evaluatorType: 'human', tests: null, testLabels: [] }, shadow);
+  assert.equal(hNone.suggestion, 'uncertain'); assert.equal(hNone.confidence, 0);
 });
 
 test('conflicting signals and gaming lower confidence and escalate', () => {

@@ -60,6 +60,10 @@ const check = (id, name, pass, detail = '') => { results.push({ id, name, pass: 
 
 process.env.SUPABASE_JWT_SECRET = 'test-jwt-secret-for-e2e-only-not-a-real-key';
 process.env.STORAGE_DRIVER = 'memory';
+// Phase C round 2: simulated GitHub (no request to GitHub) and the R2 development sandbox (synthetic code only).
+process.env.GITHUB_MODE = 'simulated';
+process.env.GITHUB_WEBHOOK_SECRET = 'ui-acceptance-only-webhook-secret-not-real-0123456789';
+process.env.R2_MODE = 'synthetic_dev';
 process.env.UPLOAD_MAX_BYTES = String(UPLOAD_MAX_BYTES);
 const { Test } = apiRequire('@nestjs/testing');
 const { SignJWT } = apiRequire('jose');
@@ -631,6 +635,57 @@ async function scenarioB15(browser) {
     await op.goto(`${APP}/evaluation?submission=${sid}`); await op.getByText('لا نجد هذا التسليم ضمن أعمالك').waitFor();
     check('B15n', "another graduate cannot see this graduate's pilot result", !(await bodyText(op)).includes('لاحظتُ في الملفات المسلّمة'));
     await op.context().close();
+
+    // B24 · Phase C round 2: link GitHub (simulated, selected repositories, read-only), submit Task C from its pull
+    // request, and see the automated tests on that exact commit — labelled as candidate, shadow, never skill proof.
+    const g = await newUser();
+    await apiCall(g, 'POST', '/me/bootstrap', {}); await apiCall(g, 'PUT', '/me/career-goal', { targetRoleId: report.role.id, confirmed: true });
+    const gp = await pageFor(browser, g);
+    await gp.goto(`${APP}/github`); await gp.locator('[data-testid="github-connect"]').waitFor();
+    const perms = await gp.locator('[data-testid="github-permissions"]').innerText();
+    const login = `sim-ui${g.id.slice(0, 6)}`;
+    await gp.locator('#gh-login').fill(login);
+    await gp.locator('[data-testid="github-install"]').click(); await gp.locator('[data-testid="github-linked"]').waitFor();
+    check('B24a', 'GitHub page: read-only permissions and what is never done are stated; only the selected repository is linked; no organisation required',
+      /قراءة محتوى المستودعات التي تختارينها/.test(perms) && /لا كتابة ولا حذف ولا دمج/.test(perms) && /لا يُشترط إنشاء منظمة/.test(perms)
+      && (await gp.locator('[data-testid="github-linked"] li').allInnerTexts()).join() === `${login}/leave-requests (خاص)`, perms.replace(/\n/g, ' | ').slice(0, 160));
+    await shot(gp, 'B24-github-linked-desktop');
+    const taskC = report.activities.find((a) => a.code === 'act_fe_integrated_leave_requests');
+    await gp.goto(`${APP}/activities/${taskC.activityId}`); await gp.getByRole('heading', { name: 'كيف يُقيَّم عملك' }).waitFor();
+    await gp.getByRole('button', { name: 'ابدئي النشاط' }).click();
+    await gp.waitForURL(/\/work\//); await gp.locator('[data-testid="github-source"]').waitFor();
+    check('B24b', 'workspace: «التسليم من GitHub» is marked required for the activity that measures Git', /مطلوب في هذا النشاط/.test(await gp.locator('[data-testid="github-source"]').innerText()));
+    await gp.locator('[data-testid="github-repo"]').selectOption({ label: `${login}/leave-requests (خاص)` });
+    await gp.locator('[data-testid="github-pick-pr"]').first().check();
+    await gp.locator('[data-testid="github-chosen"]').waitFor();
+    for (const [k, v] of [['note.data_flow', 'البيانات تأتي من الواجهة الوهمية ثم تُعرض حسب حالتها.'], ['answer.clarification', 'سألتُ عن ترتيب الطلبات واعتمدتُ الأحدث أولًا.'],
+      ['note.bug_trace', 'تتبّعتُ زر إعادة المحاولة فوجدتُ أن حالة التحميل لا تُعاد عند الخطأ.'], ['answer.decisions', 'أبقيتُ الفلتر في الحالة نفسها ليبقى للبيانات مصدر واحد.'],
+      ['answer.git_diff_explained', 'الفرق يغيّر معالجة الخطأ ويضيف حالة الفراغ دون إعادة كتابة الصفحة.']]) {
+      if (await gp.locator(fileInput(k)).count()) await gp.locator(fileInput(k)).fill(v);
+    }
+    await answerQuestionnaire(gp);
+    await shot(gp, 'B24-github-workspace-desktop');
+    await gp.getByRole('button', { name: 'تسليم للتقييم' }).click();
+    await gp.waitForURL(/\/evaluation\?submission=/, { timeout: 120000 });
+    const gsid = new URL(gp.url()).searchParams.get('submission');
+    const pinned = await one('select commit_sha from submission_source where submission_id = $1', [gsid]);
+    check('B24c', 'the submission is pinned to the pull request head commit; its files came from that commit', !!pinned && /^[0-9a-f]{40}$/.test(pinned.commit_sha)
+      && await count(`select count(*)::int n from submission_artifact where submission_id = $1 and key in ('file.index_html','file.styles_css','file.app_js')`, [gsid]) === 3);
+    const hasRun = await count('select count(*)::int n from test_run where submission_id = $1', [gsid]) === 1;
+    if (hasRun) {
+      await gp.locator('[data-testid="test-runs"]').waitFor();
+      const tr = await gp.locator('[data-testid="test-runs"]').innerText();
+      check('B24d', 'evaluation page: the automated tests on that commit, with neutral labels, marked candidate and shadow; never skill proof; no test internals',
+        tr.includes(pinned.commit_sha.slice(0, 7)) && /اختبارات مرشّحة لم يعتمدها خبير/.test(tr) && /لا تُثبت المهارة وحدها/.test(tr) && /وضع الظل/.test(tr)
+        && !/expected|solution|reference|planted|REFERENCE/i.test(tr), tr.replace(/\n/g, ' | ').slice(0, 200));
+      await gp.setViewportSize({ width: 390, height: 844 });
+      const ov = await gp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      await shot(gp, 'B24-test-results-mobile'); await gp.setViewportSize({ width: 1280, height: 900 });
+      check('B24e', 'the test results fit a 390px phone (RTL)', ov <= 0, `overflow=${ov}`);
+    } else {
+      check('B24d', 'R2 ran on the pinned commit (development sandbox available here)', false, 'no test_run recorded');
+    }
+    await gp.context().close();
   } finally {
     await useSafetyBaseline();
   }

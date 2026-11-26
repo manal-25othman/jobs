@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>طلبات الإجازة</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1>طلبات الإجازة</h1>
+    <p class="sub">طلباتك السابقة وحالتها، من الأحدث إلى الأقدم</p>
+  </header>
+  <main>
+    <section aria-labelledby="list-title">
+      <h2 id="list-title" class="visually-hidden">قائمة الطلبات</h2>
+      <div id="app" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="mock-api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

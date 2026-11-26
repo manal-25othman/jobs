@@ -28,6 +28,8 @@ export interface PageDriver {
   click(selector: string): Promise<void>;
   fill(selector: string, value: string): Promise<void>;
   press(key: string): Promise<void>;
+  /** Chooses an option of a <select> as a user would (trusted input events from the engine). */
+  selectOption(selector: string, value: string): Promise<void>;
   /** The element that has focus, described from the isolated world. */
   focused(): Promise<{ tag: string; id: string; text: string; outlineVisible: boolean } | null>;
   wait(ms: number): Promise<void>;

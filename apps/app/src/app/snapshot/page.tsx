@@ -37,6 +37,12 @@ export default function SnapshotPage() {
       <h1>لقطة مساري</h1>
       <p className="body-sm muted">صفحة واحدة: ما أثبتِّه، وأين الفجوات، وخطوتك التالية. كل عبارة تذكر مصدرها.</p>
 
+      <section className="card" data-testid="snapshot-summary">
+        <h2>الخلاصة</h2>
+        <p className="body-sm" style={{ margin: 0 }}>{s.summaryAr}</p>
+        <p className="micro muted">صياغة قالبية ثابتة من البيانات أدناه فقط (A02)، لا من نموذج ذكاء اصطناعي.</p>
+      </section>
+
       <section className="card" data-testid="snapshot-role">
         <h2>الدور المستهدف</h2>
         {s.role ? <p className="body-sm" style={{ margin: 0 }}>{s.role.textAr} <Source x={s.role} /></p> : <p className="body-sm">لم تختاري دورًا بعد. <a className="link" href="/goal">اختاري هدفك المهني</a></p>}

@@ -1,0 +1,35 @@
+{
+  "_label": "CANDIDATE — not approved by an expert",
+  "_about": "The graduate starter as handed out.",
+  "tests": {
+    "gaming.environment_probing": "pass",
+    "quality.source_files_present": "pass",
+    "semantic.heading_and_landmarks": "fail",
+    "semantic.requests_as_list_or_table": "fail",
+    "output.requests_follow_data": "fail",
+    "output.order_by_submission_date": "fail",
+    "data_states.loading_visible": "pass",
+    "data_states.error_with_retry_button": "fail",
+    "data_states.empty_message": "fail",
+    "state.retry_completes_cleanly": "fail",
+    "state.retry_then_empty_answer": "fail",
+    "responsive.page_width_360": "fail",
+    "responsive.page_width_1024": "pass",
+    "a11y.retry_by_keyboard": "fail"
+  },
+  "criteria": {
+    "semantic_structure": "unmet",
+    "responsive_layout": "unmet",
+    "data_states": "unmet",
+    "state_transitions": "unmet",
+    "problem_traced": "human",
+    "root_cause_fixed": "unmet",
+    "code_understanding": "human",
+    "git_workflow": "human",
+    "decision_clarity": "human",
+    "judgment_assumption_check": "human",
+    "a11y_basics": "unmet",
+    "deliverables_complete": "human"
+  },
+  "gamingSignalsAtLeast": []
+}

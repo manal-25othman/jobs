@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ورشة أساسيات تحليل البيانات — التسجيل</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="logo">أكاديمية المهارات</div>
+  </header>
+
+  <div class="page">
+    <main class="content">
+      <h1>ورشة أساسيات تحليل البيانات</h1>
+      <p class="lead">ورشة تطبيقية من يومين: من تنظيف البيانات إلى أول لوحة متابعة.</p>
+
+      <h2>جدول الورشة</h2>
+      <div class="schedule-wrap" tabindex="0" aria-label="جدول الورشة، يمكن تمريره أفقيًا">
+      <table class="schedule">
+        <thead>
+        <tr><th scope="col">اليوم</th><th scope="col">الوقت</th><th scope="col">الموضوع</th><th scope="col">المدرّبة</th><th scope="col">القاعة</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>الأحد</td><td>5:00 – 8:00 مساءً</td><td>تنظيف البيانات وتجهيزها</td><td>د. هيا العتيبي</td><td>قاعة 3</td></tr>
+        <tr><td>الاثنين</td><td>5:00 – 8:00 مساءً</td><td>التحليل الوصفي ولوحات المتابعة</td><td>د. هيا العتيبي</td><td>قاعة 3</td></tr>
+        <tr><td>الثلاثاء (اختياري)</td><td>6:00 – 7:30 مساءً</td><td>جلسة أسئلة مفتوحة ومراجعة مشروعات المشاركين النهائية مع التعليق على كل مشروع</td><td>د. هيا العتيبي</td><td>قاعة الاجتماعات الكبرى في الطابق الثاني</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h2>التسجيل</h2>
+      <form class="form" id="signup" novalidate>
+        <div class="row">
+          <label>الاسم الكامل
+            <input id="full-name" type="text" autocomplete="name" aria-describedby="full-name-msg">
+          </label>
+          <span class="msg" id="full-name-msg" role="alert"></span>
+        </div>
+        <div class="row">
+          <label>البريد الإلكتروني
+            <input id="mail" type="email" autocomplete="email" aria-describedby="mail-msg">
+          </label>
+          <span class="msg" id="mail-msg" role="alert"></span>
+        </div>
+        <div class="row">
+          <label>رقم الجوال (اختياري)
+            <input id="mobile" type="tel" autocomplete="tel">
+          </label>
+        </div>
+        <button class="btn register">سجّليني الآن</button>
+        <div id="result" class="result" role="status"></div>
+      </form>
+    </main>
+
+    <aside class="side">
+      <h2 class="side-title">معلومات سريعة</h2>
+      <ul>
+        <li>المقاعد: 24</li>
+        <li>اللغة: العربية</li>
+        <li>الشهادة: حضور</li>
+      </ul>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

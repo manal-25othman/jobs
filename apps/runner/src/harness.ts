@@ -90,6 +90,7 @@ export class Driver implements PageDriver {
 
   async click(selector: string): Promise<void> { await this.need().page.click(selector); }
   async fill(selector: string, value: string): Promise<void> { await this.need().page.fill(selector, value); }
+  async selectOption(selector: string, value: string): Promise<void> { await this.need().page.selectOption(selector, value); }
   async press(key: string): Promise<void> { await this.need().page.keyboard.press(key); }
   async wait(ms: number): Promise<void> { await new Promise((r) => setTimeout(r, Math.min(ms, this.stepTimeoutMs))); }
 

@@ -1,0 +1,29 @@
+{
+  "_label": "CANDIDATE — not approved by an expert",
+  "_about": "The symptom patched in renderTasks (an error with no tasks reads 'no tasks'); the throw stays; the filter overwrites state.tasks; an accidental global.",
+  "tests": {
+    "quality.structure_kept": "pass",
+    "quality.declared_identifiers": "fail",
+    "gaming.environment_probing": "pass",
+    "quality.source_files_present": "pass",
+    "output.list_follows_data": "pass",
+    "filter.control_labelled": "pass",
+    "filter.each_status_then_all": "fail",
+    "filter.no_match_message": "fail",
+    "data_states.empty_answer_message": "pass",
+    "data_states.error_and_empty_distinct": "fail",
+    "errors.retry_recovers": "fail",
+    "data_states.loading_then_list": "pass"
+  },
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "unmet",
+    "filter_in_state": "unmet",
+    "empty_state_correct": "unmet",
+    "js_correctness": "unmet",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "gamingSignalsAtLeast": []
+}

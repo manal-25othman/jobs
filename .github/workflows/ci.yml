@@ -1,0 +1,48 @@
+# CI for development tests only (Phase C round 2, owner decision 8: activated after the permission and cost review in
+# docs/ops/research/GITHUB-APP-INTEGRATION-RESEARCH.md §Q10).
+#  - Read-only token (`contents: read`; every other permission is then `none`). No secrets. No deploy. No
+#    pull_request_target. Runs only what a contributor runs locally. Public repository: standard runners are free.
+#  - The R2 sandbox tests need root and cgroup v1; on hosted runners they skip with a stated reason, and the API e2e
+#    records "R2 did not run" (synthetic code is never run outside the development sandbox).
+#  - The browser journey needs a built app and Chromium; it runs locally (apps/app/test/browser) until added here.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main, 'claude/career-os-graduates-y42s9z']
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_HOST_AUTH_METHOD: trust }
+        ports: ['55432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      PGURL: postgresql://postgres@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm test                       # domain, config, agents, app unit tests
+      - run: npm run verify                 # boundaries, frozen prototype, tokens, documentation
+      - run: npm run build -w @naqla/runner && npm run build -w @naqla/api
+      - run: node --test --test-concurrency=1 apps/runner/dist/sandbox.test.js apps/runner/dist/run.test.js   # skips without root + cgroup v1
+      - name: database proofs (RLS as authenticated, rollback round-trip)
+        run: DATABASE_URL=$PGURL NAQLA_TEST_DB=naqla_dbproof bash scripts/db-test.sh
+      - name: e2e database
+        run: |
+          psql -q "$PGURL" -c "create database naqla_e2e"
+          for f in supabase/migrations/*.sql supabase/seed/*.sql; do psql -q -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55432/naqla_e2e -f "$f" >/dev/null; done
+          DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node scripts/career-data.mjs import trk_frontend_junior
+      - name: API e2e
+        working-directory: apps/api
+        run: DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node --test --test-concurrency=1 dist/test/*.e2e.js

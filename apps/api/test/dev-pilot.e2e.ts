@@ -886,7 +886,10 @@ describe('GitHub source + R2 shadow runs (Phase C round 2; simulated GitHub, syn
       }
       if (a.testRun) assert.equal(a.testRun.commitSha, head, 'the observations are on the pinned commit');
       const humanCrit = (await pool.query(`select key from rubric_criterion rc join evaluation_result er on er.rubric_version_id = rc.rubric_version_id where er.submission_id = $1 and rc.evaluator_type::text = 'human'`, [sub.submissionId])).rows.map((r) => r.key);
-      for (const k of humanCrit) assert.equal(a.suggestions.find((s: { criterionKey: string }) => s.criterionKey === k)?.suggestion, 'uncertain', `${k}: a human criterion is never suggested met/unmet`);
+      for (const k of humanCrit) {
+        const s = a.suggestions.find((x: { criterionKey: string }) => x.criterionKey === k);
+        assert.ok(s && s.confidence <= 0.5 && s.escalationReasons.includes('human_criterion'), `${k}: a human criterion is never decided; at most a capped suggestion`);
+      }
       await http.get(`/v1/review/items/${item.id}/automated`).set(auth(other)).expect(403);
       await http.get(`/v1/review/items/${item.id}/automated`).set(auth(u)).expect((r) => assert.ok(r.status === 403 || r.status === 404, `graduate: ${r.status}`));
       const mine = (await http.get('/v1/me/proposals').set(auth(u)).expect(200)).body.data;

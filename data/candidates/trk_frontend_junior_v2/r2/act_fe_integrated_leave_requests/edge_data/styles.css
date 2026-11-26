@@ -1,0 +1,38 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+  line-height: 1.6;
+}
+
+.header { background: #1f5a4e; color: #fff; padding: 14px 16px; }
+.header h1 { margin: 0; font-size: 1.4rem; }
+.sub { margin: 4px 0 0; color: #d6e8e1; }
+
+main { max-width: 860px; margin: 0 auto; padding: 16px; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.message { background: #fff; border: 1px solid #e3e7df; border-radius: 10px; padding: 14px 16px; }
+.message--error { border-color: #a94442; color: #a94442; }
+
+.table-wrap { overflow-x: auto; }
+.requests { width: 100%; min-width: 520px; border-collapse: collapse; background: #fff; }
+.requests th, .requests td { padding: 10px 12px; border-bottom: 1px solid #e3e7df; text-align: start; }
+.status { border-radius: 999px; padding: 2px 10px; font-size: .85rem; background: #eef4f8; }
+.status--approved { background: #eaf6ef; color: #2f7d57; }
+.status--rejected { background: #fceeee; color: #a94442; }
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #1f5a4e;
+  background: #fff;
+  color: #1f5a4e;
+  cursor: pointer;
+}
+button:focus-visible { outline: 3px solid #1f5a4e; outline-offset: 2px; }

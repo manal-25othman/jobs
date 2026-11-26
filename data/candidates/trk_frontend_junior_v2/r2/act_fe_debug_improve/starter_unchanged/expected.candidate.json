@@ -1,0 +1,33 @@
+{
+  "_label": "CANDIDATE — not approved by an expert",
+  "_about": "The graduate starter as handed out.",
+  "tests": {
+    "quality.starter_lines_kept": "pass",
+    "gaming.environment_probing": "pass",
+    "quality.source_files_present": "pass",
+    "semantic.form_with_submit_button": "fail",
+    "semantic.headings_and_table_headers": "fail",
+    "a11y.fields_have_labels": "fail",
+    "a11y.keyboard_reaches_submit": "fail",
+    "a11y.focus_visible_on_controls": "fail",
+    "a11y.field_errors_linked": "fail",
+    "validation.invalid_addresses_refused": "fail",
+    "validation.common_addresses_accepted": "fail",
+    "form.per_field_messages_when_empty": "fail",
+    "form.values_kept_and_error_clears": "fail",
+    "responsive.page_width_360": "fail",
+    "responsive.schedule_reachable_360": "fail",
+    "responsive.sidebar_beside_1024": "fail"
+  },
+  "criteria": {
+    "semantic_fixed": "unmet",
+    "a11y_keyboard_forms": "unmet",
+    "responsive_fixed": "unmet",
+    "validation_fixed": "unmet",
+    "form_submission_flow": "unmet",
+    "scope_discipline": "human",
+    "root_cause_note": "human",
+    "deliverables_complete": "met"
+  },
+  "gamingSignalsAtLeast": []
+}

@@ -366,7 +366,7 @@ export interface NextStep { code: string; textAr: string; whyAr: string; href: s
 export interface SourcedStatement { textAr: string; source: string; sourceRef: string | null }
 export interface CareerSnapshot {
   kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[]; selfAssessed: SourcedStatement[];
-  gapOrderAr: string; nextStep: NextStep; limitsAr: string[];
+  gapOrderAr: string; nextStep: NextStep; limitsAr: string[]; summaryAr: string;
 }
 export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback' | 'improvement_hints';
 export interface GuidanceAnswer {

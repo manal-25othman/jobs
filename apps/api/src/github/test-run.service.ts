@@ -35,8 +35,10 @@ export class TestRunService {
   constructor(private readonly db: DbService) {}
 
   private invoke(activityId: string, files: readonly SubmittedFile[], commitSha: string | null): Promise<{ ok: true; result: TestRunResult } | { ok: false; error: string }> {
+    let cli: string;
+    try { cli = runnerCli(); } catch { return Promise.resolve({ ok: false, error: 'runner not built' }); }
     return new Promise((resolve) => {
-      const child = spawn(process.execPath, [runnerCli()], { stdio: ['pipe', 'pipe', 'ignore'], env: { NODE_ENV: process.env['NODE_ENV'] ?? 'development', PATH: '/usr/bin:/bin' } });
+      const child = spawn(process.execPath, [cli], { stdio: ['pipe', 'pipe', 'ignore'], env: { NODE_ENV: process.env['NODE_ENV'] ?? 'development', PATH: '/usr/bin:/bin' } });
       let out = '';
       const timer = setTimeout(() => child.kill('SIGKILL'), 180_000);
       child.stdout.on('data', (d: Buffer) => { if (out.length < 512 * 1024) out += d.toString('utf8'); });

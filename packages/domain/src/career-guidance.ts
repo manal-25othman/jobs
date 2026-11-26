@@ -127,6 +127,22 @@ export interface CareerSnapshot {
   readonly gapOrderAr: string;
   readonly nextStep: NextStep;
   readonly limitsAr: readonly string[];
+  /**
+   * A02 template phrasing (FR-A-001 fallback; plan §2 row 4): ONE paragraph built only from the facts above — the role,
+   * the evaluated strengths, the first gap in the stated order, the next step. Self-assessment is never phrased as a
+   * strength; no level or readiness is stated. Model phrasing replaces this only after OPEN-023.
+   */
+  readonly summaryAr: string;
+}
+
+/** The A02 template. Pure: the same snapshot facts always give the same text. */
+export function snapshotSummaryAr(p: { readonly role: SourcedStatement | null; readonly strengths: readonly SourcedStatement[]; readonly gaps: readonly SourcedStatement[]; readonly nextStep: NextStep }): string {
+  if (!p.role) return `لم تختاري دورًا مهنيًا بعد، فلا يمكن تشخيص الفجوات. الخطوة التالية: ${p.nextStep.textAr}`;
+  const strip = (t: string) => t.split('»')[0]!.replace('«', '');
+  const strengths = p.strengths.length === 0 ? 'لا توجد بعد مهارة مُثبتة بدليل مُقيَّم'
+    : `مهارات مُثبتة بدليل مُقيَّم: ${p.strengths.length}${p.strengths.length ? ` (${p.strengths.slice(0, 2).map((s) => `«${strip(s.textAr)}»`).join('، ')})` : ''}`;
+  const gap = p.gaps[0] ? `أول مهارة بلا دليل مُقيَّم في الترتيب المعروض: «${strip(p.gaps[0].textAr)}»` : 'لا فجوات ظاهرة في مهارات الدور المسجّلة';
+  return `هدفك: ${p.role.textAr}. ${strengths}. ${gap}. الخطوة التالية: ${p.nextStep.textAr}`;
 }
 
 const CLASS_RANK: Record<string, number> = { must: 0, core: 1, supporting: 2 };
@@ -153,5 +169,6 @@ export function careerSnapshot(input: { readonly roleLabelAr: string | null; rea
     selfAssessed: input.skills.filter((s) => s.selfRatingAr).map((s) => ({ textAr: `«${s.labelAr}»: قدّرتِها «${s.selfRatingAr}»`, source: 'self_assessment' as const, sourceRef: s.skillId })),
     gapOrderAr: classed ? 'مرتّبة حسب تصنيف معتمد من الخبراء' : 'بترتيب الدور كما سُجّل، لا أولوية معتمدة',
     nextStep: input.nextStep, limitsAr,
+    summaryAr: snapshotSummaryAr({ role: input.roleLabelAr ? { textAr: input.roleLabelAr, source: 'career_goal', sourceRef: input.roleId } : null, strengths, gaps, nextStep: input.nextStep }),
   };
 }

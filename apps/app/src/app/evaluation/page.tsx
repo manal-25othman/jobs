@@ -8,6 +8,7 @@ import { Steps } from '../../components/Steps';
 import { JourneyNav } from '../../components/JourneyNav';
 import { GuidancePanel } from '../../components/GuidancePanel';
 import { HintsPanel } from '../../components/HintsPanel';
+import { TestRunsPanel } from '../../components/TestRunsPanel';
 import { ExperimentalNotice } from '../../components/ExperimentalNotice';
 import { evaluationPageState, levelChangeToShow, criterionResult, chipClass, friendlyErrorAr, attributionNoticeAr,
   hasPerSkillResults, skillOutcomeCopy, skillCriterionCopy, skillLevelLine, perSkillSummaryAr,
@@ -373,6 +374,7 @@ function EvaluationInner() {
       {token && view?.resultId && submissionId ? (
         <section className="card">
           <h2>تلميحات خطوة خطوة</h2>
+          <TestRunsPanel token={token} submissionId={submissionId} />
           <HintsPanel token={token} submissionId={submissionId} />
         </section>
       ) : null}

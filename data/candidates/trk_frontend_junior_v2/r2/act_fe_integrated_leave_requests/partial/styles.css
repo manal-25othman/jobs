@@ -1,0 +1,16 @@
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+}
+
+.header { background: #1f5a4e; color: #fff; padding: 14px 16px; font-size: 1.3rem; }
+
+#app { padding: 16px; }
+
+.loading { color: #5f6b63; }
+.error { color: #a94442; }
+
+.request-row { display: flex; gap: 24px; background: #fff; padding: 10px 12px; border-bottom: 1px solid #e3e7df; }
+.request-row span { min-width: 140px; }

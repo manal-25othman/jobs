@@ -7,6 +7,8 @@
  *  - Layers stay separate: the inputs are layer-1 test observations and the deterministic rule result; the output is a
  *    layer-2 suggestion; skill proof and readiness are never computed here.
  *  - Grounded: every suggestion cites an excerpt that exists in its inputs (Q11).
+ *  - A `human` criterion is never decided: a suggestion is offered only where automated tests observe it, capped
+ *    at 0.5 (0.4 for a mandatory «met»), and is otherwise «uncertain».
  *  - Shadow stage: EVERY suggestion escalates to a person until a named calibration decision, whatever its confidence.
  *    80% agreement is an initial test indicator, never an authorisation (owner decision 4).
  */
@@ -63,9 +65,16 @@ export function suggestCriterion(i: CriterionSuggestionInput, ctx: SuggestionCon
   const failedLabel = i.testLabels.find((t) => t.mode === 'automated' && t.outcome === 'fail')?.labelAr ?? null;
   const anyLabel = i.testLabels.find((t) => t.mode === 'automated')?.labelAr ?? i.testLabels[0]?.labelAr ?? null;
 
-  if (i.evaluatorType === 'human') {
+  // A criterion the rubric gives to a person is never decided here. Where automated tests observe it, a suggestion is
+  // still offered — that is where the reviewer most needs help — with confidence capped; with no automated
+  // observation it stays uncertain.
+  const human = i.evaluatorType === 'human';
+  if (human) {
     reasons.push('human_criterion');
-    return { criterionKey: i.criterionKey, suggestion: 'uncertain', confidence: 0, excerptAr: anyLabel ?? i.ruleExcerpt ?? 'بند يقرره إنسان', basis: i.tests ? ['tests'] : [], escalate: true, escalationReasons: reasons };
+    const automated = i.testLabels.some((t) => t.mode === 'automated');
+    if (!automated || !i.tests || i.tests.observation === 'human_only') {
+      return { criterionKey: i.criterionKey, suggestion: 'uncertain', confidence: 0, excerptAr: anyLabel ?? i.ruleExcerpt ?? 'بند يقرره إنسان', basis: i.tests ? ['tests'] : [], escalate: true, escalationReasons: reasons };
+    }
   }
 
   const testView = i.tests && i.tests.observation !== 'human_only' ? i.tests.observation : null;
@@ -86,6 +95,7 @@ export function suggestCriterion(i: CriterionSuggestionInput, ctx: SuggestionCon
   if (ctx.gamingSignals.length || ctx.injectionSuspected) confidence = Math.min(confidence, 0.3);
   // A met suggestion on a mandatory criterion is the costly error (Q3): it is never more confident than the rule allows.
   if (suggestion === 'met' && i.mandatory && !basis.includes('rule')) confidence = Math.min(confidence, 0.65);
+  if (human) confidence = Math.min(confidence, suggestion === 'met' && i.mandatory ? 0.4 : 0.5);
 
   const excerptAr = (suggestion === 'unmet' && failedLabel) || (basis.includes('tests') ? anyLabel : null) || i.ruleExcerpt || 'لا مقتطف';
   return { criterionKey: i.criterionKey, suggestion, confidence: round2(confidence), excerptAr, basis, escalate: reasons.length > 0, escalationReasons: [...new Set(reasons)] };

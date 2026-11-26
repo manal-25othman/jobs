@@ -60,3 +60,17 @@ describe('A02 — Career Snapshot (FR-U-014)', () => {
     assert.equal(s.strengths.length, 0); assert.ok(s.limitsAr.some((l) => /لا تمنح مستوى/.test(l)));
   });
 });
+
+test('A02 template phrasing: one paragraph from the snapshot facts only; self-assessment never phrased as a strength', async () => {
+  const { careerSnapshot } = await import('./career-guidance.js');
+  const step = { code: 'choose_activity', textAr: 'ابدئي نشاطًا', whyAr: 'x', href: '/activities', source: 'activity_catalogue', sourceRef: null, agent: 'A01' } as const;
+  const s = careerSnapshot({ roleLabelAr: 'مطوّر واجهات', roleId: 'r', nextStep: step as never, skills: [
+    { skillId: 'a', labelAr: 'HTML الدلالي', level: 'demonstrated', standingEvaluatedCount: 1, approvedClass: null, roleOrder: 1, selfRatingAr: null },
+    { skillId: 'b', labelAr: 'إتاحة الوصول', level: 'gap', standingEvaluatedCount: 0, approvedClass: null, roleOrder: 2, selfRatingAr: 'متقدّم' },
+  ] as never });
+  assert.match(s.summaryAr, /^هدفك: مطوّر واجهات\. مهارات مُثبتة بدليل مُقيَّم: 1 \(«HTML الدلالي»\)\. أول مهارة بلا دليل مُقيَّم في الترتيب المعروض: «إتاحة الوصول»\. الخطوة التالية: ابدئي نشاطًا$/);
+  assert.ok(!s.summaryAr.includes('متقدّم'), 'the self-rating is not in the summary');
+  assert.ok(!/جاهز|مستوى/.test(s.summaryAr));
+  const none = careerSnapshot({ roleLabelAr: null, roleId: null, nextStep: step as never, skills: [] });
+  assert.match(none.summaryAr, /لم تختاري دورًا/);
+});
