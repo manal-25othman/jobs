@@ -16,6 +16,7 @@ import { ReadinessModule } from './readiness/readiness.module';
 import { IntegrityModule } from './integrity/integrity.module';
 import { GuidanceModule } from './guidance/guidance.module';
 import { ManagerModule } from './manager/manager.module';
+import { GitHubModule } from './github/github.module';
 
 /**
  * Vertical Slice 1 only.
@@ -24,7 +25,7 @@ import { ManagerModule } from './manager/manager.module';
  * agent orchestration. Those are deliberately absent, not pending.
  */
 @Module({
-  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule, AdminModule, GuidanceModule, ManagerModule],
+  imports: [InfraModule, StorageModule, CareerDataModule, AgentsModule, Slice1Module, ReviewModule, EvidenceModule, SkillProgressModule, AssessmentModule, ConfigurationModule, ReadinessModule, IntegrityModule, AdminModule, GuidanceModule, ManagerModule, GitHubModule],
   controllers: [HealthController, DomainInfoController],
 })
 export class AppModule {}

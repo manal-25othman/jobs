@@ -29,7 +29,7 @@ async function bootstrap(): Promise<void> {
   }
 
   // S0 / P0-3: an explicit origin allow-list in production (CORS_ALLOWED_ORIGINS); any origin only outside production.
-  const app = await NestFactory.create(AppModule, { cors: { origin: corsOrigins(env) } });
+  const app = await NestFactory.create(AppModule, { cors: { origin: corsOrigins(env) }, rawBody: true });
   app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', {
     // A share link may live for 90 days; it must not break on a version bump.

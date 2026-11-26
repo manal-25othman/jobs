@@ -83,7 +83,7 @@ export async function bootApp(opts: { legacyVerificationCompat?: boolean } = {})
   // TEST DOUBLE for storage; proves ownership/provenance/report boundary, not Supabase.
   process.env['STORAGE_DRIVER'] = 'memory';
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication({ rawBody: true });
   app.useGlobalFilters(new DomainExceptionFilter());
   app.setGlobalPrefix('v1', {
     // A share link may live for 90 days; it must not break on a version bump.
