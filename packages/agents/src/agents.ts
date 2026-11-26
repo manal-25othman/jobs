@@ -8,11 +8,14 @@
 import type { AgentType, ProposalType, Trigger } from './contracts.js';
 import type { GuidanceCapability } from './guidance.js';
 
+/** Learner-facing guidance capabilities, plus the reviewer-facing A13 suggestion. */
+export type AgentCapability = GuidanceCapability | 'review_suggestion';
+
 export interface AgentSpec {
   readonly agentType: AgentType;
   /** Builds the FULL context; the gateway redacts it to the allow-list. */
-  readonly requestedAction: (trigger: Trigger, capability?: GuidanceCapability) => string;
-  readonly expectedProposalTypes: (trigger: Trigger, capability?: GuidanceCapability) => readonly ProposalType[];
+  readonly requestedAction: (trigger: Trigger, capability?: AgentCapability) => string;
+  readonly expectedProposalTypes: (trigger: Trigger, capability?: AgentCapability) => readonly ProposalType[];
 }
 
 export const RecruitmentAgent: AgentSpec = {
@@ -29,12 +32,15 @@ export const RecruitmentAgent: AgentSpec = {
 
 export const TechnicalAgent: AgentSpec = {
   agentType: 'technical',
-  requestedAction: (_t, cap) => cap === 'improvement_hints'
+  requestedAction: (_t, cap) => cap === 'review_suggestion'
+    ? 'suggest, per criterion, met / unmet / uncertain with the excerpt it rests on and a confidence, for the human reviewer only; never a decision (A13)'
+    : cap === 'improvement_hints'
     ? 'give ONE level of hint for each unmet criterion of the graduate\'s own result: where to look, the concept, or a resource; never code or the fix (A15/A03)'
     : cap === 'learning_guidance'
     ? 'guide learning for one skill as a technical mentor: the registry resource, the practice and self-check questions; never a solution (A07/A03)'
     : 'review the evaluation as a technical mentor: explain, point out weaknesses, propose next step',
-  expectedProposalTypes: (_t, cap) => cap === 'improvement_hints' ? ['improvement_action']
+  expectedProposalTypes: (_t, cap) => cap === 'review_suggestion' ? ['criterion_suggestion']
+    : cap === 'improvement_hints' ? ['improvement_action']
     : cap === 'learning_guidance' ? ['technical_next_action', 'followup_question']
     : ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'],
 };

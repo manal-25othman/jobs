@@ -76,6 +76,15 @@ export function validateSchema(agentType: AgentType, raw: unknown): Omit<AgentPr
       }
     }
   }
+  if (proposalType === 'criterion_suggestion') {
+    const m = p as unknown as Record<string, unknown>;
+    if (m['kind'] !== 'criterion_suggestion' || !isStr(m['criterionKey']) || !['met', 'unmet', 'uncertain'].includes(String(m['suggestion']))
+        || typeof m['confidence'] !== 'number' || (m['confidence'] as number) < 0 || (m['confidence'] as number) > 1 || !isStr(m['excerptAr']) || !isStr(m['explanationAr'])
+        || !isArr(m['basis']) || !isArr(m['escalationReasons'])) {
+      throw new ProposalRejected('schema', 'criterion_suggestion needs criterionKey, suggestion, confidence 0..1, excerptAr, basis, explanationAr');
+    }
+    if (m['escalate'] !== true) throw new ProposalRejected('schema', 'A13: before calibration is approved every suggestion is escalated to a person');
+  }
   if (proposalType === 'manager_turn') {
     const m = p as unknown as Record<string, unknown>;
     if (m['kind'] !== 'manager_turn' || !isStr(m['replyAr']) || !(m['replyAr'] as string).trim() || !isStr(m['interventionKey'])) throw new ProposalRejected('schema', 'manager_turn needs a manager_turn payload with replyAr');
@@ -366,6 +375,12 @@ export function validateAgainstDomain(
     if (texts.some((t) => codeLikeViolation(t))) throw new ProposalRejected('domain', 'A03/A15 guard: a hint never contains ready code');
   }
 
+  // A13: a suggestion never decides, never speaks of a level, verification or readiness, never addresses the graduate.
+  if (payload.kind === 'criterion_suggestion') {
+    const v = reviewSuggestionViolation(`${p.summary ?? ''} ${payload.explanationAr}`);
+    if (v) throw new ProposalRejected('domain', `A13 guard: ${v}`);
+  }
+
   // A11 (FR-A-002): the manager never gives code or solution steps, never hints at a score or criterion.
   if (payload.kind === 'manager_turn') {
     const v = managerTurnViolation(payload.replyAr);
@@ -389,6 +404,14 @@ export function managerTurnViolation(text: string): string | null {
   if (codeLikeViolation(text)) return 'code or code-like content';
   if (/(الحل هو|الحل:|خطوات الحل|الخطوة الأولى|اكتبي الكود|غيّري السطر|غيري السطر|استخدمي الدالة|عدّلي الملف|عدلي الملف)/.test(text)) return 'solution steps';
   if (/(درجة|درجتك|الدرجات|علامة|علامتك|معيار|المعايير|ربريك|رُبريك|ستنجحين|ستجتازين|اجتياز|تقييمك|نقاطك)/.test(text) || /\b(score|grade|rubric|pass(ed)?)\b/i.test(text)) return 'a hint about the score or the criteria';
+  return null;
+}
+
+/** A13 guard: a reviewer suggestion is not a decision and never reaches into levels, verification or readiness. */
+export function reviewSuggestionViolation(text: string): string | null {
+  if (/(تم اعتماد|اعتُمد|معتمد نهائي|قرار نهائي|نجح الخرّيج|رسب|مستوى التحقق|التحقق الكامل|جاهز للعمل|جاهزية|تمت الموافقة)/.test(text)) return 'decision, level, verification or readiness language';
+  if (/\b(approved|verified|final decision|passed the activity|failed the activity|ready for hire)\b/i.test(text)) return 'decision, level, verification or readiness language';
+  if (/(أنتِ|أنتَ|عزيزتي|عزيزي)/.test(text)) return 'a reviewer suggestion never addresses the graduate';
   return null;
 }
 

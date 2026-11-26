@@ -4,6 +4,7 @@ import { HumanReviewerGuard } from './reviewer.guard';
 import { MaterialService } from '../slice1/material.service';
 import { ManagerService } from '../manager/manager.service';
 import { ReviewService } from './review.service';
+import { AutomatedReviewService } from './automated-review.service';
 
 /**
  * Reviewer endpoints. There is deliberately NO endpoint here that touches a
@@ -13,7 +14,7 @@ import { ReviewService } from './review.service';
 @Controller('review')
 @UseGuards(HumanReviewerGuard)
 export class ReviewController {
-  constructor(private readonly review: ReviewService, private readonly materialSvc: MaterialService, private readonly managerSvc: ManagerService) {}
+  constructor(private readonly review: ReviewService, private readonly materialSvc: MaterialService, private readonly managerSvc: ManagerService, private readonly automated: AutomatedReviewService) {}
   private who(req: Request) { return req.naqlaReviewer!; }
 
   @Get('queue') async queue(@Req() req: Request) { return { ok: true, data: { items: await this.review.queue(this.who(req)) } }; }
@@ -22,6 +23,8 @@ export class ReviewController {
   @Get('items/:id/materials') async materials(@Req() req: Request, @Param('id') id: string) { return { ok: true, data: await this.materialSvc.forReviewItem(this.who(req).id, id) }; }
   /** A11: the virtual-manager conversation of the work under review (up to the submission); not scored in P1. */
   @Get('items/:id/manager-turns') async managerTurns(@Req() req: Request, @Param('id') id: string) { return { ok: true, data: await this.managerSvc.forReviewItem(this.who(req).id, id) }; }
+  /** Phase C round 2: R2 observations, the pinned source and A13 suggestions — for the assigned reviewer only; never a decision. */
+  @Get('items/:id/automated') async automatedLayer(@Req() req: Request, @Param('id') id: string) { return { ok: true, data: await this.automated.forReviewItem(this.who(req).id, id) }; }
   @Get('items/:id') async open(@Req() req: Request, @Param('id') id: string) { return { ok: true, data: await this.review.open(this.who(req), id) }; }
   @Post('items/:id/decision')
   async decide(@Req() req: Request, @Param('id') id: string, @Body() body: { levelKey: string; rationale: string; disagreementWithAutomated?: boolean; supersedesReviewId?: string | null }) {

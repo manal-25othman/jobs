@@ -55,3 +55,4 @@ export * from './self-assessment.js';
 export * from './virtual-manager.js';
 export * from './test-run.js';
 export * from './github-integration.js';
+export * from './assessment-suggestion.js';

@@ -97,6 +97,13 @@ export const RULES: readonly Rule[] = [
       requestedAction: 'progressive hints per unmet criterion; never code (A15/A03)', expectedProposalTypes: ['improvement_action'] },
   },
   {
+    // A13: per-criterion suggestions for the ASSIGNED reviewer of one item (shadow stage: always escalated).
+    ruleId: 'R12-review-suggestion-to-technical',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'review_suggestion',
+    route: { ruleId: 'R12-review-suggestion-to-technical', agentType: 'technical',
+      requestedAction: 'suggest, per criterion, met / unmet / uncertain with the excerpt it rests on and a confidence, for the human reviewer only (A13)', expectedProposalTypes: ['criterion_suggestion'] },
+  },
+  {
     // A11 (FR-U-026): the graduate writes to the virtual manager of their work simulation; the cap is checked before.
     ruleId: 'R10-manager-message-to-virtual-manager',
     when: (e) => e.type === 'user.requested' && e.facts['managerTurn'] === true,

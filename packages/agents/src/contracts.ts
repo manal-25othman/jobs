@@ -11,7 +11,7 @@
  * Version of the proposal envelope and payload contract. Bumped when a field,
  * payload kind or validation-relevant semantic changes. Recorded by the harness.
  */
-export const PROPOSAL_SCHEMA_VERSION = '1.4.0';
+export const PROPOSAL_SCHEMA_VERSION = '1.5.0';
 
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
@@ -40,6 +40,8 @@ export const RECRUITMENT_PROPOSAL_TYPES = [
 export const TECHNICAL_PROPOSAL_TYPES = [
   'technical_feedback', 'rubric_explanation', 'improvement_action', 'followup_question',
   'validation_activity', 'missing_evidence', 'technical_next_action',
+  // A13 (schema 1.5.0): a per-criterion suggestion for the assigned human reviewer only. Never a decision.
+  'criterion_suggestion',
 ] as const;
 
 /** A11 Virtual Manager (FR-U-026): one manager turn in the work simulation. */
@@ -81,6 +83,9 @@ export const AGENTS: readonly AgentDefinition[] = [
       'activityContext',
       // Phase B package 5: a guidance request (learning_guidance / assessment_feedback) — learner-visible facts only.
       'guidanceRequest',
+      // A13: the reviewer-side facts of ONE review item — per-criterion rule results, R2 observations (neutral labels),
+      // Git observations. Never reference solutions, planted defects, expected test values or the graduate's identity.
+      'reviewContext',
     ],
     proposalTypes: TECHNICAL_PROPOSAL_TYPES,
   },
@@ -160,6 +165,7 @@ export interface AgentProposal {
 /** Every payload is one of these. An arbitrary blob is not a proposal. */
 export type ProposalPayload =
   | ManagerTurnPayload
+  | CriterionSuggestionPayload
   | WordingPayload
   | GapPayload
   | ActionPayload
@@ -192,6 +198,19 @@ export interface WordingPayload {
 }
 
 /** A11: one manager turn. `basis` says where the words come from; a model reply must still pass the A11 guard. */
+/** A13: what the reviewer sees for one criterion. A suggestion, never a decision; always escalated before calibration. */
+export interface CriterionSuggestionPayload {
+  readonly kind: 'criterion_suggestion';
+  readonly criterionKey: string;
+  readonly suggestion: 'met' | 'unmet' | 'uncertain';
+  readonly confidence: number;
+  readonly excerptAr: string;
+  readonly basis: readonly ('tests' | 'rule')[];
+  readonly explanationAr: string;
+  readonly escalate: true;
+  readonly escalationReasons: readonly string[];
+}
+
 export interface ManagerTurnPayload {
   readonly kind: 'manager_turn';
   readonly interventionKey: string;

@@ -126,6 +126,17 @@ export class AgentService {
       payload: (p?.structuredPayload ?? null) as { replyAr: string; basis: string; clarificationTopic: string | null } | null, rejected: result.rejected.map((r) => r.reason) };
   }
 
+  /** A13: per-criterion suggestions for the ASSIGNED reviewer (shadow stage). Stored under the reviewer, never the graduate. */
+  async reviewSuggestions(reviewerId: string, reviewContext: Record<string, unknown>, submissionId: string) {
+    const decision = route({ type: 'user.requested', userId: reviewerId, facts: { capability: 'review_suggestion' } });
+    if (!decision || decision.agentType !== 'technical') throw new BadRequestException('no route for review suggestions');
+    const result = await this.gateway.invoke({ agentType: 'technical', trigger: 'user.requested', userId: reviewerId, targetRoleId: null,
+      fullContext: { reviewContext }, inputReferences: [{ kind: 'submission', id: submissionId }], domainFacts: await this.domainFacts(reviewerId) });
+    const persisted = await this.persist(reviewerId, result, decision.ruleId);
+    return { status: result.usage.status, invocationId: result.invocation.invocationId, stored: persisted.stored.length,
+      suggestions: result.proposals.map((p) => p.structuredPayload as unknown as Record<string, unknown>), rejected: result.rejected.map((r) => r.reason) };
+  }
+
   private async buildContext(userId: string, agentType: AgentType, facts: Record<string, unknown>): Promise<Record<string, unknown>> {
     return this.db.asService(async (c) => {
       const goal = await c.query(`select tr.id, tr.label_en, tr.review_status from career_goal cg join target_role tr on tr.id = cg.target_role_id where cg.user_id = $1 and cg.is_current`, [userId]);

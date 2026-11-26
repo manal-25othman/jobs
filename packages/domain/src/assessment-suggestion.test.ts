@@ -1,0 +1,51 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { suggestCriterion, assertSuggestionGrounded, calibrationMetrics, type CriterionSuggestionInput, type SuggestionContext } from './assessment-suggestion.js';
+
+const shadow: SuggestionContext = { packApproved: false, calibrationApproved: false, gamingSignals: [], injectionSuspected: false };
+const tests = (observation: 'all_passed' | 'some_failed' | 'inconclusive' | 'human_only') =>
+  ({ criterionKey: 'c', automatedPassed: 1, automatedFailed: observation === 'some_failed' ? 1 : 0, automatedInconclusive: 0, supportsHuman: 0, observation });
+const base: CriterionSuggestionInput = { criterionKey: 'responsive_fixed', mandatory: true, evaluatorType: 'rule', ruleMet: null, ruleExcerpt: null, tests: tests('all_passed'),
+  testLabels: [{ labelAr: 'لا تمرير أفقي على عرض 360', outcome: 'pass', mode: 'automated' }] };
+
+test('shadow stage: every suggestion escalates, whatever the confidence', () => {
+  const s = suggestCriterion(base, shadow);
+  assert.equal(s.suggestion, 'met'); assert.equal(s.escalate, true);
+  assert.ok(s.escalationReasons.includes('calibration_not_approved'));
+  assert.ok(s.confidence <= 0.65, 'a mandatory criterion met on tests alone is capped (Q3 is the costly error)');
+  assert.doesNotThrow(() => assertSuggestionGrounded(s, base));
+});
+
+test('failed tests suggest unmet and cite the failed test; a human criterion is never suggested met/unmet', () => {
+  const failing = { ...base, tests: tests('some_failed'), testLabels: [...base.testLabels, { labelAr: 'العمود الجانبي على 1024', outcome: 'fail', mode: 'automated' }] };
+  const s = suggestCriterion(failing, shadow);
+  assert.equal(s.suggestion, 'unmet'); assert.equal(s.excerptAr, 'العمود الجانبي على 1024');
+  const h = suggestCriterion({ ...base, evaluatorType: 'human' }, shadow);
+  assert.equal(h.suggestion, 'uncertain'); assert.equal(h.confidence, 0); assert.ok(h.escalationReasons.includes('human_criterion'));
+});
+
+test('conflicting signals and gaming lower confidence and escalate', () => {
+  const c = suggestCriterion({ ...base, ruleMet: false, ruleExcerpt: 'notes.md' }, shadow);
+  assert.equal(c.suggestion, 'uncertain'); assert.ok(c.escalationReasons.includes('signals_conflict'));
+  const g = suggestCriterion({ ...base, ruleMet: true, ruleExcerpt: 'notes.md' }, { ...shadow, gamingSignals: ['automation_probe'] });
+  assert.ok(g.confidence <= 0.3); assert.ok(g.escalationReasons.includes('gaming_signals'));
+});
+
+test('an invented excerpt or an unescalated suggestion is refused', () => {
+  const s = suggestCriterion(base, shadow);
+  assert.throws(() => assertSuggestionGrounded({ ...s, excerptAr: 'اختبار مخترع' }, base), /a13_ungrounded/);
+  assert.throws(() => assertSuggestionGrounded({ ...s, escalate: false }, base), /a13_not_escalated/);
+});
+
+test('calibration metrics: agreement, kappa, false accept on mandatory, rejection sensitivity, escalation', () => {
+  const r = calibrationMetrics([
+    { criterionKey: 'a', suggested: 'met', reference: 'met', mandatory: true, escalated: true },
+    { criterionKey: 'b', suggested: 'unmet', reference: 'unmet', mandatory: true, escalated: true },
+    { criterionKey: 'c', suggested: 'met', reference: 'unmet', mandatory: true, escalated: true },
+    { criterionKey: 'd', suggested: 'uncertain', reference: 'met', mandatory: false, escalated: true },
+  ]);
+  assert.equal(r.n, 4); assert.equal(r.decidedShare, 0.75); assert.equal(r.rawAgreement, 0.667);
+  assert.equal(r.falseAcceptMandatory, 0.5); assert.equal(r.trueRejectRate, 0.5); assert.equal(r.falseRejectRate, 0);
+  assert.equal(r.unescalatedErrorRate, 0); assert.equal(r.escalationRate, 1);
+  assert.match(r.noticeAr, /لا تمنح اعتمادًا آليًا/);
+});

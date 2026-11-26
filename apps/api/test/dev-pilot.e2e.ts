@@ -845,6 +845,53 @@ describe('GitHub source + R2 shadow runs (Phase C round 2; simulated GitHub, syn
     }
   });
 
+  test('the assigned reviewer sees the automated layer (tests on the pinned commit + A13 suggestions, all escalated); the graduate and other reviewers never do', async () => {
+    const { u, login, primaries, activityId } = await startLeave();
+    const pid = (await http.post('/v1/projects').set(auth(u)).send({ title: 'مراجعة', kind: 'platform_activity', activitySpecId: activityId }).expect(201)).body.data.id as string;
+    const repo = (await http.post('/v1/me/github/simulated-install').set(auth(u)).send({ login, repositories: [`${login}/leave-requests`] }).expect(201)).body.data.repositories[0];
+    const head = ((await http.get(`/v1/me/github/repos/${repo.repoId}/commits`).set(auth(u)).expect(200)).body.data.pullRequests[0].headSha) as string;
+    await usePilotPerSkillPolicy(pool, { byLabel: 'e2e (A13 shadow)', production: false });
+    try {
+      const t = (key: string, valueText: string) => ({ key, kind: 'text', valueText, locator: 'notes.md' });
+      const sub = (await http.post(`/v1/projects/${pid}/submissions/from-github`).set(auth(u)).send({ repoId: repo.repoId, commitSha: head, pullRequestNumber: 1, skillIds: primaries, aiDisclosure: { declaredUse: [] },
+        artifacts: [t('note.data_flow', 'البيانات تأتي من الواجهة الوهمية ثم تُعرض حسب حالتها.'), t('answer.clarification', 'سألتُ عن ترتيب الطلبات قبل البدء واعتمدتُ الأحدث أولًا.'),
+          t('note.bug_trace', 'تتبّعتُ زر إعادة المحاولة فوجدتُ أن حالة التحميل لا تُعاد عند الخطأ.'), t('answer.decisions', 'أبقيتُ الفلتر في الحالة نفسها لأن ذلك يحفظ مصدرًا واحدًا للبيانات.'),
+          t('answer.git_diff_explained', 'الفرق يغيّر معالجة الخطأ ويضيف حالة الفراغ دون إعادة كتابة الصفحة.')] })
+        .expect((r) => assert.equal(r.status, 201, JSON.stringify(r.body)))).body.data;
+      const ev = (await http.post(`/v1/submissions/${sub.submissionId}/evaluate`).set(auth(u)).expect(201)).body.data;
+      const item = (await pool.query(`select id from review_queue_item where evaluation_id = $1 order by criterion_key limit 1`, [ev.evaluationId])).rows[0];
+      if (!item) {
+        const checks = (await pool.query(`select payload from audit_event where subject_id = $1 or payload::text like '%' || $1 || '%' order by occurred_at desc limit 5`, [sub.submissionId])).rows.map((r) => JSON.stringify(r.payload).slice(0, 300));
+        assert.fail(`no human-review item (${ev.outcome}): ${checks.join(' | ')}`);
+      }
+      const reviewer = await newUser(); await http.post('/v1/me/bootstrap').set(auth(reviewer)).send({}).expect(201);
+      await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'e2e operator (A13 shadow)')`, [reviewer.id]);
+      const other = await newUser(); await http.post('/v1/me/bootstrap').set(auth(other)).send({}).expect(201);
+      await pool.query(`insert into reviewer_grant (user_id, role_performed, granted_by) values ($1, 'human_reviewer', 'e2e operator (A13 shadow)')`, [other.id]);
+      await http.post(`/v1/review/queue/${item.id}/assign`).set(auth(reviewer)).send({}).expect(201);
+      const a = (await http.get(`/v1/review/items/${item.id}/automated`).set(auth(reviewer)).expect(200)).body.data;
+      assert.match(a.noticeAr, /ليس قرارًا/); assert.match(a.calibrationAr, /غير معتمدة/);
+      assert.equal(a.source.commitSha, head);
+      assert.ok(a.suggestions.length > 0, 'one suggestion per rubric criterion');
+      for (const s of a.suggestions) {
+        assert.equal(s.escalate, true, `${s.criterionKey} is escalated in the shadow stage`);
+        assert.ok(s.confidence >= 0 && s.confidence <= 1);
+        assert.ok(!/REFERENCE|solution|planted/i.test(JSON.stringify(s)), 'no reviewer-only material in a suggestion');
+      }
+      if (a.testRun) assert.equal(a.testRun.commitSha, head, 'the observations are on the pinned commit');
+      const humanCrit = (await pool.query(`select key from rubric_criterion rc join evaluation_result er on er.rubric_version_id = rc.rubric_version_id where er.submission_id = $1 and rc.evaluator_type::text = 'human'`, [sub.submissionId])).rows.map((r) => r.key);
+      for (const k of humanCrit) assert.equal(a.suggestions.find((s: { criterionKey: string }) => s.criterionKey === k)?.suggestion, 'uncertain', `${k}: a human criterion is never suggested met/unmet`);
+      await http.get(`/v1/review/items/${item.id}/automated`).set(auth(other)).expect(403);
+      await http.get(`/v1/review/items/${item.id}/automated`).set(auth(u)).expect((r) => assert.ok(r.status === 403 || r.status === 404, `graduate: ${r.status}`));
+      const mine = (await http.get('/v1/me/proposals').set(auth(u)).expect(200)).body.data;
+      assert.ok(!JSON.stringify(mine).includes('criterion_suggestion'), 'the graduate never receives A13 suggestions');
+      const scores = Number((await one(`select count(*)::int n from evaluation_criterion_score s join evaluation_result er on er.id = s.evaluation_result_id where er.submission_id = $1`, [sub.submissionId])).n);
+      const before = scores;
+      await http.get(`/v1/review/items/${item.id}/automated`).set(auth(reviewer)).expect(200);
+      assert.equal(Number((await one(`select count(*)::int n from evaluation_criterion_score s join evaluation_result er on er.id = s.evaluation_result_id where er.submission_id = $1`, [sub.submissionId])).n), before, 'reading suggestions writes no score');
+    } finally { await restoreSafetyBaseline(pool, { byLabel: 'e2e (A13 shadow)' }); }
+  });
+
   test('webhooks: bad signatures are refused, deliveries are de-duplicated, uninstall and repository removal revoke access', async () => {
     const { u, login } = await startLeave();
     const linked = (await http.post('/v1/me/github/simulated-install').set(auth(u)).send({ login, repositories: [`${login}/leave-requests`, `${login}/team-tasks`] }).expect(201)).body.data;

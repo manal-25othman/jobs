@@ -12,6 +12,7 @@ import { SkillProgressModule } from '../skill-progress/skill-progress.module';
 import { AssessmentModule } from '../assessment/assessment.module';
 import { IntegrityModule } from '../integrity/integrity.module';
 import { ManagerModule } from '../manager/manager.module';
+import { AutomatedReviewService } from './automated-review.service';
 
-@Module({ imports: [StorageModule, AgentsModule, EvidenceModule, SkillProgressModule, AssessmentModule, IntegrityModule, ManagerModule], controllers: [ReviewController], providers: [SupabaseAuthGuard, HumanReviewerGuard, ReviewService, EvaluationService, MaterialService] })
+@Module({ imports: [StorageModule, AgentsModule, EvidenceModule, SkillProgressModule, AssessmentModule, IntegrityModule, ManagerModule], controllers: [ReviewController], providers: [SupabaseAuthGuard, HumanReviewerGuard, ReviewService, EvaluationService, MaterialService, AutomatedReviewService] })
 export class ReviewModule {}

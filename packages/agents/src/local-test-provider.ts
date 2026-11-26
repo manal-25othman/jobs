@@ -153,7 +153,31 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
   }];
 }
 
+/** A13 review context: per-criterion suggestions computed by the domain rules; the template only phrases them. */
+interface ReviewContext {
+  readonly capability: 'review_suggestion';
+  readonly items: readonly { readonly criterionKey: string; readonly labelAr: string; readonly suggestion: 'met' | 'unmet' | 'uncertain'; readonly confidence: number;
+    readonly excerptAr: string; readonly basis: readonly ('tests' | 'rule')[]; readonly escalationReasons: readonly string[] }[];
+}
+
+const SUGGESTION_AR = { met: 'يبدو مستوفى', unmet: 'يبدو غير مستوفى', uncertain: 'غير محسوم آليًا' } as const;
+
+function reviewSuggestionCandidates(r: ReviewContext): unknown[] {
+  return r.items.map((i) => ({
+    proposalType: 'criterion_suggestion', subjectType: 'submission', subjectId: i.criterionKey,
+    summary: `${i.labelAr}: ${SUGGESTION_AR[i.suggestion]}`,
+    structuredPayload: { kind: 'criterion_suggestion', criterionKey: i.criterionKey, suggestion: i.suggestion, confidence: i.confidence, excerptAr: i.excerptAr, basis: i.basis,
+      explanationAr: i.basis.length === 0 ? 'لا ملاحظة آلية تغطي هذا البند؛ يقرره المراجِع.'
+        : `اعتمادًا على ${i.basis.map((b) => (b === 'tests' ? 'الاختبارات الآلية' : 'الفحص الحتمي')).join(' و')}: «${i.excerptAr}». القرار للمراجِع.`,
+      escalate: true, escalationReasons: i.escalationReasons },
+    evidenceRefs: [], sourceRefs: [{ kind: 'criterion', id: i.criterionKey }], warnings: i.escalationReasons.map((x) => `escalate:${x}`), requiresUserApproval: true,
+    rationale: 'a suggestion for the assigned reviewer, grounded in the item\'s own observations; the reviewer decides',
+  }));
+}
+
 function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const review = ctx['reviewContext'] as ReviewContext | undefined;
+  if (review?.capability === 'review_suggestion') return reviewSuggestionCandidates(review);
   const guidance = ctx['guidanceRequest'] as LearningGuidanceRequest | undefined;
   if (guidance?.capability === 'learning_guidance') return learningGuidanceCandidates(guidance);
   const hints = ctx['guidanceRequest'] as ImprovementHintsRequest | undefined;
