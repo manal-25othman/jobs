@@ -10,6 +10,7 @@
     "packages/config",
     "packages/ui",
     "apps/app",
+    "apps/runner",
     "apps/api"
   ],
   "engines": {

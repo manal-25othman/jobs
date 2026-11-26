@@ -114,6 +114,18 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'off (default) or internal. internal shows UNVERIFIED candidate learning resources, labelled and audited, to internal testers in a development deployment that shows demo content. Refused when NODE_ENV=production (Phase B, PO decision 2).',
     example: 'off', validate: oneOf('off', 'internal') },
 
+  { name: 'GITHUB_MODE', scope: 'api', required: false, secret: false,
+    description: 'off (default) or simulated. simulated is an in-memory TEST double of the GitHub App integration with synthetic repositories; no GitHub request is ever made. Refused when NODE_ENV=production. A real GitHub App arrives only after the owner approves the design (Phase C round 2, item 1).',
+    example: 'off', validate: oneOf('off', 'simulated') },
+
+  { name: 'GITHUB_WEBHOOK_SECRET', scope: 'api', required: false, secret: true,
+    description: 'Secret that signs GitHub webhook deliveries (X-Hub-Signature-256). Required when GITHUB_MODE is not off; at least 32 characters.',
+    example: '', validate: (v) => (v.length >= 32 ? null : 'must be at least 32 characters') },
+
+  { name: 'R2_MODE', scope: 'api', required: false, secret: false,
+    description: 'off (default) or synthetic_dev. synthetic_dev runs team-written test packs on SYNTHETIC code in the development namespace sandbox (apps/runner), in shadow mode. Refused when NODE_ENV=production: real graduate code needs the approved security review and a kernel-isolating backend (Phase C round 2, item 2).',
+    example: 'off', validate: oneOf('off', 'synthetic_dev') },
+
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
     validate: oneOf('debug', 'info', 'warn', 'error') },
@@ -171,6 +183,15 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
   }
   if (env['NODE_ENV'] === 'production' && env['LEARNING_CANDIDATE_PREVIEW'] === 'internal') {
     problems.push('LEARNING_CANDIDATE_PREVIEW=internal shows unverified learning resources and is refused in production (PO decision 2)');
+  }
+  if (env['NODE_ENV'] === 'production' && env['GITHUB_MODE'] === 'simulated') {
+    problems.push('GITHUB_MODE=simulated is a test double and is refused in production; the real GitHub App is not approved yet');
+  }
+  if (env['GITHUB_MODE'] && env['GITHUB_MODE'] !== 'off' && !env['GITHUB_WEBHOOK_SECRET']) {
+    problems.push('GITHUB_WEBHOOK_SECRET is required when GITHUB_MODE is not off (webhook deliveries must be verified)');
+  }
+  if (env['NODE_ENV'] === 'production' && env['R2_MODE'] === 'synthetic_dev') {
+    problems.push('R2_MODE=synthetic_dev is the development sandbox for synthetic code and is refused in production (security review not approved)');
   }
   if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
     problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');

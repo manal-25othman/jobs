@@ -1,0 +1,11 @@
+{
+  "name": "@naqla/runner",
+  "version": "0.0.0",
+  "private": true,
+  "description": "R2 isolated test runner (development backend, SYNTHETIC code only). Runs team-written test packs against a pinned code snapshot inside a namespace sandbox; assertions run outside the sandbox. No database, no network, no secrets.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "npm run build && node --test --test-concurrency=1 dist/**/*.test.js", "clean": "rm -rf dist" },
+  "dependencies": { "@naqla/domain": "*", "playwright-core": "^1.56.1" },
+  "devDependencies": { "@types/node": "22.10.2", "typescript": "5.9.3" }
+}

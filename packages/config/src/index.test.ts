@@ -103,6 +103,16 @@ describe('config validation', () => {
     } catch (e) { assert.ok(e instanceof ConfigError); assert.ok(e.problems.some((p) => p.includes('AGENT_BUDGET_CALLS_PER_DAY'))); }
   });
 
+  test('Phase C round 2: the simulated GitHub double and the R2 development sandbox are refused in production; webhooks need a secret', () => {
+    const prod = { ...base, NODE_ENV: 'production', SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_JWT_SECRET: 'j', DATABASE_URL: 'postgresql://x@y:5432/z', AGENT_BUDGET_CALLS_PER_DAY: '5', CORS_ALLOWED_ORIGINS: 'https://app.example.org' };
+    for (const [extra, needle] of [[{ GITHUB_MODE: 'simulated', GITHUB_WEBHOOK_SECRET: 'x'.repeat(32) }, 'GITHUB_MODE'], [{ R2_MODE: 'synthetic_dev' }, 'R2_MODE']] as const) {
+      try { loadEnv({ scope: 'api', env: { ...prod, ...extra } }); assert.fail('expected ConfigError'); }
+      catch (e) { assert.ok(e instanceof ConfigError && e.problems.some((p) => p.includes(needle)), needle); }
+    }
+    try { loadEnv({ scope: 'api', env: { ...base, GITHUB_MODE: 'simulated' } }); assert.fail('expected ConfigError'); }
+    catch (e) { assert.ok(e instanceof ConfigError && e.problems.some((p) => p.includes('GITHUB_WEBHOOK_SECRET'))); }
+  });
+
   test('.env.example renders every variable in the spec', () => {
     const rendered = renderEnvExample();
     for (const v of ENV_SPEC) assert.ok(rendered.includes(v.name), `${v.name} missing from .env.example`);
