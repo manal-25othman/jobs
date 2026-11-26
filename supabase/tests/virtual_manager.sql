@@ -64,4 +64,17 @@ end $$;
 reset role;
 
 -- Fixtures stay (content and history are never deleted); they are named vm-proof-*.
+-- 0044 (A11 M3): at most one code-review comment after the submission, and one or two interventions during the work.
+insert into activity_spec (id, slug, version, status, title_ar, ai_usage_mode, spec, is_demo_fixture) values
+  ('c2000000-0000-4000-8000-000000000012', 'vm-proof-activity-m3', '1.0.0', 'draft', 'نشاط', 'ai_assisted', '{}'::jsonb, true);
+insert into manager_scenario (activity_spec_id, scenario_version, persona_ar, scenario, is_demo_fixture, created_by_label, reason) values
+  ('c2000000-0000-4000-8000-000000000012', '0.2.0', 'مديرة', '{"interventions":[{"key":"kickoff","trigger":"project_started"},{"key":"review","trigger":"submission_received"}],"neverReveal":["x"]}', true, 'proof', '0044 proof');
+do $$ begin raise notice 'PASS  0044: a scenario may add one code-review comment after the submission'; end $$;
+select vm_must_fail($$insert into manager_scenario (activity_spec_id, scenario_version, persona_ar, scenario, created_by_label, reason) values
+  ('c2000000-0000-4000-8000-000000000012', '0.3.0', 'مديرة', '{"interventions":[{"key":"a","trigger":"project_started"},{"key":"b","trigger":"first_draft_saved"},{"key":"c","trigger":"project_started"}]}', 'proof', 'too many')$$,
+  '0044: still one or two interventions during the work (S11)', 'manager_scenario_scenario_check');
+select vm_must_fail($$insert into manager_scenario (activity_spec_id, scenario_version, persona_ar, scenario, created_by_label, reason) values
+  ('c2000000-0000-4000-8000-000000000012', '0.4.0', 'مديرة', '{"interventions":[{"key":"r","trigger":"submission_received"}]}', 'proof', 'none during work')$$,
+  '0044: a code-review comment alone is not a scenario', 'manager_scenario_scenario_check');
+
 drop function vm_must_fail(text, text, text);

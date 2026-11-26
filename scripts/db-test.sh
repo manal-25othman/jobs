@@ -105,13 +105,14 @@ if psql "$TARGET" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0026_eng1_p2
 fi
 echo "PASS  0026 rollback refused (per-skill history is never deleted by a rollback)"
 
-echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0043, 0042, 0041, 0040, 0039, 0038, 0037, 0036, 0035, 0034, 0033, 0032, 0031, 0030, 0029, 0028, 0027, 0026, 0025) → up"
+echo "==> ENG-1 / O-2 migration round-trip on a separate database: up → down (0044, 0043, 0042, 0041, 0040, 0039, 0038, 0037, 0036, 0035, 0034, 0033, 0032, 0031, 0030, 0029, 0028, 0027, 0026, 0025) → up"
 RT="${DB}_roundtrip"; RTURL="${PGURL%/*}/$RT"
 psql "$PGURL" -v ON_ERROR_STOP=1 -q -c "drop database if exists $RT;" -c "create database $RT;" >/dev/null
 for f in "$ROOT"/supabase/migrations/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 for f in "$ROOT"/supabase/seed/*.sql; do psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null; done
 shape() { psql "$RTURL" -At -c "select string_agg(table_name||'.'||column_name, ',' order by table_name, column_name) from information_schema.columns where table_schema = 'public'"; }
 after_up="$(shape)"
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0044_manager_code_review.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0043_github_source_and_test_runs.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0042_virtual_manager.down.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/rollback/0041_skill_self_assessment.down.sql" >/dev/null
@@ -165,6 +166,7 @@ psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0040_learning_
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0041_skill_self_assessment.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0042_virtual_manager.sql" >/dev/null
 psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0043_github_source_and_test_runs.sql" >/dev/null
+psql "$RTURL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0044_manager_code_review.sql" >/dev/null
 [[ "$(shape)" == "$after_up" ]] || { echo "FAIL  re-applying 0025/0026 did not restore the same schema" >&2; exit 1; }
 legacy="$(psql "$RTURL" -At -c "select count(*) from rubric_version where activity_spec_version is null")"
 echo "PASS  re-applied: identical schema; $legacy pre-existing rubric version(s) left unbound (legacy rows are never re-bound)"

@@ -14,13 +14,14 @@ export const MANAGER_LABEL_AR = 'مدير افتراضي: نظام آلي، لا
 export const MANAGER_NOT_SCORED_AR = 'ردودك تُحفظ مع عملك ويطّلع عليها المراجِع، ولا تُقيَّم في هذه المرحلة.';
 export const MANAGER_CAP_REACHED_AR = 'انتهى عدد الرسائل المتاحة مع المدير في هذا النشاط. اتخذي القرار الذي ترينه مناسبًا واذكري سببه في ملاحظات التسليم.';
 
-export const INTERVENTION_TRIGGERS = ['project_started', 'first_draft_saved'] as const;
-export const INTERVENTION_PURPOSES = ['ambiguity', 'requirement_change', 'decision_rationale'] as const;
+/** M3 adds `submission_received`: a team member's code-review comment after the work is handed in (training on feedback). */
+export const INTERVENTION_TRIGGERS = ['project_started', 'first_draft_saved', 'submission_received'] as const;
+export const INTERVENTION_PURPOSES = ['ambiguity', 'requirement_change', 'decision_rationale', 'code_review_feedback'] as const;
 export type InterventionTrigger = (typeof INTERVENTION_TRIGGERS)[number];
 export type InterventionPurpose = (typeof INTERVENTION_PURPOSES)[number];
 
 export const PURPOSE_AR: Record<InterventionPurpose, string> = {
-  ambiguity: 'التعامل مع الغموض', requirement_change: 'تغيّر في المتطلبات', decision_rationale: 'شرح سبب القرار',
+  ambiguity: 'التعامل مع الغموض', requirement_change: 'تغيّر في المتطلبات', decision_rationale: 'شرح سبب القرار', code_review_feedback: 'الرد على ملاحظات مراجعة الكود',
 };
 
 export interface ManagerClarification { readonly topicAr: string; readonly keywordsAr: readonly string[]; readonly answerAr: string }
@@ -50,7 +51,12 @@ export function assertManagerScenario(s: unknown): asserts s is ManagerScenario 
   if (!x || typeof x !== 'object') bad('not an object');
   if (!str(x['personaAr'], 120)) bad('personaAr is required');
   const iv = x['interventions'];
-  if (!Array.isArray(iv) || iv.length < 1 || iv.length > 2) bad('one or two interventions (S11: «رسالة أو رسالتان»)');
+  // S11: «رسالة أو رسالتان» during the work; M3 adds at most one code-review comment after the submission.
+  if (!Array.isArray(iv) || iv.length < 1 || iv.length > 3) bad('one to three interventions');
+  const during = (iv as Record<string, unknown>[]).filter((i) => i['trigger'] !== 'submission_received').length;
+  if (during < 1 || during > 2) bad('one or two interventions during the work (S11: «رسالة أو رسالتان»)');
+  if ((iv as Record<string, unknown>[]).filter((i) => i['trigger'] === 'submission_received').length > 1) bad('at most one code-review comment after the submission');
+  for (const i of iv as Record<string, unknown>[]) if ((i['trigger'] === 'submission_received') !== (i['purpose'] === 'code_review_feedback')) bad('the code-review comment comes after the submission, and only then');
   const keys = new Set<string>();
   for (const i of iv as Record<string, unknown>[]) {
     if (!/^[a-z][a-z0-9_]{1,30}$/.test(String(i['key']))) bad(`bad intervention key ${String(i['key'])}`);
@@ -71,9 +77,10 @@ export function assertManagerScenario(s: unknown): asserts s is ManagerScenario 
 export interface TurnRecord { readonly interventionKey: string; readonly author: 'manager' | 'graduate'; readonly kind: string }
 
 /** Interventions due now and not yet delivered, in scenario order. */
-export function dueInterventions(s: ManagerScenario, state: { readonly projectStarted: boolean; readonly draftSaved: boolean; readonly delivered: readonly string[] }): ManagerIntervention[] {
+export function dueInterventions(s: ManagerScenario, state: { readonly projectStarted: boolean; readonly draftSaved: boolean; readonly submitted?: boolean; readonly delivered: readonly string[] }): ManagerIntervention[] {
   return s.interventions.filter((i) => !state.delivered.includes(i.key)
-    && ((i.trigger === 'project_started' && state.projectStarted) || (i.trigger === 'first_draft_saved' && state.draftSaved)));
+    && ((i.trigger === 'project_started' && state.projectStarted) || (i.trigger === 'first_draft_saved' && state.draftSaved)
+      || (i.trigger === 'submission_received' && state.submitted === true)));
 }
 
 export interface CapState { readonly totalUsed: number; readonly totalCap: number; readonly remainingFor: (key: string) => number; readonly reached: boolean }

@@ -838,6 +838,12 @@ describe('GitHub source + R2 shadow runs (Phase C round 2; simulated GitHub, syn
     assert.equal(second.commitSha, head); assert.notEqual(second.snapshotHash, first.snapshotHash);
     const attempts = (await http.get(`/v1/projects/${pid}/attempts`).set(auth(u)).expect(200)).body.data;
     assert.deepEqual(attempts.map((a: { source: { commitSha: string } }) => a.source.commitSha), [starter, head], 'each attempt keeps its own commit');
+    // A11 M3: after the submission, a team member's code-review comment arrives; the graduate answers it (not scored).
+    const mv = (await http.get(`/v1/projects/${pid}/manager`).set(auth(u)).expect(200)).body.data;
+    const review = mv.interventions.find((i: { purposeAr: string }) => /مراجعة الكود/.test(i.purposeAr));
+    assert.ok(review, `a code-review comment is delivered after the submission (${JSON.stringify(mv.interventions)})`);
+    const reply = (await http.post(`/v1/projects/${pid}/manager/messages`).set(auth(u)).send({ interventionKey: review.key, body: 'شكرًا، سأكتب رسائل إيداع أوضح. هل أعيد كتابة السجل؟' }).expect(201)).body.data;
+    assert.ok(reply.turns.some((t: { kind: string }) => t.kind === 'reply'));
     if (first.testRun?.ran && second.testRun?.ran) {
       const passed = (r: { tests: { outcome: string; mode: string }[] }) => r.tests.filter((t) => t.mode === 'automated' && t.outcome === 'pass').length;
       assert.ok(passed(second.testRun) > passed(first.testRun), `the fixed commit passes more automated tests (${passed(first.testRun)} → ${passed(second.testRun)})`);

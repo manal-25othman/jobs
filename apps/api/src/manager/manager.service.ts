@@ -57,7 +57,9 @@ export class ManagerService {
       if (!scenario) return { available: false as const, labelAr: MANAGER_LABEL_AR, reasonAr: 'لا رسائل من مدير افتراضي في هذا النشاط.' };
       const existing = await this.turns(c, projectId);
       const draftSaved = (await c.query(`select exists (select 1 from project_draft where project_id = $1) or exists (select 1 from submission where project_id = $1) as v`, [projectId])).rows[0].v === true;
-      for (const i of dueInterventions(scenario.body, { projectStarted: true, draftSaved, delivered: existing.filter((t) => t.kind === 'intervention').map((t) => t.interventionKey) })) {
+      // A11 M3: after the first submission, a team member's code-review comment (training on feedback; not scored).
+      const submitted = (await c.query(`select exists (select 1 from submission where project_id = $1) as v`, [projectId])).rows[0].v === true;
+      for (const i of dueInterventions(scenario.body, { projectStarted: true, draftSaved, submitted, delivered: existing.filter((t) => t.kind === 'intervention').map((t) => t.interventionKey) })) {
         const r = await c.query(`insert into manager_turn (project_id, user_id, scenario_id, intervention_key, author, kind, body) values ($1,$2,$3,$4,'manager','intervention',$5)
                                   on conflict do nothing returning id`, [projectId, userId, scenario.id, i.key, i.messageAr]);
         if (r.rowCount) await emitAuditEvent(c, { eventType: 'manager.intervened', userId, actorKind: 'system', subjectTable: 'manager_turn', subjectId: r.rows[0].id,
@@ -118,7 +120,11 @@ export class ManagerService {
                                     join submission s on s.id = e.submission_id where q.id = $1`, [itemId])).rows[0];
       if (!item) throw new NotFoundException('review item not found');
       if (item.assigned_to !== reviewerId) throw new ForbiddenException('this item is assigned to another reviewer');
-      const turns = (await this.turns(c, item.project_id)).filter((t) => t.createdAt <= new Date(item.submitted_at).toISOString());
+      // The conversation up to the submission, plus the code-review exchange that follows it (M3) — both unscored.
+      const sc = (await c.query(`select s.scenario from manager_scenario s join project p on p.activity_spec_id = s.activity_spec_id where p.id = $1 order by s.created_at desc limit 1`, [item.project_id])).rows[0]?.scenario as ManagerScenario | undefined;
+      const reviewKeys = new Set((sc?.interventions ?? []).filter((i) => i.trigger === 'submission_received').map((i) => i.key));
+      const turns = (await this.turns(c, item.project_id)).filter((t) => t.createdAt <= new Date(item.submitted_at).toISOString() || reviewKeys.has(t.interventionKey))
+        .map((t) => ({ ...t, afterSubmission: reviewKeys.has(t.interventionKey) }));
       await emitAuditEvent(c, { eventType: 'manager.reviewer_read', userId: null, actorKind: 'human_reviewer', actorId: reviewerId, rolePerformed: 'human_reviewer',
         subjectTable: 'project', subjectId: item.project_id, reason: 'an assigned reviewer read the virtual-manager conversation of the work under review', payload: { reviewItemId: itemId, turns: turns.length } });
       return { labelAr: MANAGER_LABEL_AR, notScoredAr: MANAGER_NOT_SCORED_AR, turns };

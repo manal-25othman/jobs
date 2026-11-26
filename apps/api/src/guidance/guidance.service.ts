@@ -98,7 +98,13 @@ export class GuidanceService {
       { resultId: string | null; rubricVersion: string | null; criteria: { criterion_key: string; score: number | string | null; max_score: number | string; rationale: string | null; nameAr: string | null }[] } | null;
     toolsUsed.push('my_feedback');
     if (!view || !view.resultId) throw new ConflictException('[no_result_yet] لا توجد نتيجة تقييم لهذا العمل بعد؛ التلميحات تأتي بعد النتيجة.');
-    const unmet = view.criteria.filter((c) => c.score !== null && Number(c.score) < Number(c.max_score));
+    // Phase C round 2: failed automated tests on the pinned commit (neutral labels only) are a second source of "where
+    // to look". They are observations, not a score; the criterion's own result is unchanged.
+    const run = await this.db.asService(async (c) => (await c.query(`select t.result from test_run t join submission s on s.id = t.submission_id
+      where t.submission_id = $1 and s.user_id = $2 order by t.created_at desc limit 1`, [body.submissionId, userId])).rows[0]?.result as { tests: { criterionKey: string; labelAr: string; outcome: string; mode: string }[] } | undefined);
+    const failedTests = (run?.tests ?? []).filter((t) => t.mode === 'automated' && t.outcome === 'fail' && safe(t.labelAr));
+    if (run) toolsUsed.push('my_test_results');
+    const unmet = view.criteria.filter((c) => (c.score !== null && Number(c.score) < Number(c.max_score)) || failedTests.some((t) => t.criterionKey === c.criterion_key));
     if (unmet.length === 0) return { noneAr: 'كل البنود مستوفاة في هذه النتيجة؛ لا تلميحات.', level };
     const meta = await this.db.asService(async (c) => (await c.query(
       `select rc.key, rc.mandatory, rc.linked_skill_id from rubric_criterion rc join evaluation_result er on er.rubric_version_id = rc.rubric_version_id where er.id = $1`, [view.resultId])).rows);
@@ -109,7 +115,9 @@ export class GuidanceService {
       const name = c.nameAr && safe(c.nameAr) ? c.nameAr : 'هذا البند';
       let hint: string;
       if (level === 1) {
-        hint = `انظري في عملك إلى ما يقيسه «${name}».${c.rationale && safe(c.rationale) ? ` ما سجّله التقييم: ${c.rationale}` : ' اقرئي ملاحظة التقييم على هذا البند في صفحة النتيجة.'}`;
+        const ft = failedTests.filter((t) => t.criterionKey === c.criterion_key).map((t) => `«${t.labelAr}»`).slice(0, 2);
+        hint = `انظري في عملك إلى ما يقيسه «${name}».${c.rationale && safe(c.rationale) ? ` ما سجّله التقييم: ${c.rationale}` : ' اقرئي ملاحظة التقييم على هذا البند في صفحة النتيجة.'}`
+          + (ft.length ? ` اختبار آلي لم ينجح في هذه النسخة: ${ft.join('، ')}. جرّبي السلوك نفسه بنفسك.` : '');
       } else {
         let skill: Awaited<ReturnType<GuidanceTools['skill']>> | null = null;
         if (m?.linked_skill_id) {

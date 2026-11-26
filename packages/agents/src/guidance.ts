@@ -20,7 +20,7 @@ export type GuidanceCapability = (typeof GUIDANCE_CAPABILITIES)[number];
 export type ToolScope = 'own_data' | 'visible_content' | 'verified_registry';
 
 export interface GuidanceToolSpec {
-  readonly name: 'occupation_profile' | 'skill_explanation' | 'approved_resources' | 'skill_activities' | 'my_progress' | 'my_feedback';
+  readonly name: 'occupation_profile' | 'skill_explanation' | 'approved_resources' | 'skill_activities' | 'my_progress' | 'my_feedback' | 'my_test_results';
   readonly purposeAr: string;
   readonly scope: ToolScope;
   readonly contract: string;
@@ -34,6 +34,7 @@ export const GUIDANCE_TOOLS: readonly GuidanceToolSpec[] = [
   { name: 'skill_activities', purposeAr: 'أنشطة الدور التي تتدرّب فيها على المهارة', scope: 'visible_content', contract: 'A07', capabilities: ['career_guidance', 'learning_guidance'] },
   { name: 'my_progress', purposeAr: 'تقدّمك: مستوى التحقق، والأدلة المُقيَّمة، والأعمال الجارية — لك وحدك', scope: 'own_data', contract: 'A01/A02', capabilities: ['career_guidance', 'learning_guidance'] },
   { name: 'my_feedback', purposeAr: 'نتيجة تقييم عملك وملاحظات كل معيار — لصاحب العمل وحده', scope: 'own_data', contract: 'A13/A15', capabilities: ['assessment_feedback', 'improvement_hints'] },
+  { name: 'my_test_results', purposeAr: 'نتائج الاختبارات الآلية على النسخة التي سلّمتِها (أسماء محايدة فقط) — لصاحب العمل وحده', scope: 'own_data', contract: 'A15/A03', capabilities: ['improvement_hints'] },
 ];
 
 export interface CapabilitySpec {
