@@ -70,6 +70,39 @@ export const RULES: readonly Rule[] = [
       requestedAction: 'draft the requested career claim from existing evidence only',
       expectedProposalTypes: ['cv_bullet', 'project_description', 'professional_summary', 'linkedin_headline', 'linkedin_about', 'linkedin_skill', 'linkedin_project', 'case_study', 'recruiter_next_action'] },
   },
+  // Phase B package 5: the three guidance capabilities, on the graduate's request only. Read → propose → explain.
+  {
+    ruleId: 'R7-career-guidance-to-recruitment',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'career_guidance',
+    route: { ruleId: 'R7-career-guidance-to-recruitment', agentType: 'recruitment',
+      requestedAction: 'explain the career state: one next step and the role gaps (A01/A02/A04)', expectedProposalTypes: ['recruiter_next_action', 'profile_gap'] },
+  },
+  {
+    ruleId: 'R8-learning-guidance-to-technical',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'learning_guidance',
+    route: { ruleId: 'R8-learning-guidance-to-technical', agentType: 'technical',
+      requestedAction: 'guide learning and practice for one skill (A07/A03)', expectedProposalTypes: ['technical_next_action', 'followup_question'] },
+  },
+  {
+    ruleId: 'R9-assessment-feedback-to-technical',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'assessment_feedback',
+    route: { ruleId: 'R9-assessment-feedback-to-technical', agentType: 'technical',
+      requestedAction: 'explain the recorded evaluation and the way to improve (A13/A15)', expectedProposalTypes: ['rubric_explanation', 'technical_feedback', 'technical_next_action', 'missing_evidence'] },
+  },
+  {
+    // R1 (code-review guidance): progressive hints per unmet criterion of the graduate's own result (A15/A03).
+    ruleId: 'R11-improvement-hints-to-technical',
+    when: (e) => e.type === 'user.requested' && e.facts['capability'] === 'improvement_hints',
+    route: { ruleId: 'R11-improvement-hints-to-technical', agentType: 'technical',
+      requestedAction: 'progressive hints per unmet criterion; never code (A15/A03)', expectedProposalTypes: ['improvement_action'] },
+  },
+  {
+    // A11 (FR-U-026): the graduate writes to the virtual manager of their work simulation; the cap is checked before.
+    ruleId: 'R10-manager-message-to-virtual-manager',
+    when: (e) => e.type === 'user.requested' && e.facts['managerTurn'] === true,
+    route: { ruleId: 'R10-manager-message-to-virtual-manager', agentType: 'virtual_manager',
+      requestedAction: 'reply once in the persona of the virtual manager (A11)', expectedProposalTypes: ['manager_turn'] },
+  },
 ];
 
 /** First matching rule wins. Returns null when no agent should run. */

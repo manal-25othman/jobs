@@ -15,7 +15,7 @@ export const PROPOSAL_SCHEMA_VERSION = '1.4.0';
 
 /* ───────────────────────────── agent registry ──────────────────────────── */
 
-export const AGENT_TYPES = ['recruitment', 'technical', 'learning', 'personal_branding', 'business'] as const;
+export const AGENT_TYPES = ['recruitment', 'technical', 'learning', 'personal_branding', 'business', 'virtual_manager'] as const;
 export type AgentType = (typeof AGENT_TYPES)[number];
 
 export interface AgentDefinition {
@@ -42,7 +42,10 @@ export const TECHNICAL_PROPOSAL_TYPES = [
   'validation_activity', 'missing_evidence', 'technical_next_action',
 ] as const;
 
-export const PROPOSAL_TYPES = [...RECRUITMENT_PROPOSAL_TYPES, ...TECHNICAL_PROPOSAL_TYPES] as const;
+/** A11 Virtual Manager (FR-U-026): one manager turn in the work simulation. */
+export const MANAGER_PROPOSAL_TYPES = ['manager_turn'] as const;
+
+export const PROPOSAL_TYPES = [...RECRUITMENT_PROPOSAL_TYPES, ...TECHNICAL_PROPOSAL_TYPES, ...MANAGER_PROPOSAL_TYPES] as const;
 export type ProposalType = (typeof PROPOSAL_TYPES)[number];
 
 /** Proposals that change professional wording. These ALWAYS need the user. */
@@ -64,6 +67,8 @@ export const AGENTS: readonly AgentDefinition[] = [
       'claimRequest',
       // Phase 7b: the recorded facts (ids, kinds, values) behind new evidence, so a draft can declare its plan.
       'claimFacts',
+      // Phase B package 5: a guidance request (career_guidance) — the A01 next step and the A02 snapshot facts.
+      'guidanceRequest',
     ],
     proposalTypes: RECRUITMENT_PROPOSAL_TYPES,
   },
@@ -74,9 +79,15 @@ export const AGENTS: readonly AgentDefinition[] = [
       'deterministicResults', 'userExplanation', 'aiDisclosure', 'existingEvidence', 'ambiguity',
       // Career Data Foundation: the structured activity (deliverables, skills, tasks, rubric criteria).
       'activityContext',
+      // Phase B package 5: a guidance request (learning_guidance / assessment_feedback) — learner-visible facts only.
+      'guidanceRequest',
     ],
     proposalTypes: TECHNICAL_PROPOSAL_TYPES,
   },
+  // A11 Virtual Manager (FR-U-026 / FR-A-002): its own contract, on the same gateway. It sees the learner-facing
+  // scenario of the current intervention and the graduate's message only — never the never-reveal list, a reference
+  // solution, a rubric or a planted defect.
+  { agentId: 'A11-MGR', agentType: 'virtual_manager', implemented: true, allowedContext: ['managerContext'], proposalTypes: MANAGER_PROPOSAL_TYPES },
   // Extension contracts only. The gateway refuses to invoke them.
   { agentId: 'A-LEARN', agentType: 'learning', implemented: false, allowedContext: [], proposalTypes: [] },
   { agentId: 'A-BRAND', agentType: 'personal_branding', implemented: false, allowedContext: [], proposalTypes: [] },
@@ -126,7 +137,7 @@ export interface AgentInvocation {
 export const PROPOSAL_LIFECYCLE = ['generated', 'validated', 'awaiting_user', 'approved', 'rejected', 'superseded'] as const;
 export type ProposalLifecycle = (typeof PROPOSAL_LIFECYCLE)[number];
 
-export type SubjectType = 'skill_claim' | 'evidence' | 'evaluation_result' | 'professional_asset' | 'career_goal' | 'submission';
+export type SubjectType = 'skill_claim' | 'evidence' | 'evaluation_result' | 'professional_asset' | 'career_goal' | 'submission' | 'project';
 
 export interface AgentProposal {
   readonly proposalId: string;
@@ -148,6 +159,7 @@ export interface AgentProposal {
 
 /** Every payload is one of these. An arbitrary blob is not a proposal. */
 export type ProposalPayload =
+  | ManagerTurnPayload
   | WordingPayload
   | GapPayload
   | ActionPayload
@@ -177,6 +189,15 @@ export interface WordingPayload {
    * CHECKED by Claim-to-Fact Grounding, never trusted as evidence.
    */
   readonly claimPlan?: import('./claim-grounding.js').ClaimPlan;
+}
+
+/** A11: one manager turn. `basis` says where the words come from; a model reply must still pass the A11 guard. */
+export interface ManagerTurnPayload {
+  readonly kind: 'manager_turn';
+  readonly interventionKey: string;
+  readonly replyAr: string;
+  readonly basis: 'clarification' | 'refusal' | 'no_detail';
+  readonly clarificationTopic: string | null;
 }
 
 export interface GapPayload {

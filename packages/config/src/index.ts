@@ -106,6 +106,14 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'Per-user daily cap on agent invocations. Development default 50. REQUIRED in production: the real value is TBD until a provider is connected and cost is measured (D-073).', example: '50',
     validate: (v) => (/^\d+$/.test(v) ? null : 'must be an integer') },
 
+  { name: 'CORS_ALLOWED_ORIGINS', scope: 'api', required: false, secret: false,
+    description: 'Comma-separated browser origins allowed to call the API (e.g. the app URL). REQUIRED in production, where "*" is refused. Unset outside production: any origin (development only). S0, backlog P0-3.',
+    example: 'http://localhost:3000', validate: (v) => (v.split(',').every((o) => o.trim() === '*' || /^https?:\/\/[^/\s]+$/.test(o.trim())) ? null : 'must be comma-separated origins like https://app.example.com') },
+
+  { name: 'LEARNING_CANDIDATE_PREVIEW', scope: 'api', required: false, secret: false,
+    description: 'off (default) or internal. internal shows UNVERIFIED candidate learning resources, labelled and audited, to internal testers in a development deployment that shows demo content. Refused when NODE_ENV=production (Phase B, PO decision 2).',
+    example: 'off', validate: oneOf('off', 'internal') },
+
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
     validate: oneOf('debug', 'info', 'warn', 'error') },
@@ -158,6 +166,12 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
   if (env['NODE_ENV'] === 'production' && env['AGENT_PROVIDER'] === 'local-test') {
     problems.push('AGENT_PROVIDER=local-test is TEST/NON-PRODUCTION and is refused in production (OPEN-023 unresolved)');
   }
+  if (env['NODE_ENV'] === 'production' && (!env['CORS_ALLOWED_ORIGINS'] || env['CORS_ALLOWED_ORIGINS'].split(',').some((o) => o.trim() === '*'))) {
+    problems.push('CORS_ALLOWED_ORIGINS is required in production and may not be "*" (backlog P0-3)');
+  }
+  if (env['NODE_ENV'] === 'production' && env['LEARNING_CANDIDATE_PREVIEW'] === 'internal') {
+    problems.push('LEARNING_CANDIDATE_PREVIEW=internal shows unverified learning resources and is refused in production (PO decision 2)');
+  }
   if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
     problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');
   }
@@ -186,4 +200,19 @@ export function renderEnvExample(): string {
     }
   }
   return lines.join('\n');
+}
+
+/** S0 / P0-3: the CORS origin rule. Outside production with nothing set, any origin (development); else the list. */
+export function corsOrigins(env: Readonly<Record<string, string | undefined>>): true | string[] {
+  const raw = env['CORS_ALLOWED_ORIGINS'];
+  if (!raw) {
+    if (env['NODE_ENV'] === 'production') throw new ConfigError(['CORS_ALLOWED_ORIGINS is required in production']);
+    return true;
+  }
+  const list = raw.split(',').map((o) => o.trim()).filter(Boolean);
+  if (list.includes('*')) {
+    if (env['NODE_ENV'] === 'production') throw new ConfigError(['CORS_ALLOWED_ORIGINS may not be "*" in production']);
+    return true;
+  }
+  return list;
 }

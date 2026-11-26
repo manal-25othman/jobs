@@ -1,0 +1,79 @@
+{
+ "_label": "DRAFT / CANDIDATE — virtual-manager scenarios (A11) for the Junior Frontend v2 development pilot. NOT REVIEWED, NOT APPROVED.",
+ "_note": "FR-U-026 / FR-A-002, journey S11. One or two interventions per activity, each with a stated assessment purpose and a trigger. The manager speaks in business language, clarifies partially, never gives a solution or steps, never hints at a score, and never says anything in neverReveal (assessment design; never sent to an agent). Requires expert review before any approval. Internal development pilot only.",
+ "version": "0.1.0",
+ "activities": {
+  "act_fe_debug_improve": {
+   "personaAr": "مديرة المنتج في فريق الفعاليات",
+   "capMessages": 4,
+   "interventions": [
+    {
+     "key": "kickoff", "trigger": "project_started", "purpose": "ambiguity", "maxReplies": 2,
+     "messageAr": "مرحبًا، وصلتنا الشكاوى المرفقة عن صفحة التسجيل في الورشة. الورشة بعد أسبوعين، وأغلب المسجّلين يدخلون من الجوال. لا أطلب إعادة تصميم الصفحة؛ أريد أن يستطيع كل شخص أن يسجّل بنجاح. إن لم يتسع الوقت لكل شيء فرتّبي ما تبدئين به، واكتبي لي في ملاحظاتك ما أجّلتِه ولماذا.",
+     "clarifications": [
+      { "topicAr": "الأولوية", "keywordsAr": ["أولوية", "أبدأ", "الأهم", "أولا", "أولًا", "ترتيب"], "answerAr": "الأهم أن يكتمل التسجيل لكل شخص، بمن فيهم من يستخدم لوحة المفاتيح أو قارئ الشاشة. الشكل يأتي بعد ذلك." },
+      { "topicAr": "الشكل", "keywordsAr": ["تصميم", "ألوان", "الوان", "شكل", "هوية"], "answerAr": "لا تغيّري هوية الصفحة ولا ألوانها. إن احتجتِ تعديلًا في الشكل فليكن لإصلاح مشكلة، لا للتجميل." },
+      { "topicAr": "الجوال", "keywordsAr": ["جوال", "هاتف", "موبايل", "شاشة صغيرة"], "answerAr": "جرّبي على شاشة جوال صغيرة؛ هذا ما يستخدمه معظم المسجّلين." },
+      { "topicAr": "البريد", "keywordsAr": ["بريد", "ايميل", "إيميل", "تأكيد"], "answerAr": "نرسل بريد التأكيد بعد التسجيل، لذلك يهمنا ألا يُقبل بريد واضح الخطأ." },
+      { "topicAr": "الموعد", "keywordsAr": ["موعد", "متى", "وقت", "تسليم"], "answerAr": "سلّمي حين تكون الصفحة صالحة للاستخدام، واكتبي بوضوح ما لم يكتمل." }
+     ]
+    },
+    {
+     "key": "change", "trigger": "first_draft_saved", "purpose": "requirement_change", "maxReplies": 2,
+     "messageAr": "تحديث من فريق الفعاليات: إذا ظهرت للمستخدم رسالة خطأ في النموذج، فيجب ألا تُمسح البيانات التي كتبها. هل يدخل هذا في عملك الحالي؟ إن لم تستطيعي، اكتبي لي السبب.",
+     "clarifications": [
+      { "topicAr": "نطاق الطلب", "keywordsAr": ["ضروري", "إلزامي", "لازم", "نطاق", "مطلوب"], "answerAr": "هذا طلب جديد وليس من الشكاوى الأصلية. إن نفّذتِه فاذكري ذلك، وإن أجّلتِه فاذكري السبب. القرار لك." }
+     ]
+    }
+   ],
+   "neverReveal": ["btn-register", "btn register", "indexOf", "overflow-x", "720px", "1280", "outline: none", "outline:none", "<h4", "class=\"btn"]
+  },
+  "act_fe_change_request": {
+   "personaAr": "صاحب المنتج",
+   "capMessages": 4,
+   "interventions": [
+    {
+     "key": "kickoff", "trigger": "project_started", "purpose": "ambiguity", "maxReplies": 2,
+     "messageAr": "أهلًا، طلب التصفية والبلاغ في ملف الطلب. البلاغ أزعج فريق التسويق أكثر من غيره، فلا أريده أن يتكرر. أخبريني في ملاحظاتك كيف تأكدتِ أن التغيير لم يكسر شيئًا كان يعمل.",
+     "clarifications": [
+      { "topicAr": "الأولوية", "keywordsAr": ["أولوية", "أبدأ", "الأهم", "أولا", "أولًا"], "answerAr": "ابدئي بما تجدينه منطقيًا، لكن لا تسلّمي والبلاغ ما زال قائمًا." },
+      { "topicAr": "إعادة الكتابة", "keywordsAr": ["إعادة كتابة", "اعادة كتابة", "إطار", "اطار", "مكتبة"], "answerAr": "لا. نريد التعديل على الصفحة الحالية دون إطار عمل جديد، كما في ملاحظات الفريق." },
+      { "topicAr": "الحالات", "keywordsAr": ["حالة", "حالات", "جديدة", "منجزة", "تصفية"], "answerAr": "الحالات الأربع كما في الطلب، و«الكل» هو الاختيار الافتراضي." },
+      { "topicAr": "العدد", "keywordsAr": ["عدد", "عداد"], "answerAr": "نعم، يبقى عدد المهام المعروضة ظاهرًا بعد التصفية." }
+     ]
+    },
+    {
+     "key": "rationale", "trigger": "first_draft_saved", "purpose": "decision_rationale", "maxReplies": 2,
+     "messageAr": "سؤال سريع قبل أن تكملي: لماذا اخترتِ الطريقة التي تعرضين بها المهام بعد التصفية؟ لا أطلب التفاصيل التقنية؛ أريد السبب بجملتين، وضعيه في ملاحظة القرار عند التسليم أيضًا.",
+     "clarifications": [
+      { "topicAr": "أين أكتب", "keywordsAr": ["أين", "اين", "ملاحظة", "ملاحظات", "أكتب"], "answerAr": "في ملاحظة القرار ضمن التسليم، وبإمكانك أن تكتبيه هنا أيضًا." }
+     ]
+    }
+   ],
+   "neverReveal": ["throw", "tasks.length", "!tasks", "state-example", "status error", "status: 'error'"]
+  },
+  "act_fe_integrated_leave_requests": {
+   "personaAr": "مسؤولة الموارد البشرية",
+   "capMessages": 4,
+   "interventions": [
+    {
+     "key": "kickoff", "trigger": "project_started", "purpose": "ambiguity", "maxReplies": 2,
+     "messageAr": "مرحبًا، الموظفون يسألوننا كل يوم عن حالة طلبات إجازتهم، ونريد أن يروها بأنفسهم. اعتمدي على وصف الصفحة المرفق، وإن وجدتِ شيئًا غير واضح فاتخذي قرارًا معقولًا واكتبي سببه في وصف طلب الدمج.",
+     "clarifications": [
+      { "topicAr": "الترتيب", "keywordsAr": ["ترتيب", "الأحدث", "الاحدث", "الأقدم", "الاقدم"], "answerAr": "المكتوب في وصف الصفحة هو المطلوب." },
+      { "topicAr": "الجوال", "keywordsAr": ["جوال", "هاتف", "موبايل"], "answerAr": "كثير من الموظفين يفتحون الصفحة من الجوال." },
+      { "topicAr": "التسليم", "keywordsAr": ["تسليم", "طلب الدمج", "رابط", "مستودع"], "answerAr": "سلّمي رابط طلب الدمج ورمز آخر إيداع كما في الدليل، ومستودعك يبقى خاصًا." }
+     ]
+    },
+    {
+     "key": "change", "trigger": "first_draft_saved", "purpose": "requirement_change", "maxReplies": 2,
+     "messageAr": "تحديث: بعض الموظفين لا يميّزون الألوان جيدًا. يجب أن تُفهم حالة كل طلب من النص، لا من اللون وحده. هل يدخل هذا في عملك؟ إن لم يدخل فاكتبي السبب.",
+     "clarifications": [
+      { "topicAr": "النطاق", "keywordsAr": ["ضروري", "إلزامي", "لازم", "نطاق"], "answerAr": "هذا طلب إضافي. نفّذيه إن استطعتِ، وإلا فاذكري سبب التأجيل." }
+     ]
+    }
+   ],
+   "neverReveal": ["isLoading", "retry()", "flaky", "oldest", "الأقدم أولًا في البيانات", "ترتيب البيانات", "sort("]
+  }
+ }
+}

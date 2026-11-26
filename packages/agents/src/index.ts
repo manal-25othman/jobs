@@ -10,3 +10,4 @@ export * from './gateway.js';
 export * from './harness/index.js';
 export * from './claim-grounding.js';
 export * from './grounding-lexicon.js';
+export * from './guidance.js';

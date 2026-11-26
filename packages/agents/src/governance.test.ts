@@ -196,6 +196,7 @@ describe('governance — provider, privacy, extension contracts', () => {
       assert.equal(agentDefinition(t).implemented, false);
       await assert.rejects(() => gw().invoke({ agentType: t, trigger: 'user.requested', userId: 'u', targetRoleId: null, fullContext: {}, inputReferences: [], domainFacts: facts }), /extension contract/);
     }
-    assert.equal(AGENTS.filter((a) => a.implemented).length, 2);
+    // Exactly these are implemented; A11 (virtual manager, FR-U-026) was added by the PO's decision after package 5.
+    assert.deepEqual(AGENTS.filter((a) => a.implemented).map((a) => a.agentType), ['recruitment', 'technical', 'virtual_manager']);
   });
 });

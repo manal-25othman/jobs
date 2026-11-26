@@ -21,7 +21,7 @@ Contract: `packages/config/src/index.ts`; template: `.env.example`. The API fail
 |---|---|---|---|
 | `NODE_ENV` | both | ✓ | `production` turns on every production guard (demo content refused, development-only configuration refused, memory storage refused, agent budget required) |
 | `NAQLA_DEPLOY_REGION` | both | ✓ | |
-| `NEXT_PUBLIC_APP_URL` | app | ✓ | Also the CORS allow-list value (⚠ CORS is currently open: backlog P0-3) |
+| `NEXT_PUBLIC_APP_URL` | app | ✓ | Also the CORS allow-list value (CORS: `CORS_ALLOWED_ORIGINS` is required in production and refuses `*` — S0, P0-3 closed in code) |
 | `NEXT_PUBLIC_API_URL` | app | ✓ | Also the base of share links (⚠ they return raw JSON) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | both | ✓ | The anon key is public by design; safe only with RLS on every table |
 | `SUPABASE_SERVICE_ROLE_KEY` | API | ✓ secret | API only. **Never** given a `NEXT_PUBLIC_` name or set on the app host |

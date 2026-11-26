@@ -1,0 +1,29 @@
+# S0 (Package 7) — PROPOSED CI workflow. NOT ACTIVE: it lives outside .github/workflows on purpose. Moving it there
+# turns on GitHub Actions for this repository (usage, minutes and secrets) and needs the Product Owner's approval.
+# It runs only the checks a contributor already runs locally; it deploys nothing and needs no secret.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_HOST_AUTH_METHOD: trust }
+        ports: ['55432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm test                      # domain, config, agents, app unit tests
+      - run: npm run verify                # boundaries, frozen prototype, tokens, documentation
+      - run: NAQLA_TEST_DB=naqla_dbproof bash scripts/db-test.sh   # database proofs, RLS as authenticated, rollback round-trip
+      - run: npm run validate:materials    # starter materials (Playwright)
+      # API e2e and the browser journey need the e2e database rebuild script; added when the runner image is fixed.

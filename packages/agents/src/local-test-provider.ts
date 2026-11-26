@@ -53,6 +53,8 @@ export class LocalTestProvider implements AgentProvider {
       candidates = recruitmentCandidates(req.context);
     } else if (req.agentType === 'technical') {
       candidates = technicalCandidates(req.context);
+    } else if (req.agentType === 'virtual_manager') {
+      candidates = managerCandidates(req.context);
     } else {
       candidates = [];
     }
@@ -63,6 +65,8 @@ export class LocalTestProvider implements AgentProvider {
 /* The templates below copy context facts; they never add a fact. */
 
 function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const guidance = ctx['guidanceRequest'] as CareerGuidanceRequest | undefined;
+  if (guidance?.capability === 'career_guidance') return careerGuidanceCandidates(guidance);
   const claimRequest = ctx['claimRequest'] as ClaimRequest | undefined;
   if (claimRequest) return claimDraftCandidates(claimRequest);
   // Mode C — ambiguity: incomplete or conflicting input yields a limitation
@@ -150,6 +154,10 @@ function recruitmentCandidates(ctx: Readonly<Record<string, unknown>>): unknown[
 }
 
 function technicalCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const guidance = ctx['guidanceRequest'] as LearningGuidanceRequest | undefined;
+  if (guidance?.capability === 'learning_guidance') return learningGuidanceCandidates(guidance);
+  const hints = ctx['guidanceRequest'] as ImprovementHintsRequest | undefined;
+  if (hints?.capability === 'improvement_hints') return improvementHintCandidates(hints);
   const r = ctx['deterministicResults'] as { evaluationResultId: string; outcome: string; skillId: string;
     criteria: { key: string; met: boolean; rationale: string }[]; blockingCheck: string | null } | undefined;
   if (!r) return [];
@@ -379,4 +387,114 @@ function nothingToDraft(kind: string, why: string): unknown {
     structuredPayload: { kind: 'action', action: `complete an evaluated activity before drafting a ${kind}`, why, estimatedMinutes: null },
     evidenceRefs: [], sourceRefs: [], rationale: 'no wording without a support path', warnings: [], requiresUserApproval: false,
   };
+}
+
+/* ───────────── Phase B package 5: guidance templates (copy recorded facts; add none) ───────────── */
+
+interface CareerGuidanceRequest {
+  readonly capability: 'career_guidance';
+  readonly roleId: string | null;
+  readonly nextStep: { readonly code: string; readonly textAr: string; readonly whyAr: string; readonly href: string };
+  readonly gaps: readonly { readonly skillId: string; readonly labelAr: string; readonly level: string }[];
+  readonly gapOrderAr: string;
+}
+interface LearningGuidanceRequest {
+  readonly capability: 'learning_guidance';
+  readonly skill: { readonly skillId: string; readonly labelAr: string; readonly indicatorsAr: readonly string[] };
+  readonly practice: { readonly activityId: string; readonly titleAr: string; readonly startable: boolean } | null;
+  readonly resource: { readonly code: string; readonly titleAr: string } | null;
+}
+
+function careerGuidanceCandidates(g: CareerGuidanceRequest): unknown[] {
+  const roleRef = g.roleId ? [{ kind: 'target_role', id: g.roleId }] : [];
+  return [{
+    proposalType: 'recruiter_next_action', subjectType: 'career_goal', subjectId: g.roleId ?? 'none',
+    summary: g.nextStep.textAr,
+    structuredPayload: { kind: 'action', action: `open ${g.nextStep.href} (${g.nextStep.code})`, why: g.nextStep.whyAr, estimatedMinutes: null },
+    evidenceRefs: [], sourceRefs: roleRef, rationale: 'the one next step A01 derived from the recorded state, restated; nothing is assigned or decided',
+    warnings: [], requiresUserApproval: false,
+  }, ...g.gaps.map((x) => ({
+    proposalType: 'profile_gap', subjectType: 'skill_claim', subjectId: x.skillId,
+    summary: `مهارة في دورك بلا دليل مُقيَّم بعد: «${x.labelAr}»`,
+    structuredPayload: { kind: 'gap', skillId: x.skillId, explanation: `a requirement of the chosen role; current verification level '${x.level}' (${g.gapOrderAr})`, currentState: x.level },
+    evidenceRefs: [], sourceRefs: roleRef, rationale: 'a role requirement with no evaluated evidence is a gap to see, not a claim', warnings: [], requiresUserApproval: false,
+  }))];
+}
+
+function learningGuidanceCandidates(g: LearningGuidanceRequest): unknown[] {
+  const out: unknown[] = [];
+  if (g.practice) {
+    out.push({
+      proposalType: 'technical_next_action', subjectType: 'skill_claim', subjectId: g.skill.skillId,
+      summary: `طبّقي «${g.skill.labelAr}» في نشاط: «${g.practice.titleAr}»`,
+      structuredPayload: { kind: 'action', action: `practise in activity ${g.practice.activityId}${g.resource ? ' after the recommended registry resource' : ''}`,
+        why: g.practice.startable ? 'the assessed activity, not reading, produces evidence' : 'the activity where this skill is practised; it cannot be started yet', estimatedMinutes: null },
+      evidenceRefs: [], sourceRefs: [], rationale: 'learning ends in practice (FR-A-011); the practice comes from the role catalogue', warnings: g.practice.startable ? [] : ['practice activity not startable yet'], requiresUserApproval: false,
+    });
+  }
+  if (g.skill.indicatorsAr.length) {
+    out.push({
+      proposalType: 'followup_question', subjectType: 'skill_claim', subjectId: g.skill.skillId,
+      summary: `أسئلة تتحققين بها من فهمك لـ«${g.skill.labelAr}» قبل التطبيق`,
+      structuredPayload: { kind: 'followup_question', questions: g.skill.indicatorsAr.slice(0, 4).map((i) => `هل يظهر في عملك: ${i}؟`),
+        purpose: 'a self-check from the skill indicators; not an assessment, and no answer changes a level' },
+      evidenceRefs: [], sourceRefs: [], rationale: 'the questions restate the recorded indicators of the skill; no solution is given', warnings: g.practice ? [] : ['no practice activity is available for this skill'], requiresUserApproval: false,
+    });
+  }
+  return out;
+}
+
+/* ───────────── A11 virtual manager (test provider): answers ONLY from the scenario's clarifications ───────────── */
+
+interface ManagerContext {
+  readonly projectId: string;
+  readonly interventionKey: string;
+  readonly personaAr: string;
+  readonly clarifications: readonly { readonly topicAr: string; readonly keywordsAr: readonly string[]; readonly answerAr: string }[];
+  readonly graduateMessage: string;
+}
+const foldAr = (t: string) => t.replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي');
+/** Requests the manager refuses in persona: a solution, code, steps, or a verdict on the work or the score. */
+const SOLUTION_OR_SCORE_REQUEST = /(الحل|حلّ|كود|اكتب(ي)? لي|اعطني|اعطيني|كيف ابرمج|كيف اكتب|خطوات|درجة|درجتي|سانجح|هل نجحت|هل عملي صحيح|التقييم|المعايير|معيار|علامة|علامتي)/;
+export const MANAGER_REFUSAL_AR = 'هذا قرار تقني يعود إليك، ولا أستطيع الحكم على العمل قبل تسليمه. ما الذي تحتاجين أن أوضّحه في المطلوب نفسه؟';
+export const MANAGER_NO_DETAIL_AR = 'لا أملك تفاصيل أكثر مما في الطلب. اتخذي القرار الذي ترينه مناسبًا، واذكري سببه في ملاحظاتك.';
+
+function managerCandidates(ctx: Readonly<Record<string, unknown>>): unknown[] {
+  const m = ctx['managerContext'] as ManagerContext | undefined;
+  if (!m) return [];
+  const msg = foldAr(m.graduateMessage);
+  let basis: 'clarification' | 'refusal' | 'no_detail' = 'no_detail'; let reply = MANAGER_NO_DETAIL_AR; let topic: string | null = null;
+  if (SOLUTION_OR_SCORE_REQUEST.test(msg)) { basis = 'refusal'; reply = MANAGER_REFUSAL_AR; }
+  else {
+    let best = 0;
+    for (const c of m.clarifications) {
+      const hits = c.keywordsAr.filter((k) => msg.includes(foldAr(k))).length;
+      if (hits > best) { best = hits; basis = 'clarification'; reply = c.answerAr; topic = c.topicAr; }
+    }
+  }
+  return [{
+    proposalType: 'manager_turn', subjectType: 'project', subjectId: m.projectId,
+    summary: reply.length > 140 ? `${reply.slice(0, 137)}…` : reply,
+    structuredPayload: { kind: 'manager_turn', interventionKey: m.interventionKey, replyAr: reply, basis, clarificationTopic: topic },
+    evidenceRefs: [], sourceRefs: [], warnings: [], requiresUserApproval: false,
+    rationale: basis === 'clarification' ? 'a clarification the scenario allows, restated' : basis === 'refusal' ? 'a solution, code or score request is refused in persona (A11)' : 'nothing in the scenario answers this; the decision is left to the graduate',
+  }];
+}
+
+/* ───────────── R1: progressive hints per unmet criterion (A15/A03) — restates the prepared hint; never code ───────────── */
+
+interface ImprovementHintsRequest {
+  readonly capability: 'improvement_hints';
+  readonly level: 1 | 2 | 3;
+  readonly items: readonly { readonly criterionKey: string; readonly severity: 'important' | 'improvement'; readonly questionAr: string; readonly hintAr: string }[];
+}
+
+function improvementHintCandidates(g: ImprovementHintsRequest): unknown[] {
+  return g.items.map((i) => ({
+    proposalType: 'improvement_action', subjectType: 'submission', subjectId: i.criterionKey,
+    summary: i.questionAr,
+    structuredPayload: { kind: 'action', action: `hint level ${g.level} for criterion ${i.criterionKey}`, why: i.hintAr, estimatedMinutes: null },
+    evidenceRefs: [], sourceRefs: [], warnings: [`severity:${i.severity}`], requiresUserApproval: false,
+    rationale: 'a guiding question and one level of hint for an unmet criterion of the graduate\'s own result; the fix stays theirs',
+  }));
 }

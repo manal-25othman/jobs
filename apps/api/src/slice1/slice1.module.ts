@@ -25,5 +25,7 @@ import { UserProvisioningService } from '../auth/user-provisioning.service';
     UserProvisioningService, CareerService, SubmissionService,
     EvaluationService, AssetService, ReportService, ShareService, UploadService, WithdrawalService, ActivityCatalogueService, DraftService, MaterialService,
   ],
+  // Phase B package 5: read services the guidance tools wrap (no new data path).
+  exports: [CareerService, ActivityCatalogueService, EvaluationService],
 })
 export class Slice1Module {}

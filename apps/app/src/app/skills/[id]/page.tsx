@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api, type TrackSkillDetail } from '../../../lib/api';
+import { api, type TrackSkillDetail, type LearningPlan, type RecommendedResource } from '../../../lib/api';
 import { useSession, Loading, ErrorBanner, EvidenceState } from '../../../components/Session';
 import { LEVEL_AR, EVIDENCE_STEPS_AR } from '../../../lib/journey';
+import { GuidancePanel } from '../../../components/GuidancePanel';
 
 /**
  * Skill detail. Phase B, package 1: the graduate's six questions first (what it is, why the role needs it, what it
@@ -32,7 +33,14 @@ export default function SkillDetailPage() {
     <main className="wrap">
       <p className="body-sm"><a className="link" href="/skills">← مهارات المسار</a></p>
       <h1>{s.labelAr} <span className="term muted" lang="en">{s.labelEn}</span></h1>
-      <SkillExplained d={d} />
+      <SkillExplained d={d} token={token} />
+
+      <section className="card" data-testid="self-assessment-card">
+        <h2>تقديرك الذاتي</h2>
+        {d.selfAssessment ? <p className="body-sm" style={{ margin: 0 }}>قدّرتِ نفسك: <strong>{d.selfAssessment.ratingAr}</strong>{d.selfAssessment.note ? ` — ${d.selfAssessment.note}` : ''}</p>
+          : <p className="body-sm muted" style={{ margin: 0 }}>لم تقدّري نفسك في هذه المهارة بعد.</p>}
+        <p className="micro muted">تقدير ذاتي: لا يُحتسب دليلًا، ولا يغيّر مستوى التحقق، ولا يظهر لأي جهة خارجية. <a className="link" href="/self-assessment">قيّمي نفسك</a></p>
+      </section>
 
       <h2 style={{ marginTop: 8 }}>حالتك في هذه المهارة</h2>
       <section className="card">
@@ -111,7 +119,7 @@ export default function SkillDetailPage() {
 }
 
 /** The six graduate questions, answered only from content that exists; a missing answer is said plainly. */
-function SkillExplained({ d }: { d: TrackSkillDetail }) {
+function SkillExplained({ d, token }: { d: TrackSkillDetail; token: string | null }) {
   const x = d.skill.explanation;
   return (
     <>
@@ -140,10 +148,13 @@ function SkillExplained({ d }: { d: TrackSkillDetail }) {
         </section>
       ) : null}
 
-      <section className="card">
-        <h2>ماذا أتعلّم وأين؟</h2>
-        <p className="body-sm muted">مصادر التعلّم لهذه المهارة قيد التحقق من روابطها ومراجعتها، وتظهر هنا بعد ذلك. التعلّم اختياري دائمًا: إن كنتِ واثقة من المهارة فانتقلي مباشرة إلى التدرّب عليها.</p>
-      </section>
+      <LearningCard plan={d.learning} />
+      {token ? (
+        <section className="card">
+          <h2>مرشد التعلّم</h2>
+          <GuidancePanel token={token} capability="learning_guidance" skillId={d.skill.skillId} buttonAr="اقترحي عليّ كيف أتدرّب على هذه المهارة" labelFor={(id) => (id === d.skill.skillId ? d.skill.labelAr : null)} />
+        </section>
+      ) : null}
 
       <section className="card">
         <h2>كيف أتدرّب عليها؟</h2>
@@ -165,5 +176,57 @@ function SkillExplained({ d }: { d: TrackSkillDetail }) {
         <ol className="body-sm" style={{ margin: 0 }}>{EVIDENCE_STEPS_AR.map((step) => <li key={step}>{step}</li>)}</ol>
       </section>
     </>
+  );
+}
+
+/**
+ * Phase B package 2 — «ماذا أتعلّم وأين؟»: one ranked resource from the registry, its reason, and the practice that
+ * must follow (A07, deterministic). An unverified candidate appears only in the internal preview, always labelled.
+ */
+function LearningCard({ plan }: { plan: LearningPlan | undefined }) {
+  return (
+    <section className="card" data-testid="learning-card">
+      <h2>ماذا أتعلّم وأين؟</h2>
+      {plan ? (
+        <>
+          <p className="body-sm">{plan.need.textAr}</p>
+          {plan.candidatePreview ? <p className="body-sm"><span className="chip chip--attention" data-testid="learning-preview-label">معاينة داخلية: موارد مرشّحة غير متحقَّق منها</span></p> : null}
+          {plan.resource ? <ResourceItem r={plan.resource} primary /> : null}
+          {plan.alternatives.length ? (
+            <>
+              <p className="body-sm" style={{ fontWeight: 500, margin: '10px 0 4px' }}>بديلان بالترتيب، إن لم يناسبك الأول</p>
+              <div className="rows">{plan.alternatives.map((r) => <ResourceItem key={r.id} r={r} />)}</div>
+            </>
+          ) : null}
+          {plan.fallbackAr ? <p className="body-sm muted" data-testid="learning-fallback">{plan.fallbackAr}</p> : null}
+          {plan.practice ? (
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 10 }} data-testid="learning-practice">
+              <span className="body-sm" style={{ fontWeight: 500 }}>ثم طبّقي:</span>
+              <a className="link grow" href={`/activities/${encodeURIComponent(plan.practice.activityId)}`}>{plan.practice.titleAr}</a>
+              {!plan.practice.startable ? <span className="chip">غير متاح بعد</span> : null}
+            </div>
+          ) : null}
+          {plan.practice ? <p className="micro muted" style={{ margin: '4px 0 0' }}>{plan.practice.whyAr}</p> : null}
+        </>
+      ) : <p className="body-sm muted">لا تتوفر توصية تعلّم لهذه المهارة الآن.</p>}
+      <p className="disclaimer">التعلّم اختياري ولا يغيّر مستواك: المستوى يثبته التقييم وحده. المورد من سجل منسّق، لا من بحث حر.</p>
+    </section>
+  );
+}
+
+function ResourceItem({ r, primary }: { r: RecommendedResource; primary?: boolean }) {
+  return (
+    <div className={primary ? 'resource resource--primary' : 'resource'} data-testid="learning-resource" data-exposure={r.exposure}>
+      <p className="body-sm" style={{ margin: 0, fontWeight: primary ? 500 : 400 }}>
+        {r.url ? <a className="link" href={r.url} target="_blank" rel="noopener noreferrer">{r.titleAr}</a> : r.titleAr}
+        {r.provider ? <span className="muted"> · {r.provider}</span> : null}
+      </p>
+      <p className="micro muted" style={{ margin: '2px 0' }}>
+        <span className="chip">{r.typeAr}</span> <span className="chip">{r.languageAr}</span> <span className="chip">{r.costAr}</span> <span className="chip">{r.durationAr}</span>
+      </p>
+      {r.whyAr ? <p className="body-sm" style={{ margin: '2px 0' }}>لماذا هذا المورد؟ {r.whyAr}</p> : null}
+      {r.labelAr ? <p className="micro" style={{ margin: '2px 0' }}><span className="chip chip--attention">{r.labelAr}</span></p> : null}
+      <p className="micro muted" style={{ margin: 0 }}>{r.linkStatusAr}{r.url ? ' · يفتح في موقع خارجي' : ''}</p>
+    </div>
   );
 }

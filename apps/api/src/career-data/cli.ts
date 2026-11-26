@@ -16,6 +16,8 @@
  *   claims-public-freeze --operator <uuid> --reason "<why>"   Phase 9: pre-deployment — close direct public paths until re-grounded
  *   pilot-load [dir] --by <name> --reason "<why>"   D-135: DEVELOPMENT ONLY — load the v2 candidate as DEMO pilot content (undecided values stay empty + TBD); refused in production
  *   pilot-materials --by <name> --reason "<why>"   Phase B package 3: DEVELOPMENT ONLY — store the pilot's starter (graduate) and reference (reviewer) materials in private storage; load before pilot-publish; Supabase storage only
+ *   pilot-learning --by <name> --reason "<why>"   Phase B package 2: DEVELOPMENT ONLY — load the pilot's CANDIDATE learning resources (draft, unverified) into the registry and apply any recorded direct link check; never reviews or publishes
+ *   pilot-manager --by <name> --reason "<why>"   A11 M1: DEVELOPMENT ONLY — load the pilot's CANDIDATE virtual-manager scenarios (load before pilot-publish); never approves them
  *   pilot-publish --operator <uuid> --reason "<why>"   D-136: LOCAL DEVELOPMENT ONLY — the authorized Product Owner publishes the loaded DEMO pilot content for internal testing (never production/staging; not SME approval)
  *   pilot-policy <per-skill|baseline> --by <name>   D-135: DEVELOPMENT ONLY — per-skill feedback for the pilot, or restore the D-118 safety baseline
  *   readiness-new-set <key> --rules <file.json> [--role <uuid>] --label-ar <l> --label-en <l> --description <d> --by <name>   Phase 5: a DRAFT readiness rule set (inactive); rule types are code, values are the file's
@@ -24,6 +26,8 @@ import { Pool } from 'pg';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadPack } from './pack-loader';
+import { loadLearningCandidates, LearningCandidateLoadError } from './learning-candidate-loader';
+import { loadPilotManagerScenarios, ManagerScenarioLoadError } from './manager-scenario-loader';
 import { loadCandidate, validateCandidate, type CandidateReport } from './candidate';
 import { importPack, renderNearDuplicateReport, ImportError } from './pipeline';
 import { runQualityChecks, coreSkillEvidencePaths } from './quality-rules';
@@ -92,6 +96,29 @@ export async function main(argv: string[], root: string): Promise<number> {
         console.log(`  starter-file fingerprints recorded: ${r.starterChecksums}`);
         return 0;
       } catch (e) { if (e instanceof MaterialLoadError) { console.error(e.message); return 1; } throw e; }
+    }
+    if (cmd === 'pilot-learning') {
+      const by = arg(argv, '--by'); const reason = arg(argv, '--reason');
+      if (!by || !reason) { console.error('pilot-learning needs --by <name> and --reason "<why>"'); return 2; }
+      try {
+        const r = await loadLearningCandidates(pool, { candidatesDir: join(root, 'data', 'candidates', 'trk_frontend_junior_v2', 'learning'), byLabel: by, reason, production });
+        console.log(`candidate learning resources ${r.version} — DEVELOPMENT ONLY, draft, unverified, not reviewed`);
+        console.log(`  written ${r.written}, refreshed ${r.refreshed}, direct checks applied ${r.directChecksApplied}`);
+        if (r.flagged.length) console.log(`  flagged by the direct check: ${r.flagged.join(', ')}`);
+        if (r.overLimit.length) console.log(`  not loaded (the skill already holds ${r.perSkillMax} resources — the pack constraint is respected): ${r.overLimit.join(', ')}`);
+        if (r.skippedReviewed.length) console.log(`  left untouched (already in review): ${r.skippedReviewed.join(', ')}`);
+        return 0;
+      } catch (e) { if (e instanceof LearningCandidateLoadError) { console.error(e.message); return 1; } throw e; }
+    }
+    if (cmd === 'pilot-manager') {
+      const by = arg(argv, '--by'); const reason = arg(argv, '--reason');
+      if (!by || !reason) { console.error('pilot-manager needs --by <name> and --reason "<why>"'); return 2; }
+      try {
+        const r = await loadPilotManagerScenarios(pool, { scenariosFile: join(root, 'data', 'candidates', 'trk_frontend_junior_v2', 'manager', 'scenarios.candidate.json'), byLabel: by, reason, production });
+        console.log(`virtual-manager scenarios ${r.version} — DEVELOPMENT ONLY, candidate content, not expert reviewed`);
+        console.log(`  written: ${r.written.join(', ') || 'none'}; already recorded: ${r.skipped.join(', ') || 'none'}`);
+        return 0;
+      } catch (e) { if (e instanceof ManagerScenarioLoadError) { console.error(e.message); return 1; } throw e; }
     }
     if (cmd === 'pilot-publish') {
       const operatorId = arg(argv, '--operator'); const reason = arg(argv, '--reason');

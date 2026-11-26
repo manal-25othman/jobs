@@ -326,6 +326,21 @@ export interface TrackSkillDetail {
   decisions: { id: string; decision: string; previousState: string; proposedState: string | null; resultingState: string; policy: string; policyStatus: string; policyResolution: string | null; trackConfigVersionId: string | null; decidedAt: string }[];
   journeyEvents: { trigger: string; from: string; to: string | null; applied: boolean; outcome: string; reason: string; at: string }[];
   activities: { id: string; slug: string; titleAr: string; version: string; depth: string }[];
+  /** Phase B package 2: the deterministic A07 recommendation (registry only, mandatory practice, never a level). */
+  learning?: LearningPlan;
+  /** FR-U-013: the graduate's own latest self-assessment (Observed only; never a level). */
+  selfAssessment?: { rating: string; ratingAr: string; note: string | null; at: string; count: number } | null;
+}
+export interface RecommendedResource {
+  id: string; code: string; titleAr: string; titleEn: string; provider: string | null; typeAr: string; languageAr: string; costAr: string;
+  url: string | null; whyAr: string; durationMinutes: number | null; durationAr: string; exposure: 'verified' | 'candidate'; labelAr: string | null; linkStatusAr: string;
+}
+export interface LearningPlan {
+  kind: 'LearningPlanProposal'; agent: 'A07'; mode: 'deterministic';
+  need: { code: 'no_evidence' | 'practiced_not_demonstrated' | 'strengthen'; textAr: string };
+  resource: RecommendedResource | null; alternatives: RecommendedResource[];
+  practice: { activityId: string; slug: string; titleAr: string; startable: boolean; whyAr: string } | null;
+  fallbackAr: string | null; candidatePreview: boolean; grantsLevel: false;
 }
 
 /* ───────────────────────── AI usage & integrity (Phase 6) ───────────────────────── */
@@ -344,4 +359,26 @@ export interface ChallengeView {
   id: string; submissionId: string; typeCode: string; typeLabelAr: string; promptAr: string; promptEn: string | null;
   status: 'issued' | 'answered' | 'reviewed' | 'expired' | 'withdrawn'; issuedAt: string; dueAt: string | null;
   response: { text?: string; code?: string } | null; respondedAt: string | null; result: { outcome: string; observations: string; reviewedAt: string } | null;
+}
+
+/* ───────────── Phase B package 5: A01 next step, A02 snapshot, guidance (test provider only) ───────────── */
+export interface NextStep { code: string; textAr: string; whyAr: string; href: string; source: string; sourceRef: string | null; agent: 'A01' }
+export interface SourcedStatement { textAr: string; source: string; sourceRef: string | null }
+export interface CareerSnapshot {
+  kind: 'CareerSnapshot'; agent: 'A02'; mode: 'deterministic'; role: SourcedStatement | null; strengths: SourcedStatement[]; gaps: SourcedStatement[]; selfAssessed: SourcedStatement[];
+  gapOrderAr: string; nextStep: NextStep; limitsAr: string[];
+}
+export type GuidanceCapability = 'career_guidance' | 'learning_guidance' | 'assessment_feedback' | 'improvement_hints';
+export interface GuidanceAnswer {
+  capability: GuidanceCapability; labelAr: string; contracts: string[]; toolsUsed: string[]; noticeAr: string; withheldAr: string | null; noneAr?: string; level?: number;
+  status: string; provider: string; testOnly: true; ruleId: string;
+  proposals: { id: string; proposalType: string; summary: string; structuredPayload: Record<string, unknown>; warnings: string[]; lifecycle: string }[];
+}
+
+/* ───────────── FR-U-013 self-assessment (Observed only) ───────────── */
+export interface SelfAssessmentView {
+  role: { id: string; labelAr: string } | null; noticeAr: string; notEvidenceAr: string; confidence: 'observed';
+  scale: { key: string; labelAr: string; descriptorAr: string }[];
+  items: { skillId: string; labelAr: string; latest: { rating: string; ratingAr: string; note: string | null; at: string; count: number } | null }[];
+  recorded?: number;
 }

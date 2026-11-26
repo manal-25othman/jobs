@@ -5,7 +5,7 @@ import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import {
   AgentGateway, LocalTestProvider, route, nudgesFor, validateAgainstDomain, assertLifecycle, assertReadyForApproval, ProposalRejected,
-  WORDING_PROPOSAL_TYPES, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
+  WORDING_PROPOSAL_TYPES, type GuidanceCapability, type AgentType, type Trigger, type GatewayResult, type DomainFacts, type AgentProposal,
   type ProposalLifecycle, type InputReference, type WordingPayload, type TestProviderMode,
 } from '@naqla/agents';
 import {
@@ -85,6 +85,45 @@ export class AgentService {
       this.logger.warn(`agent orchestration failed and was ignored: ${(e as Error).message}`);
       return null;
     }
+  }
+
+  /**
+   * Phase B package 5 — one guidance capability, on the graduate's request. The SAME path as every agent call:
+   * deterministic routing (R7–R9) → full context → gateway (allow-list redaction, budget, schema + domain validation)
+   * → persisted proposals and usage. Only the test provider exists (OPEN-023). Unlike `onEvent`, the outcome is
+   * returned to the caller (budget, provider error or refusal included), never hidden.
+   */
+  async guidance(userId: string, capability: GuidanceCapability, guidanceRequest: Record<string, unknown>, facts: Record<string, unknown>, refs: InputReference[]) {
+    const decision = route({ type: 'user.requested', userId, facts: { ...facts, capability } });
+    if (!decision) throw new BadRequestException(`no route for capability '${capability}'`);
+    const fullContext: Record<string, unknown> = { ...(await this.buildContext(userId, decision.agentType, facts)), guidanceRequest };
+    const domainFacts = await this.domainFacts(userId);
+    const targetRoleId = (fullContext['targetRole'] as { id?: string } | null | undefined)?.id ?? null;
+    const result = await this.gateway.invoke({ agentType: decision.agentType, trigger: 'user.requested', userId, targetRoleId, fullContext, inputReferences: refs, domainFacts, capability });
+    const persisted = await this.persist(userId, result, decision.ruleId);
+    const all = await this.list(userId);
+    return {
+      ruleId: decision.ruleId, agentType: decision.agentType, invocationId: result.invocation.invocationId, status: result.usage.status,
+      provider: result.usage.provider, testOnly: true as const, redactedPaths: result.redactedPaths,
+      rejected: result.rejected.map((r) => r.code), refused: persisted.refused,
+      proposals: all.filter((p) => persisted.stored.includes(p.id)).map((p) => ({ id: p.id, proposalType: p.proposalType, summary: p.summary, structuredPayload: p.structuredPayload, warnings: p.warnings, lifecycle: p.lifecycle })),
+    };
+  }
+
+  /**
+   * A11 (FR-U-026) — one virtual-manager reply through the same gateway (R10). The agent sees ONLY `managerContext`
+   * (the learner-facing scenario of the intervention and the graduate's message). The proposal is persisted like every
+   * agent output (invocation, usage, budget); the manager panel shows it, not the proposals page.
+   */
+  async managerTurn(userId: string, managerContext: Record<string, unknown>) {
+    const decision = route({ type: 'user.requested', userId, facts: { managerTurn: true } });
+    if (!decision || decision.agentType !== 'virtual_manager') throw new BadRequestException('no route for the virtual manager');
+    const result = await this.gateway.invoke({ agentType: 'virtual_manager', trigger: 'user.requested', userId, targetRoleId: null,
+      fullContext: { managerContext }, inputReferences: [{ kind: 'project', id: String(managerContext['projectId']) }], domainFacts: await this.domainFacts(userId) });
+    const persisted = await this.persist(userId, result, decision.ruleId);
+    const p = persisted.stored[0] ? result.proposals.find((x) => x.proposalId === persisted.stored[0]) ?? null : null;
+    return { status: result.usage.status, invocationId: result.invocation.invocationId, proposalId: p?.proposalId ?? null,
+      payload: (p?.structuredPayload ?? null) as { replyAr: string; basis: string; clarificationTopic: string | null } | null, rejected: result.rejected.map((r) => r.reason) };
   }
 
   private async buildContext(userId: string, agentType: AgentType, facts: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -316,7 +355,7 @@ export class AgentService {
     return this.db.asUser(userId, async (c) => {
       const { rows } = await c.query(`select id, agent_type, proposal_type, subject_type, subject_id, summary, structured_payload, evidence_refs, source_refs,
         rationale, warnings, requires_user_approval, lifecycle, version, previewed_at, approved_at, approved_body, rejected_at, rejection_reason, superseded_by, resulting_asset_id, created_at
-        from agent_proposal order by created_at desc`);
+        from agent_proposal where agent_type::text <> 'virtual_manager' order by created_at desc`);
       return rows.map(this.row);
     });
   }
