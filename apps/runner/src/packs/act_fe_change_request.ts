@@ -2,6 +2,9 @@
  * CANDIDATE pack — act_fe_change_request (team tasks: status filter + empty-list report). Not approved by an expert.
  * Every list test serves its OWN task data (overrideFile) with a status mix unlike the shipped file, so output that is
  * hard-coded for the shipped data fails. Data states come from the harness (failRequestsTo), not the URL scenario.
+ * 0.2.0: the filter is chosen BEFORE the data arrives (in the error state, or while loading) and then the list is
+ * rendered from new data, so a filter that hides or re-filters already-rendered items, rather than living in state,
+ * is told apart; and a second data set of the same shape checks the default list against hard-coded output.
  */
 import type { PageDriver, TestPack } from '../pack.js';
 import { clickTagged, fail, fileAt, pass, presence, probingReport, q, starterRetention, until } from './lib.js';
@@ -24,6 +27,23 @@ const TASKS_NO_DONE = [
   { id: 22, title: 'تحديث أيقونات القائمة', owner: 'خالد', status: 'new', due: '2027-02-03' },
   { id: 23, title: 'ضبط المسافات في الجوال', owner: 'نورة', status: 'in_progress', due: '2027-02-04' },
 ];
+/** Data served for the re-render: 3 done, 1 new, 1 in progress (counts unlike every other set here). */
+const TASKS_LATER = [
+  { id: 31, title: 'نقل الخطوط إلى ملف مستقل', owner: 'عبير', status: 'done', due: '2027-03-02' },
+  { id: 32, title: 'إضافة وصف لحقول البحث', owner: 'ماجد', status: 'in_progress', due: '2027-03-04' },
+  { id: 33, title: 'اختبار الصفحة على متصفح قديم', owner: 'عبير', status: 'done', due: '2027-03-05' },
+  { id: 34, title: 'تقليل حجم ملف السكربت', owner: 'رهف', status: 'new', due: '2027-03-07' },
+  { id: 35, title: 'توحيد أسماء الأصناف', owner: 'ماجد', status: 'done', due: '2027-03-09' },
+];
+/** A second data set of the same shape: other titles, owners, order and status mix. */
+const TASKS_OTHER = [
+  { id: 47, title: 'تجربة القائمة المنسدلة بلوحة المفاتيح', owner: 'أروى', status: 'in_progress', due: '2027-04-11' },
+  { id: 41, title: 'حذف الصور غير المستخدمة', owner: 'بدر', status: 'in_progress', due: '2027-04-02' },
+  { id: 45, title: 'كتابة رسالة الخطأ لنموذج الدخول', owner: 'جود', status: 'new', due: '2027-04-08' },
+  { id: 43, title: 'ضبط ارتفاع الأسطر في الجداول', owner: 'أروى', status: 'done', due: '2027-04-05' },
+];
+/** Titles of the file shipped with the starter: none may appear while other data is served. */
+const SHIPPED_TITLES = ['تحديث صفحة الأسئلة الشائعة', 'مراجعة نصوص رسائل الخطأ في النموذج', 'إصلاح محاذاة الشعار على الجوال', 'إضافة نص بديل لصور صفحة الفريق', 'تجهيز قائمة التحقق قبل الإطلاق', 'توحيد ألوان الأزرار مع الهوية'];
 const LABEL: Record<string, string> = { all: 'الكل', new: 'جديدة', in_progress: 'قيد التنفيذ', done: 'منجزة' };
 
 const TASKS_LIB = String.raw`
@@ -50,6 +70,18 @@ const pickFilter = (label) => {
   const b = [...document.querySelectorAll('button, [role=button], [role=tab], [role=radio]')].find((x) => vis(x) && x.textContent.trim() === label && !x.closest('li'));
   return b && tag(b, 'filter') ? 'tag' : '';
 };
+const controlShows = (label) => {
+  for (const s of document.querySelectorAll('select')) {
+    if ([...s.options].some((x) => x.textContent.trim() === label)) { const o = s.options[s.selectedIndex]; return !!o && o.textContent.trim() === label; }
+  }
+  const radios = [...document.querySelectorAll('input[type=radio]')].filter((r) => nameOf(r) === label);
+  if (radios.length) return radios.some((r) => r.checked);
+  const b = [...document.querySelectorAll('button, [role=button], [role=tab], [role=radio]')].find((x) => vis(x) && x.textContent.trim() === label && !x.closest('li'));
+  if (!b) return false;
+  const exposed = ['aria-pressed', 'aria-selected', 'aria-checked', 'aria-current'].filter((a) => b.hasAttribute(a));
+  return exposed.length === 0 || exposed.some((a) => b.getAttribute(a) !== 'false');
+};
+const allTaskNodes = () => [...region().querySelectorAll('li')];
 const shows = (label, n) => {
   const it = items();
   if (it.length !== n) return false;
@@ -75,12 +107,36 @@ async function pick(p: PageDriver, status: string): Promise<boolean> {
   return false;
 }
 
+const countOf = (tasks: readonly { status: string }[], status: string): number => (status === 'all' ? tasks.length : tasks.filter((t) => t.status === status).length);
+
+/**
+ * Chooses «منجزة» before any task is rendered, then lets the list render from TASKS_LATER: first in the error state
+ * (then retry), else while the request is still loading. Returns how the choice was made, or '' when the control is
+ * not there before the data (the caller then checks the ready list instead).
+ */
+async function chooseBeforeData(p: PageDriver): Promise<'retry' | 'loading' | ''> {
+  p.overrideFile(DATA, JSON.stringify(TASKS_LATER));
+  p.failRequestsTo(DATA, 'error');
+  await p.open();
+  if (await ut(p, `return !!retryCtl() && !loadingShown() && items().length === 0;`, 2500)) {
+    if (await pick(p, 'done')) {
+      p.failRequestsTo(DATA, 'ok');
+      if ((await qt<boolean>(p, `return tag(retryCtl(), 'retry');`)) && (await clickTagged(p, 'retry'))) return 'retry';
+    }
+  }
+  p.failRequestsTo(DATA, 'slow');
+  await p.open();
+  await p.wait(150);
+  if ((await qt<boolean>(p, `return loadingShown() && items().length === 0;`)) && (await pick(p, 'done'))) return 'loading';
+  return '';
+}
+
 const expectShown = (p: PageDriver, status: string, n: number): Promise<boolean> =>
   ut(p, `return shows(${JSON.stringify(status === 'all' ? '' : LABEL[status])}, ${n});`, 1200);
 
 export const actFeChangeRequestPack: TestPack = {
   activityId: 'act_fe_change_request',
-  version: '0.1.0',
+  version: '0.2.0',
   status: 'candidate',
   entry: 'index.html',
   tests: [
@@ -128,6 +184,31 @@ export const actFeChangeRequestPack: TestPack = {
         for (const [status, n] of steps) {
           if (!(await pick(p, status))) return fail('لا عنصر اختيار للحالة');
           if (!(await expectShown(p, status, n))) return fail(`المعروض بعد اختيار «${LABEL[status]}» لا يطابق المهام أو عددها`);
+        }
+        return pass();
+      },
+    },
+    {
+      id: 'filter.kept_when_data_renders', criterionKey: 'filter_in_state', layer: 'functional', mode: 'automated',
+      labelAr: 'حالة تُختار قبل وصول البيانات تبقى مطبّقة وظاهرة في عنصر الاختيار حين تُعرض البيانات، ثم تغييرها وإزالتها يعيدان الحساب من القائمة كاملة',
+      run: async (p) => {
+        const how = await chooseBeforeData(p);
+        if (how === '') {
+          // The control appears only with the data: check the ready list is recomputed, not hidden item by item.
+          if (!(await openWith(p, TASKS_LATER))) return fail('لم تُعرض القائمة');
+          if (!(await pick(p, 'done'))) return fail('لا عنصر اختيار للحالة');
+          if (!(await expectShown(p, 'done', countOf(TASKS_LATER, 'done')))) return fail('المعروض بعد اختيار «منجزة» لا يطابق المهام أو عددها');
+          const hidden = await qt<number>(p, `return allTaskNodes().filter((li) => !txt(li) || !(li.textContent || '').includes(${JSON.stringify(LABEL.done)})).length;`);
+          if (hidden > 0) return fail(`المهام غير المطابقة مخفية في الصفحة لا محسوبة من الحالة: ${hidden}`);
+        } else {
+          const note = how === 'retry' ? 'بعد إعادة المحاولة' : 'بعد انتهاء التحميل';
+          await ut(p, `return !loadingShown() && (items().length > 0 || emptyShown() || errorShown());`, 3500);
+          if (!(await expectShown(p, 'done', countOf(TASKS_LATER, 'done')))) return fail(`الحالة المختارة قبل وصول البيانات لم تُطبَّق ${note}`);
+          if (!(await qt<boolean>(p, `return controlShows(${JSON.stringify(LABEL.done)});`))) return fail(`عنصر الاختيار لا يُظهر الحالة المطبّقة ${note}`);
+        }
+        for (const status of ['new', 'all', 'in_progress', 'all']) {
+          if (!(await pick(p, status))) return fail('لا عنصر اختيار للحالة');
+          if (!(await expectShown(p, status, countOf(TASKS_LATER, status)))) return fail(`المعروض بعد اختيار «${LABEL[status]}» لا يُحسب من القائمة كاملة`);
         }
         return pass();
       },
@@ -189,6 +270,22 @@ export const actFeChangeRequestPack: TestPack = {
         const clean = await qt<boolean>(p, `return !errorShown() && !loadingShown();`);
         if (!clean) return fail('بقيت رسالة خطأ أو تحميل بعد النجاح');
         return p.pageErrors().length === 0 ? pass() : fail('أخطاء غير معالجة في الصفحة');
+      },
+    },
+    {
+      id: 'output.other_tasks_same_shape', criterionKey: 'js_correctness', layer: 'output', mode: 'automated',
+      labelAr: 'بيانات أخرى بالبنية نفسها (عناوين ومسؤولون وحالات وترتيب مختلف) تُعرض كلها بحالتها وعددها، ولا يظهر شيء من الملف المرفق',
+      run: async (p) => {
+        if (!(await openWith(p, TASKS_OTHER))) return fail('عدد المهام المعروضة لا يطابق البيانات الأخرى');
+        const r = await qt<{ bad: number; count: boolean; stale: number }>(p, `
+          const tasks = ${JSON.stringify(TASKS_OTHER)}; const L = ${JSON.stringify(LABEL)};
+          const texts = items().map(txt);
+          const bad = tasks.filter((t) => !texts.some((x) => x.includes(t.title) && x.includes(t.owner) && x.includes(L[t.status]))).length;
+          const body = txt(document.body);
+          return { bad, count: hasNumber(outsideItems(), tasks.length), stale: ${JSON.stringify(SHIPPED_TITLES)}.filter((x) => body.includes(x)).length };`);
+        if (r.bad > 0) return fail(`مهام لا تُعرض بعنوانها ومسؤولها وحالتها: ${r.bad}`);
+        if (r.stale > 0) return fail(`تظهر مهام من الملف المرفق لا من الخدمة: ${r.stale}`);
+        return r.count ? pass() : fail('عدد المهام المعروضة غير ظاهر أو لا يطابق البيانات');
       },
     },
     {

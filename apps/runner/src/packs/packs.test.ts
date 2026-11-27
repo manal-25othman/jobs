@@ -50,10 +50,10 @@ for (const activity of ACTIVITIES) {
     assert.ok(pack, `${activity} is registered`);
     assert.equal(pack.activityId, activity);
     assert.equal(pack.status, 'candidate');
-    assert.equal(pack.version, '0.1.0');
+    assert.equal(pack.version, '0.2.0');
     const keys = new Set(criteriaOf(activity));
     const all = entries(pack);
-    assert.ok(all.length >= 8 && all.length <= 16, `${all.length} tests`);
+    assert.ok(all.length >= 8 && all.length <= 20, `${all.length} tests`);
     for (const t of all) assert.ok(keys.has(t.criterionKey), `${t.id} maps to ${t.criterionKey}, which is not in the rubric`);
     for (const h of pack.humanOnlyCriteria) {
       assert.ok(keys.has(h.criterionKey), `human-only ${h.criterionKey} is not in the rubric`);

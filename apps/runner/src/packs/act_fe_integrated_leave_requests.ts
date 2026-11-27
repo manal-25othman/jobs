@@ -3,6 +3,9 @@
  * List tests serve their OWN requests (overrideFile), in an order that is neither oldest- nor newest-first, so a
  * page that hard-codes the shipped data or only reverses it is told apart from one that orders by submission date.
  * Data states come from the harness (failRequestsTo), never from the page's URL scenario.
+ * 0.2.0: state-transition tests follow whole sequences of visible states (error → retry → error → retry → list or
+ * empty), read the whole page (not only the list region) for a stale error, a live alert, aria-busy or a leftover retry
+ * control, and a second data set of the same shape tells real rendering from output written for the shipped file.
  */
 import type { PageDriver, TestPack } from '../pack.js';
 import { MOBILE, TABLET, clickTagged, fail, pass, presence, probingReport, q, until } from './lib.js';
@@ -17,6 +20,15 @@ const REQUESTS = [
   { id: 7005, type: 'sick', startDate: '2027-02-08', endDate: '2027-02-09', days: 2, status: 'approved', submittedAt: '2027-02-08' },
   { id: 7006, type: 'annual', startDate: '2027-09-12', endDate: '2027-09-16', days: 5, status: 'rejected', submittedAt: '2027-08-20' },
 ];
+/** A second data set of the same shape: other ids, years, durations and status mix, shuffled. */
+const OTHER_REQUESTS = [
+  { id: 9102, type: 'annual', startDate: '2028-10-03', endDate: '2028-10-16', days: 12, status: 'pending', submittedAt: '2028-09-01' },
+  { id: 9087, type: 'emergency', startDate: '2028-03-21', endDate: '2028-03-21', days: 1, status: 'approved', submittedAt: '2028-03-21' },
+  { id: 9140, type: 'sick', startDate: '2028-12-06', endDate: '2028-12-09', days: 4, status: 'rejected', submittedAt: '2028-12-05' },
+  { id: 9055, type: 'annual', startDate: '2028-01-29', endDate: '2028-01-30', days: 2, status: 'approved', submittedAt: '2028-01-04' },
+];
+/** Start dates of the file shipped with the starter: none may appear while other data is served. */
+const SHIPPED_STARTS = ['2026-02-08', '2026-04-14', '2026-06-03', '2026-08-16', '2026-12-20'];
 const NEWEST_FIRST = [...REQUESTS].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)).map((r) => r.startDate);
 const TYPE_RE: Record<string, string> = { annual: 'سنوي', sick: 'مرض', emergency: 'اضطرار|طار' };
 const STATUS_RE: Record<string, string> = { approved: 'مقبول|موافق|معتمد', pending: 'قيد|انتظار|معل', rejected: 'مرفوض|رفض' };
@@ -36,14 +48,29 @@ const emptyShown = () => /لا (توجد )?طلبات/.test(txt(region()));
 const retryAny = () => findButton(/إعادة المحاولة|حاول/) || innermost(/إعادة المحاولة/, region());
 const retryReal = () => { const b = retryAny(); return realButton(b) ? b : null; };
 const listed = (n) => reqItems().length === n && !loadingShown();
+const ERR_RE = /تعذّر|تعذر|خطأ|فشل|لم (نتمكن|يتمكن|تتمكن|يتم)|مشكلة|انقطع/;
+const errorAnywhere = () => ERR_RE.test(txt(document.body));
+const alertShown = () => [...document.querySelectorAll('[role=alert]')].some((e) => vis(e) && txt(e));
+const busyShown = () => [...document.querySelectorAll('[aria-busy=true], [role=progressbar]')].some(vis);
+const errorTrace = () => [...new Set([...document.querySelectorAll('[role=alert]')].filter(vis).map(txt)
+  .concat([txt(innermost(ERR_RE))]).filter((t) => t.length >= 4))];
+const traceGone = (trace) => { const b = txt(document.body); return trace.every((t) => !b.includes(t)); };
+const settledList = (n, trace) => listed(n) && !errorAnywhere() && !alertShown() && !busyShown() && !retryAny() && traceGone(trace);
+const settledEmpty = () => emptyShown() && reqItems().length === 0 && !loadingShown() && !errorAnywhere() && !alertShown() && !busyShown();
+const errorAgain = () => (errorShown() || alertShown()) && !!retryAny() && !loadingShown() && reqItems().length === 0;
+const leftovers = (n, trace) => [
+  reqItems().length !== n ? 'الطلبات غير معروضة كاملة' : '', loadingShown() || busyShown() ? 'التحميل ما زال ظاهرًا' : '',
+  errorAnywhere() || !traceGone(trace) ? 'رسالة الخطأ ما زالت ظاهرة' : '', alertShown() ? 'تنبيه role=alert ما زال ظاهرًا' : '',
+  retryAny() ? 'زر إعادة المحاولة ما زال ظاهرًا' : '',
+].filter(Boolean).join(' · ');
 `;
 
 const ql = <T>(p: PageDriver, body: string): Promise<T> => q<T>(p, body, LEAVE_LIB);
 const ul = (p: PageDriver, body: string, ms: number): Promise<boolean> => until(p, body, ms, LEAVE_LIB);
 
 /** Serves the pack's requests, opens, and waits for a rendered list; returns how many requests are shown. */
-async function openList(p: PageDriver, viewport?: { width: number; height: number }): Promise<number> {
-  p.overrideFile(DATA, JSON.stringify(REQUESTS));
+async function openList(p: PageDriver, viewport?: { width: number; height: number }, reqs: readonly object[] = REQUESTS): Promise<number> {
+  p.overrideFile(DATA, JSON.stringify(reqs));
   await p.open(undefined, viewport);
   await ul(p, `return reqItems().length > 0 && !loadingShown();`, 2500);
   await p.wait(100);
@@ -62,9 +89,50 @@ async function failThenRetry(p: PageDriver, next: 'ok' | 'slow' | 'empty'): Prom
   return (await clickTagged(p, 'retry')) ? 'clicked' : 'no_retry';
 }
 
+/** Requests whose type, period, days or status (in Arabic) are not all shown; raw English codes count once. */
+function fieldsMissing(p: PageDriver, reqs: readonly (typeof REQUESTS)[number][]): Promise<number> {
+  return ql<number>(p, `
+    const reqs = ${JSON.stringify(reqs)}; const T = ${JSON.stringify(TYPE_RE)}; const S = ${JSON.stringify(STATUS_RE)};
+    const texts = reqItems().map(txt);
+    let bad = 0;
+    for (const r of reqs) {
+      const t = texts.find((x) => x.includes(r.startDate));
+      const daysOk = t && (hasNumber(t.replace(r.startDate, '').replace(r.endDate, ''), r.days));
+      if (!t || !t.includes(r.endDate) || !daysOk || !new RegExp(T[r.type]).test(t) || !new RegExp(S[r.status]).test(t)) bad++;
+    }
+    if (/\\b(annual|sick|emergency|approved|pending|rejected)\\b/.test(txt(region()))) bad++;
+    return bad;`);
+}
+
+/**
+ * Opens with the service failing and waits for the error state; returns what the error said (visible alerts and the
+ * innermost element carrying an error word), so a later state can be checked for any trace of it. Null: no error state.
+ */
+async function openInError(p: PageDriver): Promise<string[] | null> {
+  p.overrideFile(DATA, JSON.stringify(REQUESTS));
+  p.failRequestsTo(DATA, 'error');
+  await p.open();
+  if (!(await ul(p, `return errorAgain();`, 2500))) return null;
+  return ql<string[]>(p, `return errorTrace();`);
+}
+
+/** Lets the next request answer with `next`, then activates the visible retry control; false when there is none. */
+async function retryWith(p: PageDriver, next: 'ok' | 'slow' | 'empty' | 'error'): Promise<boolean> {
+  p.failRequestsTo(DATA, next);
+  if (!(await ql<boolean>(p, `return tag(retryAny(), 'retry');`))) return false;
+  return clickTagged(p, 'retry');
+}
+
+/** A retry that fails again: the page must come back to the error state, with no list and no loading left. */
+async function retryFailsAgain(p: PageDriver): Promise<boolean> {
+  if (!(await retryWith(p, 'error'))) return false;
+  await p.wait(700);
+  return ul(p, `return errorAgain();`, 2000);
+}
+
 export const actFeIntegratedLeaveRequestsPack: TestPack = {
   activityId: 'act_fe_integrated_leave_requests',
-  version: '0.1.0',
+  version: '0.2.0',
   status: 'candidate',
   entry: 'index.html',
   tests: [
@@ -92,18 +160,19 @@ export const actFeIntegratedLeaveRequestsPack: TestPack = {
       labelAr: 'كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات',
       run: async (p) => {
         if ((await openList(p)) !== N) return fail('عدد الطلبات المعروضة لا يطابق ما أرجعته الخدمة');
-        const bad = await ql<number>(p, `
-          const reqs = ${JSON.stringify(REQUESTS)}; const T = ${JSON.stringify(TYPE_RE)}; const S = ${JSON.stringify(STATUS_RE)};
-          const texts = reqItems().map(txt);
-          let bad = 0;
-          for (const r of reqs) {
-            const t = texts.find((x) => x.includes(r.startDate));
-            const daysOk = t && (hasNumber(t.replace(r.startDate, '').replace(r.endDate, ''), r.days));
-            if (!t || !t.includes(r.endDate) || !daysOk || !new RegExp(T[r.type]).test(t) || !new RegExp(S[r.status]).test(t)) bad++;
-          }
-          if (/\b(annual|sick|emergency|approved|pending|rejected)\b/.test(txt(region()))) bad++;
-          return bad;`);
+        const bad = await fieldsMissing(p, REQUESTS);
         return bad === 0 ? pass() : fail(`طلبات لا تُعرض حقولها كاملة بالعربية: ${bad}`);
+      },
+    },
+    {
+      id: 'output.other_requests_same_shape', criterionKey: 'data_states', layer: 'output', mode: 'automated',
+      labelAr: 'بيانات أخرى بالبنية نفسها (أرقام وتواريخ وحالات مختلفة) تُعرض كلها، ولا يظهر شيء من الملف المرفق',
+      run: async (p) => {
+        if ((await openList(p, undefined, OTHER_REQUESTS)) !== OTHER_REQUESTS.length) return fail('عدد الطلبات المعروضة لا يطابق البيانات الأخرى');
+        const bad = await fieldsMissing(p, OTHER_REQUESTS);
+        if (bad > 0) return fail(`طلبات لا تُعرض حقولها كاملة بالعربية: ${bad}`);
+        const stale = await ql<number>(p, `const b = txt(document.body); return ${JSON.stringify(SHIPPED_STARTS)}.filter((d) => b.includes(d)).length;`);
+        return stale === 0 ? pass() : fail(`تظهر طلبات من الملف المرفق لا من الخدمة: ${stale}`);
       },
     },
     {
@@ -164,6 +233,45 @@ export const actFeIntegratedLeaveRequestsPack: TestPack = {
         if ((await failThenRetry(p, 'empty')) === 'no_retry') return fail('لا عنصر لإعادة المحاولة بعد الفشل');
         const ok = await ul(p, `return emptyShown() && !loadingShown() && !errorShown();`, 3000);
         return ok ? pass() : fail('بعد إعادة المحاولة بقائمة خالية لم تنته رسالة التحميل أو لم تظهر حالة الفراغ');
+      },
+    },
+    {
+      id: 'state.retry_success_clears_error', criterionKey: 'state_transitions', layer: 'functional', mode: 'automated',
+      labelAr: 'بعد نجاح إعادة المحاولة لا يبقى في الصفحة كلها أثر للخطأ: لا رسالته، ولا تنبيه، ولا زر إعادة المحاولة، ولا تحميل',
+      run: async (p) => {
+        const trace = await openInError(p);
+        if (!trace) return fail('لا حالة خطأ مع إعادة المحاولة بعد الفشل');
+        if (!(await retryWith(p, 'slow'))) return fail('لا عنصر لإعادة المحاولة بعد الفشل');
+        if (!(await ul(p, `return loadingShown() && !errorAnywhere() && !alertShown() && reqItems().length === 0;`, 1200))) {
+          return fail('أثناء إعادة المحاولة لم يظهر التحميل وحده: بقيت رسالة الخطأ أو لم يظهر التحميل');
+        }
+        if (await ul(p, `return settledList(${N}, ${JSON.stringify(trace)});`, 3500)) return pass();
+        return fail(await ql<string>(p, `return leftovers(${N}, ${JSON.stringify(trace)});`));
+      },
+    },
+    {
+      id: 'state.second_retry_cycle', criterionKey: 'state_transitions', layer: 'functional', mode: 'automated',
+      labelAr: 'دورتان: فشل، ثم إعادة محاولة تفشل (خطأ وحده)، ثم إعادة محاولة تنجح (تحميل ثم الطلبات وحدها)',
+      run: async (p) => {
+        const trace = await openInError(p);
+        if (!trace) return fail('لا حالة خطأ مع إعادة المحاولة بعد الفشل');
+        if (!(await retryFailsAgain(p))) return fail('إعادة المحاولة التي تفشل لا تعيد حالة الخطأ وحدها (مع زر إعادة المحاولة، دون تحميل)');
+        if (!(await retryWith(p, 'slow'))) return fail('لا عنصر لإعادة المحاولة في الدورة الثانية');
+        if (!(await ul(p, `return loadingShown() && !errorAnywhere() && !alertShown();`, 1200))) return fail('في الدورة الثانية لم يظهر التحميل وحده');
+        if (await ul(p, `return settledList(${N}, ${JSON.stringify(trace)});`, 3500)) return pass();
+        return fail(`بعد الدورة الثانية: ${await ql<string>(p, `return leftovers(${N}, ${JSON.stringify(trace)});`)}`);
+      },
+    },
+    {
+      id: 'state.second_retry_ends_empty', criterionKey: 'state_transitions', layer: 'functional', mode: 'automated',
+      labelAr: 'دورتان: فشل، ثم إعادة محاولة تفشل، ثم إعادة محاولة بقائمة خالية: حالة الفراغ وحدها دون تحميل ولا خطأ',
+      run: async (p) => {
+        if (!(await openInError(p))) return fail('لا حالة خطأ مع إعادة المحاولة بعد الفشل');
+        if (!(await retryFailsAgain(p))) return fail('إعادة المحاولة التي تفشل لا تعيد حالة الخطأ وحدها (مع زر إعادة المحاولة، دون تحميل)');
+        if (!(await retryWith(p, 'empty'))) return fail('لا عنصر لإعادة المحاولة في الدورة الثانية');
+        if (await ul(p, `return settledEmpty();`, 3000)) return pass();
+        const r = await ql<{ loading: boolean; error: boolean; empty: boolean }>(p, `return { loading: loadingShown() || busyShown(), error: errorAnywhere() || alertShown(), empty: emptyShown() };`);
+        return fail([r.loading ? 'التحميل ما زال ظاهرًا' : '', r.error ? 'رسالة الخطأ ما زالت ظاهرة' : '', !r.empty ? 'لا رسالة للقائمة الخالية' : ''].filter(Boolean).join(' · ') || 'الحالة الأخيرة ليست حالة الفراغ وحدها');
       },
     },
     {

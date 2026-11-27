@@ -2,6 +2,8 @@
  * CANDIDATE pack — act_fe_debug_improve (workshop registration page). Not approved by an expert.
  * Observes the page's behaviour after the graduate's fixes: form semantics, keyboard use, per-field validation,
  * layout at 360 and 1024 px. It cannot read the root-cause note, and it never decides a criterion a person owns.
+ * 0.2.0: the page has no data file, so its input varies instead: one page load receives several registrations with
+ * different names and addresses, and each verdict must follow its own input (no stale success, no stale message).
  */
 import type { PageDriver, TestPack, TestOutcomeReport } from '../pack.js';
 import { MOBILE, TABLET, clickTagged, fail, pass, presence, probingReport, q, starterRetention, until } from './lib.js';
@@ -57,6 +59,13 @@ async function submitAndSettle(p: PageDriver): Promise<{ ok: boolean; emailMsg: 
 }
 
 const INVALID = ['nora@example', 'reem.example.com', 'ali@', '@example.com', 'mona @example.com', 'sara@gmail'];
+/** One page load, several registrations of the same shape with other values: each verdict must follow its input. */
+const SEQUENCE: readonly { name: string; email: string; ok: boolean }[] = [
+  { name: 'منى الشهري', email: 'mona.alshehri@example.com', ok: true },
+  { name: 'Rana Saleh', email: 'rana@mail', ok: false },
+  { name: 'عبدالله القرني', email: 'abdullah.q@example.net', ok: true },
+  { name: 'ليان', email: 'layan@@example.org', ok: false },
+];
 const VALID = ['sara@gmail.com', 'huda.alharbi@mail.example.sa', 'n.qahtani+ws@example.org'];
 
 async function tabWalk(p: PageDriver, onStep: (w: string) => Promise<void>): Promise<string[]> {
@@ -74,7 +83,7 @@ async function tabWalk(p: PageDriver, onStep: (w: string) => Promise<void>): Pro
 
 export const actFeDebugImprovePack: TestPack = {
   activityId: 'act_fe_debug_improve',
-  version: '0.1.0',
+  version: '0.2.0',
   status: 'candidate',
   entry: 'index.html',
   tests: [
@@ -177,6 +186,30 @@ export const actFeDebugImprovePack: TestPack = {
           const r = await submitAndSettle(p);
           if (!r) return fail('لم يُعثر على زر الإرسال');
           if (!r.ok) return fail(`لم يُقبل عنوان صالح (${i + 1} من ${VALID.length})`);
+        }
+        return p.pageErrors().length === 0 ? pass() : fail('أخطاء غير معالجة في الصفحة');
+      },
+    },
+    {
+      id: 'validation.each_submission_follows_input', criterionKey: 'validation_fixed', layer: 'functional', mode: 'automated',
+      labelAr: 'تسجيلات متتالية بأسماء وعناوين مختلفة دون إعادة فتح الصفحة: كل نتيجة تتبع ما أُدخل، فلا نجاح قديم بعد رفض ولا رسالة قديمة بعد قبول',
+      run: async (p) => {
+        await p.open();
+        for (let i = 0; i < SEQUENCE.length; i++) {
+          const step = SEQUENCE[i]!;
+          const at = `(${i + 1} من ${SEQUENCE.length})`;
+          if (!(await fillField(p, 'name', step.name)) || !(await fillField(p, 'email', step.email))) return fail(`لم يُعثر على حقلي الاسم والبريد ${at}`);
+          const r = await submitAndSettle(p);
+          if (!r) return fail('لم يُعثر على زر الإرسال');
+          if (step.ok) {
+            if (!r.ok) return fail(`لم يُقبل تسجيل صالح ${at}`);
+            const clean = await qf<boolean>(p, `const e = field('email'); return !msgFor(e) && e.getAttribute('aria-invalid') !== 'true';`);
+            if (!clean) return fail(`بقيت رسالة خطأ عند البريد بعد تسجيل صالح ${at}`);
+          } else {
+            if (r.ok) return fail(`قُبلت قيمة غير صالحة ${at}`);
+            if (!r.emailMsg) return fail(`لا رسالة عند الحقل بعد إرسال قيمة غير صالحة ${at}`);
+            if ((await qf<number>(p, `return okCount();`)) > 0) return fail(`بقيت رسالة النجاح السابقة ظاهرة بعد رفض قيمة غير صالحة ${at}`);
+          }
         }
         return p.pageErrors().length === 0 ? pass() : fail('أخطاء غير معالجة في الصفحة');
       },

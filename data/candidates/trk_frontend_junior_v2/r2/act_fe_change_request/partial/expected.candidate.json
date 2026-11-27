@@ -9,10 +9,12 @@
     "output.list_follows_data": "pass",
     "filter.control_labelled": "fail",
     "filter.each_status_then_all": "fail",
+    "filter.kept_when_data_renders": "fail",
     "filter.no_match_message": "fail",
     "data_states.empty_answer_message": "pass",
     "data_states.error_and_empty_distinct": "pass",
     "errors.retry_recovers": "pass",
+    "output.other_tasks_same_shape": "pass",
     "data_states.loading_then_list": "pass"
   },
   "criteria": {

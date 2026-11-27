@@ -13,6 +13,7 @@
     "a11y.field_errors_linked": "fail",
     "validation.invalid_addresses_refused": "fail",
     "validation.common_addresses_accepted": "pass",
+    "validation.each_submission_follows_input": "fail",
     "form.per_field_messages_when_empty": "fail",
     "form.values_kept_and_error_clears": "fail",
     "responsive.page_width_360": "pass",

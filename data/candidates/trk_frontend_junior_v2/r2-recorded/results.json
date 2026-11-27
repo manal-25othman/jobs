@@ -1,10 +1,10 @@
 {
  "_label": "RECORDED by the development runner for the SIMULATED GitHub snapshots — candidate packs, synthetic code. Served in staging with R2_MODE=recorded.",
- "recordedAt": "2026-11-27T09:58:24.143Z",
+ "recordedAt": "2026-11-27T10:49:42.896Z",
  "results": {
   "act_fe_integrated_leave_requests:sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63": {
    "activityId": "act_fe_integrated_leave_requests",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63",
@@ -20,7 +20,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 13010,
+   "durationMs": 21864,
    "tests": [
     {
      "testId": "gaming.environment_probing",
@@ -65,6 +65,15 @@
      "mode": "automated",
      "outcome": "pass",
      "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
+     "noteAr": null
+    },
+    {
+     "testId": "output.other_requests_same_shape",
+     "criterionKey": "data_states",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بيانات أخرى بالبنية نفسها (أرقام وتواريخ وحالات مختلفة) تُعرض كلها، ولا يظهر شيء من الملف المرفق",
      "noteAr": null
     },
     {
@@ -122,6 +131,33 @@
      "noteAr": null
     },
     {
+     "testId": "state.retry_success_clears_error",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بعد نجاح إعادة المحاولة لا يبقى في الصفحة كلها أثر للخطأ: لا رسالته، ولا تنبيه، ولا زر إعادة المحاولة، ولا تحميل",
+     "noteAr": null
+    },
+    {
+     "testId": "state.second_retry_cycle",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "دورتان: فشل، ثم إعادة محاولة تفشل (خطأ وحده)، ثم إعادة محاولة تنجح (تحميل ثم الطلبات وحدها)",
+     "noteAr": null
+    },
+    {
+     "testId": "state.second_retry_ends_empty",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "دورتان: فشل، ثم إعادة محاولة تفشل، ثم إعادة محاولة بقائمة خالية: حالة الفراغ وحدها دون تحميل ولا خطأ",
+     "noteAr": null
+    },
+    {
      "testId": "responsive.page_width_360",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
@@ -150,13 +186,11 @@
     }
    ],
    "blockedRequests": 0,
-   "gamingSignals": [
-    "shipped_data_embedded"
-   ]
+   "gamingSignals": []
   },
   "act_fe_integrated_leave_requests:sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280": {
    "activityId": "act_fe_integrated_leave_requests",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280",
@@ -172,7 +206,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 19553,
+   "durationMs": 33895,
    "tests": [
     {
      "testId": "gaming.environment_probing",
@@ -217,7 +251,16 @@
      "mode": "automated",
      "outcome": "fail",
      "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
-     "noteAr": "طلبات لا تُعرض حقولها كاملة بالعربية: 6"
+     "noteAr": "طلبات لا تُعرض حقولها كاملة بالعربية: 7"
+    },
+    {
+     "testId": "output.other_requests_same_shape",
+     "criterionKey": "data_states",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "بيانات أخرى بالبنية نفسها (أرقام وتواريخ وحالات مختلفة) تُعرض كلها، ولا يظهر شيء من الملف المرفق",
+     "noteAr": "طلبات لا تُعرض حقولها كاملة بالعربية: 5"
     },
     {
      "testId": "output.order_by_submission_date",
@@ -274,6 +317,33 @@
      "noteAr": "بعد إعادة المحاولة بقائمة خالية لم تنته رسالة التحميل أو لم تظهر حالة الفراغ"
     },
     {
+     "testId": "state.retry_success_clears_error",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "بعد نجاح إعادة المحاولة لا يبقى في الصفحة كلها أثر للخطأ: لا رسالته، ولا تنبيه، ولا زر إعادة المحاولة، ولا تحميل",
+     "noteAr": "التحميل ما زال ظاهرًا"
+    },
+    {
+     "testId": "state.second_retry_cycle",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "دورتان: فشل، ثم إعادة محاولة تفشل (خطأ وحده)، ثم إعادة محاولة تنجح (تحميل ثم الطلبات وحدها)",
+     "noteAr": "بعد الدورة الثانية: التحميل ما زال ظاهرًا"
+    },
+    {
+     "testId": "state.second_retry_ends_empty",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "دورتان: فشل، ثم إعادة محاولة تفشل، ثم إعادة محاولة بقائمة خالية: حالة الفراغ وحدها دون تحميل ولا خطأ",
+     "noteAr": "التحميل ما زال ظاهرًا · لا رسالة للقائمة الخالية"
+    },
+    {
      "testId": "responsive.page_width_360",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
@@ -306,7 +376,7 @@
   },
   "act_fe_debug_improve:sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7": {
    "activityId": "act_fe_debug_improve",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7",
@@ -322,7 +392,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 5935,
+   "durationMs": 6393,
    "tests": [
     {
      "testId": "quality.starter_lines_kept",
@@ -424,6 +494,15 @@
      "noteAr": null
     },
     {
+     "testId": "validation.each_submission_follows_input",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة دون إعادة فتح الصفحة: كل نتيجة تتبع ما أُدخل، فلا نجاح قديم بعد رفض ولا رسالة قديمة بعد قبول",
+     "noteAr": null
+    },
+    {
      "testId": "form.per_field_messages_when_empty",
      "criterionKey": "form_submission_flow",
      "layer": "errors",
@@ -474,7 +553,7 @@
   },
   "act_fe_debug_improve:sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a": {
    "activityId": "act_fe_debug_improve",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a",
@@ -490,7 +569,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 8550,
+   "durationMs": 9800,
    "tests": [
     {
      "testId": "quality.starter_lines_kept",
@@ -592,6 +671,15 @@
      "noteAr": "لم يُقبل عنوان صالح (1 من 3)"
     },
     {
+     "testId": "validation.each_submission_follows_input",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة دون إعادة فتح الصفحة: كل نتيجة تتبع ما أُدخل، فلا نجاح قديم بعد رفض ولا رسالة قديمة بعد قبول",
+     "noteAr": "لم يُقبل تسجيل صالح (1 من 4)"
+    },
+    {
      "testId": "form.per_field_messages_when_empty",
      "criterionKey": "form_submission_flow",
      "layer": "errors",
@@ -642,7 +730,7 @@
   },
   "act_fe_change_request:sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930": {
    "activityId": "act_fe_change_request",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930",
@@ -658,7 +746,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 7169,
+   "durationMs": 9016,
    "tests": [
     {
      "testId": "quality.structure_kept",
@@ -724,6 +812,15 @@
      "noteAr": null
     },
     {
+     "testId": "filter.kept_when_data_renders",
+     "criterionKey": "filter_in_state",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "حالة تُختار قبل وصول البيانات تبقى مطبّقة وظاهرة في عنصر الاختيار حين تُعرض البيانات، ثم تغييرها وإزالتها يعيدان الحساب من القائمة كاملة",
+     "noteAr": null
+    },
+    {
      "testId": "filter.no_match_message",
      "criterionKey": "empty_state_correct",
      "layer": "output",
@@ -760,6 +857,15 @@
      "noteAr": null
     },
     {
+     "testId": "output.other_tasks_same_shape",
+     "criterionKey": "js_correctness",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بيانات أخرى بالبنية نفسها (عناوين ومسؤولون وحالات وترتيب مختلف) تُعرض كلها بحالتها وعددها، ولا يظهر شيء من الملف المرفق",
+     "noteAr": null
+    },
+    {
      "testId": "data_states.loading_then_list",
      "criterionKey": "js_correctness",
      "layer": "data_states",
@@ -774,7 +880,7 @@
   },
   "act_fe_change_request:sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c": {
    "activityId": "act_fe_change_request",
-   "packVersion": "0.1.0",
+   "packVersion": "0.2.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c",
@@ -790,7 +896,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 7209,
+   "durationMs": 10633,
    "tests": [
     {
      "testId": "quality.structure_kept",
@@ -856,6 +962,15 @@
      "noteAr": "لا عنصر اختيار للحالة"
     },
     {
+     "testId": "filter.kept_when_data_renders",
+     "criterionKey": "filter_in_state",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "حالة تُختار قبل وصول البيانات تبقى مطبّقة وظاهرة في عنصر الاختيار حين تُعرض البيانات، ثم تغييرها وإزالتها يعيدان الحساب من القائمة كاملة",
+     "noteAr": "لا عنصر اختيار للحالة"
+    },
+    {
      "testId": "filter.no_match_message",
      "criterionKey": "empty_state_correct",
      "layer": "output",
@@ -889,6 +1004,15 @@
      "mode": "automated",
      "outcome": "pass",
      "labelAr": "بعد فشل التحميل، إعادة المحاولة تعرض القائمة دون أخطاء غير معالجة",
+     "noteAr": null
+    },
+    {
+     "testId": "output.other_tasks_same_shape",
+     "criterionKey": "js_correctness",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بيانات أخرى بالبنية نفسها (عناوين ومسؤولون وحالات وترتيب مختلف) تُعرض كلها بحالتها وعددها، ولا يظهر شيء من الملف المرفق",
      "noteAr": null
     },
     {
