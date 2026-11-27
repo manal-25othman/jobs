@@ -1,3 +1,4 @@
+import { isProduction } from '../configuration/configuration.service';
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { recommendLearning, type LearningPlanProposal, type RegistryResource, type PracticeOption } from '@naqla/domain';
@@ -19,7 +20,7 @@ export class LearningService {
   constructor(private readonly db: DbService) {}
 
   previewRequested(): boolean {
-    return process.env['LEARNING_CANDIDATE_PREVIEW'] === 'internal' && process.env['NODE_ENV'] !== 'production';
+    return process.env['LEARNING_CANDIDATE_PREVIEW'] === 'internal' && !isProduction();
   }
 
   async forSkill(userId: string, skillId: string, roleId: string | null, level: string): Promise<LearningPlanProposal> {

@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "إعادة كتابة شاملة تعمل وتستوفي المتطلبات: أصناف وأسماء حقول جديدة (fullName/emailAddress)، وأقسام جديدة (hero، أسئلة)، وCSS جديد كليًا، وJS بصنف SignupForm وجدول يُبنى من بيانات.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "met",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "unmet",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form وlabel لكل حقل وbutton type=submit، وh1 ثم h2، وجدول بـthead/th وcaption، وaside وnav وmain.",
+    "a11y_keyboard_forms": "كل حقل مسمّى، ورسائل ws-field__hint مرتبطة بـaria-describedby مع aria-invalid، وتركيز ظاهر، ورابط تخطٍّ.",
+    "responsive_fixed": "لا overflow-x:hidden، والجدول داخل .ws-table-scroll، والتخطيط flex يصير صفًا عند min-width:1024px فيظهر العمود الجانبي.",
+    "validation_fixed": "نمط البريد في FIELD_SCHEMA يتطلب نطاقًا وامتدادًا فيرفض sara@gmail، ورسالة بجانب كل حقل.",
+    "root_cause_note": "الحالة تحتوي كودًا فقط بلا ملاحظات مكتوبة، فالحكم يعتمد على ملاحظة الخرّيج ويُترك للمراجِع البشري.",
+    "scope_discipline": "الصفحة أُعيدت كتابتها كاملة (HTML وCSS وJS وأسماء المعرّفات والنصوص وأقسام إضافية)، خلافًا لطلب README «إصلاحها لا إعادة كتابتها»؛ التغييرات ليست في مواضع الأعطال.",
+    "form_submission_flow": "لا إرسال مع حقل غير صالح، ولكل حقل رسالته، والقيم تبقى، والرسالة تُحدّث عند التصحيح.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

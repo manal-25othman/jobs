@@ -10,6 +10,7 @@ import { BACKEND_NAME, chromiumEntry, cleanupAttempt, prepareAttempt, type Attem
 import { Driver, launchSandboxedBrowser } from './harness.js';
 import type { TestPack } from './pack.js';
 import { gamingSignals } from './gaming.js';
+import { integritySignals } from './integrity.js';
 
 export interface AttemptInput {
   readonly pack: TestPack;
@@ -78,6 +79,6 @@ export async function runAttempt(input: AttemptInput): Promise<TestRunResult> {
   return assertTestRunResult({
     activityId: pack.activityId, packVersion: pack.version, packStatus: pack.status, commitSha: input.commitSha,
     snapshotHash: snapshotHash(input.files), origin: input.origin, backend: BACKEND_NAME, limits, status,
-    durationMs: Date.now() - started, tests, blockedRequests: blocked, gamingSignals: gamingSignals(input.files),
+    durationMs: Date.now() - started, tests, blockedRequests: blocked, gamingSignals: [...new Set([...gamingSignals(input.files), ...integritySignals(input.files, input.starterFiles ?? [])])].sort(),
   });
 }

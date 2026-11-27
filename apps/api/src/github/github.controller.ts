@@ -17,6 +17,9 @@ export class GitHubController {
   @Post('me/github/simulated-install')
   async connect(@CurrentUser() u: AuthenticatedUser, @Body() body: { login?: unknown; repositories?: unknown }) { return { ok: true, data: await this.gh.connectSimulated(u.id, body ?? {}) }; }
 
+  @Post('me/github/app-callback')
+  async appCallback(@CurrentUser() u: AuthenticatedUser, @Body() body: { code?: unknown; installationId?: unknown; state?: unknown }) { return { ok: true, data: await this.gh.completeApp(u.id, body ?? {}) }; }
+
   @Delete('me/github')
   async unlink(@CurrentUser() u: AuthenticatedUser) { return { ok: true, data: await this.gh.unlink(u.id) }; }
 

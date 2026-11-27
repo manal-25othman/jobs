@@ -1,18 +1,41 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
-  TESTS_ARE_NOT_SKILL_PROOF_AR, TEST_RUN_SHADOW_AR, assertTestRunResult, needsHumanEscalation, summarizeByCriterion,
+  TESTS_ARE_NOT_SKILL_PROOF_AR, TEST_RUN_SHADOW_AR, assertTestRunResult, snapshotHash, needsHumanEscalation, summarizeByCriterion,
   type SubmittedFile, type TestRunResult,
 } from '@naqla/domain';
 import { DbService } from '../infra/db.service';
+import { isProduction } from '../configuration/configuration.service';
 import { emitAuditEvent } from '../infra/audit';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
-export function r2Mode(): 'off' | 'synthetic_dev' {
-  return process.env['R2_MODE'] === 'synthetic_dev' && process.env['NODE_ENV'] !== 'production' ? 'synthetic_dev' : 'off';
+/**
+ * synthetic_dev: run the development sandbox (local machines only — never on a deployed host, NODE_ENV=production).
+ * recorded: serve results recorded earlier by that runner for the simulated GitHub snapshots (staging); no code runs.
+ */
+export function r2Mode(): 'off' | 'synthetic_dev' | 'recorded' {
+  const m = process.env['R2_MODE'];
+  if (m === 'synthetic_dev' && process.env['NODE_ENV'] !== 'production') return 'synthetic_dev';
+  if (m === 'recorded' && !isProduction()) return 'recorded';
+  return 'off';
+}
+
+export const RECORDED_AR = 'نتيجة مسجّلة مسبقًا من مشغّل التطوير لهذه النسخة الاصطناعية نفسها؛ لا يُشغَّل أي كود في هذه البيئة.';
+
+let recordedCache: Record<string, TestRunResult> | null = null;
+function recordedResults(): Record<string, TestRunResult> {
+  if (recordedCache) return recordedCache;
+  let d = __dirname;
+  for (let i = 0; i < 8; i++) {
+    const p = join(d, 'data', 'candidates', 'trk_frontend_junior_v2', 'r2-recorded', 'results.json');
+    if (existsSync(p)) { recordedCache = (JSON.parse(readFileSync(p, 'utf8')) as { results: Record<string, TestRunResult> }).results; return recordedCache; }
+    d = dirname(d);
+  }
+  recordedCache = {};
+  return recordedCache;
 }
 
 function runnerCli(): string {
@@ -52,11 +75,20 @@ export class TestRunService {
 
   /** Runs and records. Returns the graduate-facing view, or null when R2 is off or the activity has no pack. */
   async runForSubmission(userId: string, submissionId: string, activityKey: string, files: readonly SubmittedFile[], commitSha: string | null) {
-    if (r2Mode() === 'off') return null;
-    const r = await this.invoke(activityKey, files, commitSha);
+    const mode = r2Mode();
+    if (mode === 'off') return null;
+    let r: { ok: true; result: TestRunResult } | { ok: false; error: string };
+    if (mode === 'recorded') {
+      const rec = recordedResults()[`${activityKey}:${snapshotHash(files)}`];
+      r = rec ? { ok: true, result: { ...rec, commitSha, backend: 'recorded-dev' } } : { ok: false, error: '[r2_not_recorded] no recorded result for this snapshot' };
+    } else {
+      r = await this.invoke(activityKey, files, commitSha);
+    }
     if (!r.ok) {
       await this.db.asService((c) => emitAuditEvent(c, { eventType: 'test_run.refused', userId, actorKind: 'system', subjectTable: 'submission', subjectId: submissionId, reason: 'R2 did not run', payload: { error: r.error } }));
-      return { ran: false as const, reasonAr: /r2_pack/.test(r.error) ? 'لا توجد اختبارات آلية لهذا النشاط بعد.' : 'تعذّر تشغيل الاختبارات الآلية الآن؛ سيراجع عملك إنسان.' };
+      return { ran: false as const, reasonAr: /r2_pack/.test(r.error) ? 'لا توجد اختبارات آلية لهذا النشاط بعد.'
+        : /r2_not_recorded/.test(r.error) ? 'لا تُشغَّل الاختبارات الآلية في بيئة التجربة إلا لنسخ المستودعات المحاكاة؛ سيراجع عملك إنسان.'
+        : 'تعذّر تشغيل الاختبارات الآلية الآن؛ سيراجع عملك إنسان.' };
     }
     const result = assertTestRunResult(r.result);
     const id = await this.db.asService(async (c) => {
@@ -76,6 +108,7 @@ export class TestRunService {
   present(result: TestRunResult) {
     return {
       status: result.status, commitSha: result.commitSha, snapshotHash: result.snapshotHash, packStatus: result.packStatus,
+      recorded: result.backend === 'recorded-dev', recordedAr: result.backend === 'recorded-dev' ? RECORDED_AR : null,
       noticeAr: TESTS_ARE_NOT_SKILL_PROOF_AR, shadowAr: TEST_RUN_SHADOW_AR,
       tests: result.tests.map((t) => ({ testId: t.testId, labelAr: t.labelAr, outcome: t.outcome, mode: t.mode, noteAr: t.noteAr })),
       byCriterion: summarizeByCriterion(result),

@@ -1,0 +1,86 @@
+/* Rewritten design system for the workshop page */
+:root {
+  --ws-ink: #14241f;
+  --ws-ink-soft: #4d5c55;
+  --ws-paper: #fbfaf6;
+  --ws-card: #ffffff;
+  --ws-brand: #17463d;
+  --ws-brand-2: #2b7a68;
+  --ws-line: #dfe5dc;
+  --ws-bad: #b23a3a;
+  --ws-good: #23744c;
+  --ws-radius: 14px;
+  --ws-space: clamp(12px, 3vw, 24px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+.ws {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, system-ui, sans-serif;
+  background: var(--ws-paper);
+  color: var(--ws-ink);
+  line-height: 1.7;
+}
+
+.ws-skip { position: absolute; inset-inline-start: -999px; top: 8px; background: #fff; padding: 8px 12px; }
+.ws-skip:focus { inset-inline-start: 8px; }
+
+.ws-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.ws-header { background: var(--ws-brand); color: #fff; }
+.ws-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; max-width: 1120px; margin: 0 auto; padding: 12px var(--ws-space); }
+.ws-brand { font-weight: 800; letter-spacing: .3px; }
+.ws-nav__links { display: flex; gap: 16px; list-style: none; margin: 0; padding: 0; }
+.ws-nav__links a { color: #e6f3ef; text-decoration: none; }
+.ws-nav__links a:hover { text-decoration: underline; }
+
+.ws-hero { background: linear-gradient(135deg, var(--ws-brand), var(--ws-brand-2)); color: #fff; padding: calc(var(--ws-space) * 2) var(--ws-space); text-align: center; }
+.ws-hero__title { margin: 0 0 8px; font-size: clamp(1.5rem, 5vw, 2.4rem); }
+.ws-hero__text { max-width: 640px; margin: 0 auto 16px; color: #e6f3ef; }
+
+.ws-layout { max-width: 1120px; margin: 0 auto; padding: var(--ws-space); display: flex; flex-direction: column; gap: var(--ws-space); }
+.ws-layout__main { display: flex; flex-direction: column; gap: var(--ws-space); min-width: 0; flex: 1 1 auto; }
+.ws-layout__side { flex: 0 0 auto; align-self: flex-start; }
+
+@media (min-width: 1024px) {
+  .ws-layout { flex-direction: row; align-items: flex-start; }
+  .ws-layout__side { flex-basis: 280px; position: sticky; top: 16px; }
+}
+
+.ws-card { background: var(--ws-card); border: 1px solid var(--ws-line); border-radius: var(--ws-radius); padding: var(--ws-space); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+.ws-card h2 { margin-top: 0; font-size: 1.2rem; }
+
+.ws-table-scroll { overflow-x: auto; }
+.ws-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.ws-table th, .ws-table td { padding: 10px; border-bottom: 1px solid var(--ws-line); text-align: start; }
+.ws-table thead th { background: #eaf4f0; color: var(--ws-brand); }
+
+.ws-form { display: grid; gap: 14px; max-width: 520px; }
+.ws-field__label { display: block; font-weight: 600; margin-bottom: 4px; }
+.ws-field__input { width: 100%; padding: 11px 13px; border: 1.5px solid #c4cfc7; border-radius: 10px; font: inherit; background: #fff; }
+.ws-field__input:focus-visible { outline: 3px solid var(--ws-brand-2); outline-offset: 2px; }
+.ws-field__input[aria-invalid="true"] { border-color: var(--ws-bad); background: #fff8f8; }
+.ws-field__hint { margin: 4px 0 0; min-height: 1.3em; color: var(--ws-bad); font-size: .92rem; }
+.ws-muted { color: var(--ws-ink-soft); font-weight: 400; }
+
+.ws-button { display: inline-block; background: var(--ws-brand); color: #fff; border: 0; border-radius: 999px; padding: 11px 26px; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; justify-self: start; }
+.ws-button:hover { background: var(--ws-brand-2); }
+.ws-button:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
+.ws-button--light { background: #fff; color: var(--ws-brand); }
+
+.ws-form__status { margin: 0; min-height: 1.4em; }
+.ws-form__status.is-ok { color: var(--ws-good); }
+.ws-form__status.is-bad { color: var(--ws-bad); }
+
+.ws-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+.ws-facts dt { color: var(--ws-ink-soft); }
+.ws-facts dd { margin: 0; font-weight: 600; }
+
+details { border-top: 1px solid var(--ws-line); padding: 8px 0; }
+summary { cursor: pointer; font-weight: 600; }
+summary:focus-visible { outline: 3px solid var(--ws-brand-2); }
+
+.ws-footer { text-align: center; color: var(--ws-ink-soft); padding: 24px 16px; }

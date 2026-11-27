@@ -1,3 +1,4 @@
+import { isProduction } from '../configuration/configuration.service';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
@@ -29,7 +30,7 @@ export class CareerDataService implements OnModuleInit {
 
   /** Production refuses to start with published DEMO content (domain: demoContentAllowedInProduction). */
   async onModuleInit(): Promise<void> {
-    if (process.env['NODE_ENV'] !== 'production') return;
+    if (!isProduction()) return; // staging shows labelled pilot content; only a real launch refuses demo content
     const offenders = await this.db.asService(async (c) => {
       const out: string[] = [];
       for (const [t, col] of [['skill', 'review_status'], ['target_role', 'review_status'], ['role_requirement', 'review_status'], ['task', 'review_status'], ['activity_spec', 'status'], ['rubric_version', 'status'], ['learning_resource', 'review_status'], ['career_presentation_rule', 'review_status']] as const) {

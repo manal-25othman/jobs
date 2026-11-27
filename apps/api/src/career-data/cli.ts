@@ -1,3 +1,4 @@
+import { deploymentEnv } from '@naqla/config';
 /**
  * Career data CLI (no Nest). Commands:
  *   import <packId> [--dry-run]        Source → Raw → Normalize → Deduplicate → Map → write DRAFT
@@ -52,7 +53,7 @@ export async function main(argv: string[], root: string): Promise<number> {
   }
   const url = process.env['DATABASE_URL'];
   if (!url) { console.error('DATABASE_URL is required'); return 2; }
-  const production = process.env['NODE_ENV'] === 'production';
+  const production = deploymentEnv() === 'production'; // staging may load the labelled pilot; a launch never
   const pool = new Pool({ connectionString: url });
   try {
     const [cmd, a1, a2, a3] = argv;
@@ -124,7 +125,7 @@ export async function main(argv: string[], root: string): Promise<number> {
       const operatorId = arg(argv, '--operator'); const reason = arg(argv, '--reason');
       if (!operatorId || !reason) { console.error('pilot-publish needs --operator <uuid with an active product_owner grant> and --reason "<why>"'); return 2; }
       try {
-        const r = await publishPilotDemo(pool, { operatorId, reason, nodeEnv: process.env['NODE_ENV'], databaseUrl: url });
+        const r = await publishPilotDemo(pool, { operatorId, reason, nodeEnv: process.env['NODE_ENV'], databaseUrl: url, deployment: deploymentEnv(), stagingDecision: process.env['PILOT_STAGING_DECISION'] ?? null });
         console.log(`D-136 development pilot publication by ${r.operator} — LOCAL DEVELOPMENT ONLY, DEMO content, not SME approved`);
         console.log(`  published: ${r.published.length} (activity/rubric rows) · already published: ${r.alreadyPublished}`);
         return 0;

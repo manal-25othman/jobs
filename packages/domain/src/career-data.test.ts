@@ -114,6 +114,13 @@ describe('D-136 — development-only DEMO publication of pilot content (a separa
     assert.match(pilotDemoPublicationRefusal({ ...ok, isDemoFixture: false })!, /only DEMO-fixture/);
     assert.match(pilotDemoPublicationRefusal({ ...ok, isPilotContent: false })!, /only DEMO-fixture/);
     assert.match(pilotDemoPublicationRefusal({ ...ok, from: 'draft' })!, /from curated/);
+    // Phase C round 3: a private staging deployment only under a named owner decision; production never.
+    const hosted = { ...ok, nodeEnv: 'production', databaseHost: 'db.abcd.supabase.co' };
+    assert.match(pilotDemoPublicationRefusal({ ...hosted, deployment: 'staging' })!, /named owner decision/);
+    assert.match(pilotDemoPublicationRefusal({ ...hosted, deployment: 'staging', stagingDecision: 'yes' })!, /named owner decision/);
+    assert.equal(pilotDemoPublicationRefusal({ ...hosted, deployment: 'staging', stagingDecision: 'D-149' }), null);
+    assert.match(pilotDemoPublicationRefusal({ ...hosted, deployment: 'production', stagingDecision: 'D-149' })!, /outside local development/);
+    assert.match(pilotDemoPublicationRefusal({ ...hosted, deployment: 'staging', stagingDecision: 'D-149', isDemoFixture: false })!, /only DEMO-fixture/);
     assert.match(pilotDemoPublicationRefusal({ ...ok, reason: ' ' })!, /states why/);
   });
   test('the real SME workflow is unchanged: curated → published is still refused for every record', () => {

@@ -10,7 +10,7 @@ import { JourneyNav } from '../../components/JourneyNav';
  * read-only permissions, and can unlink at any time. Only the simulated mode exists before approval: synthetic
  * repositories, no request to GitHub. Linking is never required for non-programming tracks, nor an organisation.
  */
-interface Status { mode: 'off' | 'simulated'; linked: boolean; login?: string | null; simulatedNoticeAr?: string; permissionsAr?: string[]; neverAr?: string[];
+interface Status { mode: 'off' | 'simulated' | 'app'; installUrl?: string | null; linked: boolean; login?: string | null; simulatedNoticeAr?: string; permissionsAr?: string[]; neverAr?: string[];
   repositories?: { repoId: number; fullName: string; private: boolean }[] }
 const TEMPLATES = ['leave-requests', 'workshop-registration', 'team-tasks'];
 
@@ -58,6 +58,12 @@ export default function GitHubPage() {
               <h2>مرتبط بحساب {st.login}</h2>
               <ul className="body-sm">{(st.repositories ?? []).map((r) => <li key={r.repoId}>{r.fullName}{r.private ? ' (خاص)' : ''}</li>)}</ul>
               <button type="button" className="btn btn--secondary" data-testid="github-unlink" onClick={() => void unlink()}>إلغاء الربط وسحب الصلاحيات</button>
+            </section>
+          ) : st.mode === 'app' ? (
+            <section className="card" data-testid="github-connect-app">
+              <h2>اربطي عبر GitHub</h2>
+              <p className="body-sm">ستنتقلين إلى GitHub لتختاري «Only select repositories» ثم المستودعات التي تريدينها فقط، ثم تعودين إلى هنا.</p>
+              {st.installUrl ? <a className="btn btn--primary" href={st.installUrl} data-testid="github-install-app">المتابعة إلى GitHub (قراءة فقط)</a> : null}
             </section>
           ) : (
             <section className="card" data-testid="github-connect">

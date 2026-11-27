@@ -1,3 +1,4 @@
+import { isProduction } from '../configuration/configuration.service';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import type { PoolClient } from 'pg';
@@ -9,6 +10,7 @@ import {
 import { DbService } from '../infra/db.service';
 import { emitAuditEvent } from '../infra/audit';
 import { GITHUB_PORT, type GitHubPort } from './github.port';
+import { signInstallState, verifyInstallState } from './install-state';
 import { TestRunService } from './test-run.service';
 import { SubmissionService, type SubmissionArtifactInput } from '../slice1/submission.service';
 import { UploadService } from '../slice1/upload.service';
@@ -17,9 +19,11 @@ import { STORAGE_PORT, type StoragePort } from '../storage/storage.port';
 const UUID = /^[0-9a-f-]{36}$/i;
 const SHA = /^[0-9a-f]{40}$/;
 
-export function githubMode(): 'off' | 'simulated' {
+export function githubMode(): 'off' | 'simulated' | 'app' {
   const m = process.env['GITHUB_MODE'];
-  return m === 'simulated' && process.env['NODE_ENV'] !== 'production' ? 'simulated' : 'off';
+  if (m === 'simulated' && !isProduction()) return 'simulated';
+  if (m === 'app' && !isProduction()) return 'app';
+  return 'off';
 }
 
 /**
@@ -51,7 +55,8 @@ export class GitHubService {
     return this.db.asService(async (c) => {
       const l = await this.liveLink(c, userId);
       return {
-        mode, simulatedNoticeAr: 'وضع محاكاة للتجربة الداخلية: مستودعات اصطناعية، ولا اتصال بـGitHub.',
+        mode, simulatedNoticeAr: mode === 'simulated' ? 'وضع محاكاة للتجربة الداخلية: مستودعات اصطناعية، ولا اتصال بـGitHub.' : null,
+        installUrl: mode === 'app' && !l ? `https://github.com/apps/${process.env['GITHUB_APP_SLUG']}/installations/new?state=${encodeURIComponent(signInstallState(userId, process.env['GITHUB_APP_STATE_SECRET'] ?? ''))}` : null,
         linked: l !== null, login: l?.state.githubLogin ?? null, permissions: GITHUB_ALLOWED_PERMISSIONS,
         permissionsAr: ['قراءة محتوى المستودعات التي تختارينها', 'قراءة البيانات الوصفية', 'قراءة طلبات الدمج'],
         neverAr: ['لا كتابة ولا حذف ولا دمج', 'لا وصول لمستودعات لم تختاريها', 'لا حفظ لرموز الوصول'],
@@ -63,12 +68,37 @@ export class GitHubService {
   /** Simulated install-and-select flow: the graduate picks repositories on "GitHub", the platform records the grant. */
   async connectSimulated(userId: string, body: { login?: unknown; repositories?: unknown }) {
     this.requireOn();
+    if (githubMode() !== 'simulated') throw new BadRequestException('[github_not_simulated] الربط المحاكى غير متاح في هذا الوضع.');
     const login = String(body?.login ?? '');
     const picked = Array.isArray(body?.repositories) ? body.repositories.map(String).slice(0, 20) : [];
     if (picked.length === 0) throw new BadRequestException('[github_select] اختاري مستودعًا واحدًا على الأقل.');
     let grant;
     try { grant = await this.gh.completeInstallation({ code: 'simulated', installationId: randomInt(1, 2 ** 31), requestedLogin: login, selectRepositories: picked }); }
     catch (e) { throw new BadRequestException(String((e as Error).message)); }
+    return this.recordGrant(userId, grant, 'simulated');
+  }
+
+  /**
+   * GitHub App flow: GitHub sends the browser back to the app's /github/callback page with `installation_id`, `code`
+   * and our signed `state`; that page posts them here with the graduate's session. The state proves the install was
+   * started by THIS user (CSRF); the adapter proves the installation belongs to the GitHub user who authorised it.
+   */
+  async completeApp(userId: string, body: { code?: unknown; installationId?: unknown; state?: unknown }) {
+    this.requireOn();
+    if (githubMode() !== 'app') throw new BadRequestException('[github_not_app] ربط تطبيق GitHub غير مفعَّل في هذه البيئة.');
+    let stateUser: string;
+    try { stateUser = verifyInstallState(String(body?.state ?? ''), process.env['GITHUB_APP_STATE_SECRET'] ?? ''); }
+    catch { throw new BadRequestException('[github_state_invalid] انتهت صلاحية طلب الربط أو لا يخصّك. ابدئي الربط من جديد.'); }
+    if (stateUser !== userId) throw new BadRequestException('[github_state_invalid] انتهت صلاحية طلب الربط أو لا يخصّك. ابدئي الربط من جديد.');
+    const installationId = Number(body?.installationId);
+    if (!Number.isInteger(installationId) || installationId <= 0 || typeof body?.code !== 'string' || !body.code) throw new BadRequestException('[github_callback] بيانات الرجوع من GitHub ناقصة.');
+    let grant;
+    try { grant = await this.gh.completeInstallation({ code: body.code, installationId }); }
+    catch (e) { throw new BadRequestException(String((e as Error).message).slice(0, 200)); }
+    return this.recordGrant(userId, grant, 'app');
+  }
+
+  private async recordGrant(userId: string, grant: Awaited<ReturnType<GitHubPort['completeInstallation']>>, mode: 'simulated' | 'app') {
     assertReadOnlyPermissions(grant.permissions);
     return this.db.asService(async (c) => {
       if (await this.liveLink(c, userId)) throw new ConflictException('[github_already_linked] حسابك مرتبط بالفعل. ألغي الربط أولًا لربط حساب آخر.');
@@ -78,8 +108,8 @@ export class GitHubService {
         await c.query(`insert into github_link_repo (link_id, repo_id, full_name, owner_login, is_private) values ($1,$2,$3,$4,$5)`, [link.id, r.repoId, r.fullName, r.ownerLogin, r.private]);
       }
       await emitAuditEvent(c, { eventType: 'github.linked', userId, actorKind: 'user', actorId: userId, subjectTable: 'github_link', subjectId: link.id,
-        reason: 'graduate installed the platform GitHub App on selected repositories (simulated); read-only permissions verified',
-        payload: { mode: 'simulated', repositories: grant.repositories.map((r) => r.fullName), permissions: grant.permissions } });
+        reason: `graduate installed the platform GitHub App on selected repositories (${mode}); read-only permissions verified`,
+        payload: { mode, repositories: grant.repositories.map((r) => r.fullName), permissions: grant.permissions } });
       return { linked: true, repositories: grant.repositories.map((r) => ({ repoId: r.repoId, fullName: r.fullName, private: r.private })) };
     });
   }
@@ -106,14 +136,15 @@ export class GitHubService {
     this.requireOn();
     const l = await this.db.asService((c) => this.liveLink(c, userId));
     const repo = assertRepositoryUsable(l?.state ?? null, repoId);
-    const pr = await this.gh.getPullRequest(l!.installationId, repo.fullName, 1);
-    const headSha = head && SHA.test(head) ? head : pr?.headSha;
+    const prs = await this.gh.listPullRequests(l!.installationId, repo.fullName);
+    const pr = prs[0] ?? null;
+    const headSha = head && SHA.test(head) ? head : pr?.headSha ?? await this.gh.defaultBranchHead(l!.installationId, repo.fullName);
     if (!headSha) return { repository: repo.fullName, commits: [], pullRequests: [] };
     const commits = await this.gh.listCommits(l!.installationId, repo.fullName, headSha, 50);
     return {
       repository: repo.fullName,
       commits: commits.map((c) => ({ sha: c.sha, message: asUntrustedRepoText('commit.message', c.message, 200).text })),
-      pullRequests: pr ? [{ number: pr.number, title: asUntrustedRepoText('pr.title', pr.title, 200).text, headSha: pr.headSha, headRef: pr.headRef, state: pr.state }] : [],
+      pullRequests: prs.map((p) => ({ number: p.number, title: asUntrustedRepoText('pr.title', p.title, 200).text, headSha: p.headSha, headRef: p.headRef, state: p.state })),
     };
   }
 

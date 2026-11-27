@@ -1,0 +1,34 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "الواجهة تبدو صحيحة والمؤشر يختفي (isLoading في finally)، لكن الانتقال عند إعادة المحاولة معيب: state.error لا يُمسح أبدًا، فبعد نجاح إعادة المحاولة تتعايش error والطلبات، والعرض يخفي ذلك بترتيب الأولوية.",
+  "criteria": {
+    "semantic_structure": "met",
+    "responsive_layout": "met",
+    "data_states": "met",
+    "state_transitions": "unmet",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "code_understanding": "human",
+    "git_workflow": "human",
+    "decision_clarity": "human",
+    "judgment_assumption_check": "human",
+    "a11y_basics": "met",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "semantic_structure": "h1 واحد، وsection بعنوان h2، والطلبات ul/li، وزر إعادة المحاولة button.",
+    "responsive_layout": "عناصر عمودية مع flex-wrap في الرأس، فلا تمرير أفقي على 360 ومريحة على 1024.",
+    "data_states": "على البيانات المقدَّمة تظهر الحالات الأربع كلٌّ وحده: تحميل، وخطأ مع زر، وفراغ، وقائمة؛ وبعد flaky وإعادة المحاولة تظهر القائمة وحدها.",
+    "state_transitions": "loadRequests لا تضع state.error = null عند البدء ولا عند النجاح، فبعد إعادة محاولة ناجحة تبقى error مع requests معًا (حالتان متناقضتان)، وإعادة المحاولة لا تعيد ضبط الحالة؛ لو أعادت المحاولة قائمة خالية لظهر الخطأ القديم بدل «لا طلبات».",
+    "problem_traced": "ملاحظة تتبّع البلاغ (note.bug_trace) غير موجودة في هذه الحالة؛ الحكم عليها للمراجِع.",
+    "root_cause_fixed": "دالة تحميل واحدة وisLoading=false في finally، فالعطل المزروع (مؤشر لا يختفي) مُصلح من سببه؛ عيب error منفصل ومحسوب في state_transitions.",
+    "code_understanding": "ملاحظة تدفق البيانات (note.data_flow) غير موجودة في هذه الحالة.",
+    "git_workflow": "الفرع والإيداعات والـPull Request وSHA خارج ملفات الكود؛ يتحقق منها المراجِع في المستودع الخاص.",
+    "decision_clarity": "القراران وسببهما إجابة مكتوبة غير موجودة هنا.",
+    "judgment_assumption_check": "سؤال الاستيضاح إجابة مكتوبة؛ الكود يرتّب بحسب submittedAt تنازليًا وهذا دليل جزئي فقط.",
+    "a11y_basics": "زر حقيقي مع :focus-visible ظاهر.",
+    "deliverables_complete": "المعيار يتطلب ملاحظتي data_flow وbug_trace مع الملفات؛ الملفات الثلاثة موجودة والملاحظتان خارج الحالة."
+  },
+  "gamingExpected": false
+}

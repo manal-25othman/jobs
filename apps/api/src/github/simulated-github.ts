@@ -45,7 +45,7 @@ export class SimulatedGitHub implements GitHubPort {
   private readonly installations = new Map<number, { login: string; userId: number; repoNames: string[] }>();
 
   constructor() {
-    if (process.env['NODE_ENV'] === 'production') throw new Error('[github_simulated_refused] The simulated GitHub double is refused in production.');
+    if (process.env['NAQLA_ENV'] === 'production' || (process.env['NODE_ENV'] === 'production' && process.env['NAQLA_ENV'] !== 'staging')) throw new Error('[github_simulated_refused] The simulated GitHub double is refused in production.');
   }
 
   private materials(name: (typeof SIMULATED_REPO_TEMPLATES)[number]) {
@@ -78,14 +78,15 @@ export class SimulatedGitHub implements GitHubPort {
     }
   }
 
-  async completeInstallation(p: { code: string; installationId: number; requestedLogin: string; selectRepositories: readonly string[] }): Promise<InstallationGrant> {
+  async completeInstallation(p: { code: string; installationId: number; requestedLogin?: string; selectRepositories?: readonly string[] }): Promise<InstallationGrant> {
     if (p.code !== 'simulated') throw new Error('[github_code] invalid authorization code');
-    if (!/^sim-[a-z0-9-]{2,30}$/.test(p.requestedLogin)) throw new Error('[github_simulated_login] simulated logins start with sim-');
-    this.ensureAccount(p.requestedLogin);
-    const names = p.selectRepositories.filter((n) => this.repos.has(n));
-    this.installations.set(p.installationId, { login: p.requestedLogin, userId: 100000 + p.installationId, repoNames: names });
+    const login = p.requestedLogin ?? '';
+    if (!/^sim-[a-z0-9-]{2,30}$/.test(login)) throw new Error('[github_simulated_login] simulated logins start with sim-');
+    this.ensureAccount(login);
+    const names = (p.selectRepositories ?? []).filter((n) => this.repos.has(n));
+    this.installations.set(p.installationId, { login, userId: 100000 + p.installationId, repoNames: names });
     return {
-      githubUserId: 100000 + p.installationId, login: p.requestedLogin, installationId: p.installationId,
+      githubUserId: 100000 + p.installationId, login, installationId: p.installationId,
       permissions: { contents: 'read', metadata: 'read', pull_requests: 'read' },
       repositories: names.map((n) => this.repos.get(n)!.info),
     };
@@ -104,6 +105,8 @@ export class SimulatedGitHub implements GitHubPort {
     const idx = r.commits.findIndex((c) => c.sha === headSha);
     return r.commits.slice(0, idx + 1).reverse().slice(0, max).map((c) => ({ sha: c.sha, message: c.message, parents: c.parents }));
   }
+  async listPullRequests(i: number, fullName: string) { return this.repo(i, fullName)?.pulls ?? []; }
+  async defaultBranchHead(i: number, fullName: string) { const c = this.repo(i, fullName)?.commits; return c && c.length ? c[c.length - 1]!.sha : null; }
   async getPullRequest(i: number, fullName: string, n: number) { return this.repo(i, fullName)?.pulls.find((p) => p.number === n) ?? null; }
   async snapshot(i: number, fullName: string, s: string) {
     const c = this.repo(i, fullName)?.commits.find((x) => x.sha === s);

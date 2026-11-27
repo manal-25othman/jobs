@@ -18,6 +18,14 @@ import type { CriterionTestSummary } from './test-run.js';
 export const SUGGESTION_VALUES = ['met', 'unmet', 'uncertain'] as const;
 export type SuggestionValue = (typeof SUGGESTION_VALUES)[number];
 
+/**
+ * Signals that make a passing test untrustworthy: while any is present, no «met» is ever suggested (Phase C round 3,
+ * item 4: the false accept of the shadow run came from a modified mock service). Other signals only lower confidence.
+ */
+export const MET_BLOCKING_SIGNALS: ReadonlySet<string> = new Set([
+  'automation_probe', 'test_host_probe', 'prototype_patch', 'computed_style_override', 'provided_service_modified', 'shipped_data_embedded',
+]);
+
 export const SUGGESTION_NOT_DECISION_AR = 'اقتراح آلي للمراجِع فقط، وليس قرارًا. القرار لكِ، ولا يُعرض الاقتراح على الخرّيج.';
 export const CALIBRATION_NOT_APPROVED_AR = 'المعايرة غير معتمدة بعد: كل اقتراح يُحال إلى إنسان مهما كانت نسبة الثقة.';
 
@@ -62,7 +70,7 @@ export function suggestCriterion(i: CriterionSuggestionInput, ctx: SuggestionCon
   if (ctx.gamingSignals.length) reasons.push('gaming_signals');
   if (ctx.injectionSuspected) reasons.push('injection_suspected');
 
-  const failedLabel = i.testLabels.find((t) => t.mode === 'automated' && t.outcome === 'fail')?.labelAr ?? null;
+  const failedLabel = i.testLabels.find((t) => t.mode === 'automated' && t.outcome === 'fail')?.labelAr ?? i.testLabels.find((t) => t.outcome === 'fail')?.labelAr ?? null;
   const anyLabel = i.testLabels.find((t) => t.mode === 'automated')?.labelAr ?? i.testLabels[0]?.labelAr ?? null;
 
   // A criterion the rubric gives to a person is never decided here. Where automated tests observe it, a suggestion is
@@ -72,7 +80,8 @@ export function suggestCriterion(i: CriterionSuggestionInput, ctx: SuggestionCon
   if (human) {
     reasons.push('human_criterion');
     const automated = i.testLabels.some((t) => t.mode === 'automated');
-    if (!automated || !i.tests || i.tests.observation === 'human_only') {
+    const failedSupport = i.testLabels.some((t) => t.mode === 'supports_human' && t.outcome === 'fail');
+    if ((!automated || !i.tests || i.tests.observation === 'human_only') && !failedSupport) {
       return { criterionKey: i.criterionKey, suggestion: 'uncertain', confidence: 0, excerptAr: anyLabel ?? i.ruleExcerpt ?? 'بند يقرره إنسان', basis: i.tests ? ['tests'] : [], escalate: true, escalationReasons: reasons };
     }
   }
@@ -90,6 +99,17 @@ export function suggestCriterion(i: CriterionSuggestionInput, ctx: SuggestionCon
   else if (fromRule) { basis.push('rule'); suggestion = fromRule; confidence = 0.6; }
   else { suggestion = 'uncertain'; confidence = 0; reasons.push('no_signal'); }
 
+  // Evidence of failure is more reliable than evidence of success: a failed observation that only supports the reviewer
+  // may suggest «unmet» (weakly) where nothing automated decided; it never suggests «met».
+  const humanSupportFailed = i.testLabels.some((t) => t.mode === 'supports_human' && t.outcome === 'fail');
+  if (humanSupportFailed) {
+    if (suggestion === 'uncertain' && basis.length === 0) { suggestion = 'unmet'; confidence = 0.35; basis.push('tests'); reasons.push('reviewer_signal_failed'); const k = reasons.indexOf('no_signal'); if (k >= 0) reasons.splice(k, 1); }
+    else if (suggestion === 'met') { suggestion = 'uncertain'; confidence = 0.3; reasons.push('signals_conflict'); }
+  }
+  // A passing test is not trusted while a blocking integrity signal is present.
+  if (suggestion === 'met' && ctx.gamingSignals.some((g) => MET_BLOCKING_SIGNALS.has(g))) {
+    suggestion = 'uncertain'; confidence = Math.min(confidence, 0.2); reasons.push('integrity_blocks_met');
+  }
   if (suggestion === 'uncertain') reasons.push('inconclusive');
   if (!ctx.packApproved && basis.includes('tests')) confidence = Math.min(confidence, 0.7);
   if (ctx.gamingSignals.length || ctx.injectionSuspected) confidence = Math.min(confidence, 0.3);

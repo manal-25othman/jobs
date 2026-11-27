@@ -1,0 +1,39 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+  line-height: 1.6;
+}
+
+.header { background: #1f5a4e; color: #fff; padding: 14px 16px; }
+.header__title { margin: 0; font-size: 1.3rem; }
+.header__sub { margin: 2px 0 0; color: #d6e8e1; }
+
+.main { max-width: 880px; margin: 0 auto; padding: 16px; }
+.main h2 { font-size: 1.1rem; }
+
+.loading { color: #5f6b63; background: #fff; border-radius: 8px; padding: 12px; }
+.error { color: #a94442; background: #fff; border: 1px solid #a94442; border-radius: 8px; padding: 12px; }
+.empty { background: #fff; border-radius: 8px; padding: 12px; }
+
+/* once the list is on screen the loading text is not needed */
+#app:has(.requests) .loading { display: none; }
+
+.requests { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.request-card { background: #fff; border: 1px solid #e3e7df; border-radius: 8px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.request-card__type { font-weight: 600; flex-basis: 100%; }
+.request-card__status { margin-inline-start: auto; }
+
+.retry-button {
+  font: inherit;
+  padding: 5px 14px;
+  margin-top: 8px;
+  border: 1px solid #a94442;
+  border-radius: 6px;
+  background: #fff;
+  color: #a94442;
+  cursor: pointer;
+}

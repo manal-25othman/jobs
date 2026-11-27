@@ -3,7 +3,9 @@
  * Phase C round 2 — shadow pipeline run (SYNTHETIC cases only): R2 on every synthetic case → A13 suggestion rules per
  * criterion → compared with the CANDIDATE expected judgments (not an expert's) → calibration metrics Q1–Q7.
  * This tests the pipeline. It is NOT calibration and authorises nothing (owner decision 4).
- *   node scripts/r2-a13-shadow-run.mjs [--json out.json]
+ *   node scripts/r2-a13-shadow-run.mjs [--set dev|holdout|holdout2] [--json out.json]
+ * `dev` = the cases the checks were developed on; `holdout` = the independent set authored without access to the tests.
+ * Quality is reported on `holdout` only; `dev` shows regression, not quality.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -16,12 +18,14 @@ const CAND = join(ROOT, 'data/candidates/trk_frontend_junior_v2');
 const rubrics = JSON.parse(readFileSync(join(CAND, 'tracks/trk_frontend_junior/rubrics.json'), 'utf8')).records;
 const tree = (dir) => { const out = []; const walk = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (!n.endsWith('.candidate.json')) out.push({ path: relative(dir, p), content: readFileSync(p, 'utf8') }); } }; walk(dir); return out; };
 
+const SET = process.argv.includes('--set') ? process.argv[process.argv.indexOf('--set') + 1] : 'dev';
+const SET_DIR = SET === 'holdout' ? 'r2-holdout' : SET === 'holdout2' ? 'r2-holdout-v2' : 'r2';
 const pairs = []; const perCase = [];
 for (const activity of ['act_fe_debug_improve', 'act_fe_change_request', 'act_fe_integrated_leave_requests']) {
   const rubric = rubrics.find((r) => r.activity === activity);
   const starter = tree(join(CAND, 'materials', activity, 'graduate'));
-  for (const c of readdirSync(join(CAND, 'r2', activity)).sort()) {
-    const dir = join(CAND, 'r2', activity, c);
+  for (const c of readdirSync(join(CAND, SET_DIR, activity)).sort()) {
+    const dir = join(CAND, SET_DIR, activity, c);
     const expected = JSON.parse(readFileSync(join(dir, 'expected.candidate.json'), 'utf8'));
     const result = await runner.runAttempt({ pack: runner.packFor(activity), files: tree(dir), starterFiles: starter, commitSha: null, origin: 'synthetic' });
     const summaries = domain.summarizeByCriterion(result);
@@ -41,6 +45,6 @@ for (const activity of ['act_fe_debug_improve', 'act_fe_change_request', 'act_fe
   }
 }
 const report = domain.calibrationMetrics(pairs);
-const out = { generatedAt: new Date().toISOString(), synthetic: true, referenceIs: 'CANDIDATE expected judgments, not expert', report, perCase, pairs };
+const out = { generatedAt: new Date().toISOString(), set: SET, synthetic: true, referenceIs: 'CANDIDATE expected judgments, not expert', report, perCase, pairs };
 const i = process.argv.indexOf('--json'); if (i > 0) writeFileSync(process.argv[i + 1], JSON.stringify(out, null, 2));
 console.log(JSON.stringify({ report, perCase }, null, 2));

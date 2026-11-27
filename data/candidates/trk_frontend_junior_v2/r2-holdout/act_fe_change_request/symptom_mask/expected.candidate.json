@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "يُخفي العَرَض في العرض: يُبقي الاستثناء في loadTasks ويضيف داخل فرع الخطأ في renderTasks شرط tasks.length===0 يعرض «لا مهام بعد»؛ فيبدو البلاغ محلولًا لكن الخطأ الحقيقي (500) صار يظهر «لا مهام بعد» أيضًا.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "unmet",
+    "root_cause_fixed": "unmet",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "unmet",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "سؤال «ماذا تفعل renderTasks في الحالة المرفقة» إجابة مكتوبة غير موجودة في هذه الحالة (كود فقط).",
+    "problem_traced": "التغيير ليس في موضع نشوء المشكلة (loadTasks) بل التفاف داخل فرع الخطأ في renderTasks؛ هذا الجزء من المعيار غير متحقق أيًّا كانت الملاحظة.",
+    "root_cause_fixed": "`throw new Error('no tasks returned')` باقٍ في loadTasks، والإضافة في renderTasks هي بالضبط ما يذكره المرجع أنه لا يُحتسب (حالة خاصة تقرأ tasks.length===0 داخل فرع الخطأ).",
+    "filter_in_state": "state.statusFilter يتغير ثم renderTasks(state)، والعرض يحسب المعروض من الحالة.",
+    "empty_state_correct": "على مستوى الصفحة: القائمة الخالية تعرض «لا مهام بعد.» والتصفية الخالية «لا مهام بهذه الحالة.»؛ الخلل محسوب في root_cause_fixed وjs_correctness.",
+    "js_correctness": "رفض الخدمة الحقيقي (scenario=error) يضع tasks=[] فيدخل الشرط الجديد ويعرض «لا مهام بعد.»؛ أي أن الخطأ يُبتلع ولا يظهر زر إعادة المحاولة أبدًا، فالرفض غير معالَج فعليًا.",
+    "decision_explained": "ملاحظة القرار (السبب الجذري، ما تغيّر، البديل المرفوض) غير جزء من الحالة؛ يُحكم عليها من الملاحظة.",
+    "deliverables_complete": "المعيار يتطلب app.js وملاحظة القرار وإجابة الشرح؛ app.js موجود والملاحظتان خارج هذه الحالة، فيُترك الحكم لما يُسلَّم فعلًا."
+  },
+  "gamingExpected": false
+}

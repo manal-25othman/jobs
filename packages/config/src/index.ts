@@ -40,6 +40,22 @@ export const ENV_SPEC: readonly VarSpec[] = [
     description: 'Runtime mode.', example: 'development',
     validate: oneOf('development', 'test', 'production') },
 
+  { name: 'NAQLA_ENV', scope: 'both', required: false, secret: false,
+    description: 'Deployment: development (local), staging (private trial, synthetic data, invited testers only) or production (future launch). REQUIRED when NODE_ENV=production. Staging gets every infrastructure protection of production (real storage, CORS, budgets) but keeps the labelled pilot content and test doubles; untrusted code never runs on it.',
+    example: 'development', validate: oneOf('development', 'staging', 'production') },
+
+  { name: 'STAGING_ALLOWED_EMAILS', scope: 'api', required: false, secret: false,
+    description: 'Staging only: comma-separated e-mail addresses (or @domain suffixes) allowed to use the API. Everyone else is refused even with a valid session. REQUIRED when NAQLA_ENV=staging.',
+    example: 'owner@example.org,@testers.example.org', validate: (v) => (v.split(',').every((x) => /^(@[a-z0-9.-]+\.[a-z]{2,}|[^@\s,]+@[a-z0-9.-]+\.[a-z]{2,})$/i.test(x.trim())) ? null : 'must be comma-separated e-mails or @domain suffixes') },
+
+  { name: 'PILOT_STAGING_DECISION', scope: 'api', required: false, secret: false,
+    description: 'Staging only, data CLI: the owner decision id (D-nnn) that allows publishing the labelled DEMO pilot in the private staging database. Unset: refused (D-136 is local-only by default). Refused in production.',
+    example: '', validate: (v) => (/^D-\d{3}$/.test(v) ? null : 'must be a decision id like D-149') },
+
+  { name: 'RATE_LIMIT_PER_MINUTE', scope: 'api', required: false, secret: false,
+    description: 'Requests per minute per client (IP + user) before 429. Unset outside production/staging: no limit (tests). Default 120 when NODE_ENV=production.',
+    example: '120', validate: (v) => (/^[1-9][0-9]{0,4}$/.test(v) ? null : 'must be a positive integer') },
+
   { name: 'NAQLA_DEPLOY_REGION', scope: 'both', required: true, secret: false,
     description:
       'The region this deployment stores data in. Required because D-004 makes data residency ' +
@@ -116,15 +132,23 @@ export const ENV_SPEC: readonly VarSpec[] = [
 
   { name: 'GITHUB_MODE', scope: 'api', required: false, secret: false,
     description: 'off (default) or simulated. simulated is an in-memory TEST double of the GitHub App integration with synthetic repositories; no GitHub request is ever made. Refused when NODE_ENV=production. A real GitHub App arrives only after the owner approves the design (Phase C round 2, item 1).',
-    example: 'off', validate: oneOf('off', 'simulated') },
+    example: 'off', validate: oneOf('off', 'simulated', 'app') },
+
+  { name: 'GITHUB_APP_ID', scope: 'api', required: false, secret: false, description: 'GITHUB_MODE=app: the numeric App ID (staging App only until production is approved).', example: '', validate: (v) => (/^\d{1,12}$/.test(v) ? null : 'must be numeric') },
+  { name: 'GITHUB_APP_SLUG', scope: 'api', required: false, secret: false, description: 'GITHUB_MODE=app: the App slug used for the install link https://github.com/apps/<slug>/installations/new.', example: '', validate: (v) => (/^[a-z0-9-]{1,60}$/.test(v) ? null : 'must be the lowercase slug') },
+  { name: 'GITHUB_APP_CLIENT_ID', scope: 'api', required: false, secret: false, description: 'GITHUB_MODE=app: the App client ID (user authorization during install).', example: '' },
+  { name: 'GITHUB_APP_CLIENT_SECRET', scope: 'api', required: false, secret: true, description: 'GITHUB_MODE=app: the App client secret. Hosting secret store only.', example: '' },
+  { name: 'GITHUB_APP_PRIVATE_KEY', scope: 'api', required: false, secret: true, description: 'GITHUB_MODE=app: the App private key (PEM; \\n-escaped newlines accepted). Hosting secret store only; rotate on any doubt.', example: '' },
+  { name: 'GITHUB_APP_STATE_SECRET', scope: 'api', required: false, secret: true, description: 'GITHUB_MODE=app: ≥ 32 random characters signing the install state (CSRF protection of the install callback).', example: '', validate: (v) => (v.length >= 32 ? null : 'must be at least 32 characters') },
+  { name: 'GITHUB_API_BASE', scope: 'api', required: false, secret: false, description: 'GITHUB_MODE=app: API base URL (default https://api.github.com). Tests point it at a local mock.', example: '' },
 
   { name: 'GITHUB_WEBHOOK_SECRET', scope: 'api', required: false, secret: true,
     description: 'Secret that signs GitHub webhook deliveries (X-Hub-Signature-256). Required when GITHUB_MODE is not off; at least 32 characters.',
     example: '', validate: (v) => (v.length >= 32 ? null : 'must be at least 32 characters') },
 
   { name: 'R2_MODE', scope: 'api', required: false, secret: false,
-    description: 'off (default) or synthetic_dev. synthetic_dev runs team-written test packs on SYNTHETIC code in the development namespace sandbox (apps/runner), in shadow mode. Refused when NODE_ENV=production: real graduate code needs the approved security review and a kernel-isolating backend (Phase C round 2, item 2).',
-    example: 'off', validate: oneOf('off', 'synthetic_dev') },
+    description: 'off (default), synthetic_dev or recorded. synthetic_dev runs team-written test packs on SYNTHETIC code in the development namespace sandbox (apps/runner), in shadow mode — local development only. recorded serves results recorded earlier by the development runner for the simulated GitHub snapshots (labelled as recorded; no code runs) — for staging. Untrusted code never runs on the API host.',
+    example: 'off', validate: oneOf('off', 'synthetic_dev', 'recorded') },
 
   { name: 'LOG_LEVEL', scope: 'both', required: false, secret: false,
     description: 'Structured log level.', example: 'info',
@@ -175,23 +199,42 @@ export function loadEnv(opts: LoadOptions): Readonly<Record<string, string>> {
   if (env['NODE_ENV'] === 'production' && !env['AGENT_BUDGET_CALLS_PER_DAY']) {
     problems.push('AGENT_BUDGET_CALLS_PER_DAY is required in production; 50/day is a development default, not a product value (D-073)');
   }
-  if (env['NODE_ENV'] === 'production' && env['AGENT_PROVIDER'] === 'local-test') {
+  // Deployment: staging keeps the infrastructure rules of production but may show labelled pilot content and test doubles.
+  const deploy = env['NAQLA_ENV'] ?? (env['NODE_ENV'] === 'production' ? 'production' : 'development');
+  if (env['NODE_ENV'] === 'production' && !env['NAQLA_ENV']) {
+    problems.push('NAQLA_ENV is required when NODE_ENV=production (staging or production) so a private trial is never mistaken for a launch');
+  }
+  if (env['NAQLA_ENV'] === 'production' && env['NODE_ENV'] !== 'production') problems.push('NAQLA_ENV=production needs NODE_ENV=production');
+  const realProduction = deploy === 'production';
+  if (deploy === 'staging' && !env['STAGING_ALLOWED_EMAILS']) {
+    problems.push('STAGING_ALLOWED_EMAILS is required in staging: only invited testers may use it');
+  }
+  if (realProduction && env['AGENT_PROVIDER'] === 'local-test') {
     problems.push('AGENT_PROVIDER=local-test is TEST/NON-PRODUCTION and is refused in production (OPEN-023 unresolved)');
   }
   if (env['NODE_ENV'] === 'production' && (!env['CORS_ALLOWED_ORIGINS'] || env['CORS_ALLOWED_ORIGINS'].split(',').some((o) => o.trim() === '*'))) {
     problems.push('CORS_ALLOWED_ORIGINS is required in production and may not be "*" (backlog P0-3)');
   }
-  if (env['NODE_ENV'] === 'production' && env['LEARNING_CANDIDATE_PREVIEW'] === 'internal') {
+  if (realProduction && env['LEARNING_CANDIDATE_PREVIEW'] === 'internal') {
     problems.push('LEARNING_CANDIDATE_PREVIEW=internal shows unverified learning resources and is refused in production (PO decision 2)');
   }
-  if (env['NODE_ENV'] === 'production' && env['GITHUB_MODE'] === 'simulated') {
+  if (realProduction && env['GITHUB_MODE'] === 'simulated') {
     problems.push('GITHUB_MODE=simulated is a test double and is refused in production; the real GitHub App is not approved yet');
+  }
+  if (env['GITHUB_MODE'] === 'app') {
+    for (const k of ['GITHUB_APP_ID', 'GITHUB_APP_SLUG', 'GITHUB_APP_CLIENT_ID', 'GITHUB_APP_CLIENT_SECRET', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_STATE_SECRET']) {
+      if (!env[k]) problems.push(`${k} is required when GITHUB_MODE=app`);
+    }
+    if (realProduction) problems.push('GITHUB_MODE=app is approved for a separate development/staging App only; production needs its own approval');
   }
   if (env['GITHUB_MODE'] && env['GITHUB_MODE'] !== 'off' && !env['GITHUB_WEBHOOK_SECRET']) {
     problems.push('GITHUB_WEBHOOK_SECRET is required when GITHUB_MODE is not off (webhook deliveries must be verified)');
   }
   if (env['NODE_ENV'] === 'production' && env['R2_MODE'] === 'synthetic_dev') {
-    problems.push('R2_MODE=synthetic_dev is the development sandbox for synthetic code and is refused in production (security review not approved)');
+    problems.push('R2_MODE=synthetic_dev runs code in the development sandbox and is refused on any deployed host (staging or production): untrusted code never runs on the API host');
+  }
+  if (realProduction && env['R2_MODE'] === 'recorded') {
+    problems.push('R2_MODE=recorded serves recorded results for simulated snapshots and is refused in production');
   }
   if (env['NODE_ENV'] === 'production' && env['STORAGE_DRIVER'] === 'memory') {
     problems.push('STORAGE_DRIVER=memory is a test double and is refused in production');
@@ -221,6 +264,14 @@ export function renderEnvExample(): string {
     }
   }
   return lines.join('\n');
+}
+
+/** The deployment this process serves. Governance "production" (demo content refused, development-only rules off) is
+ * true only for a real launch; staging keeps the pilot behaviour behind the infrastructure protections of production. */
+export function deploymentEnv(env: Readonly<Record<string, string | undefined>> = process.env): 'development' | 'staging' | 'production' {
+  const v = env['NAQLA_ENV'];
+  if (v === 'development' || v === 'staging' || v === 'production') return v;
+  return env['NODE_ENV'] === 'production' ? 'production' : 'development';
 }
 
 /** S0 / P0-3: the CORS origin rule. Outside production with nothing set, any origin (development); else the list. */

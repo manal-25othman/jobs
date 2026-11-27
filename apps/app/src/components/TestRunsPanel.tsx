@@ -7,7 +7,7 @@ import { api } from '../lib/api';
  * only (never the tests, the expected values or a solution); shadow stage: they do not change the evaluation and never
  * prove a skill on their own. The graduate fixes the work themselves and submits again: a new attempt.
  */
-interface Runs { mode: 'off' | 'synthetic_dev'; runs: { id: string; status: string; commitSha: string | null; packStatus: string; noticeAr: string; shadowAr: string;
+interface Runs { mode: 'off' | 'synthetic_dev'; runs: { id: string; status: string; commitSha: string | null; packStatus: string; noticeAr: string; shadowAr: string; recorded?: boolean; recordedAr?: string | null;
   tests: { testId: string; labelAr: string; outcome: string; mode: string; noteAr: string | null }[] }[] }
 const OUTCOME_AR: Record<string, string> = { pass: 'نجح', fail: 'لم ينجح', error: 'تعذّر التحقق', timeout: 'تجاوز الوقت', skipped: 'لم يُشغَّل' };
 
@@ -25,6 +25,7 @@ export function TestRunsPanel({ token, submissionId }: { token: string; submissi
         نجح {auto.filter((t) => t.outcome === 'pass').length} من {auto.length} اختبارًا آليًا.
         {run.packStatus !== 'approved' ? <span className="chip" style={{ marginInlineStart: 6 }}>اختبارات مرشّحة لم يعتمدها خبير</span> : null}
       </p>
+      {run.recorded ? <p className="micro muted" data-testid="test-run-recorded">{run.recordedAr}</p> : null}
       <ul className="body-sm" data-testid="test-run-list">
         {run.tests.map((t) => (
           <li key={t.testId} data-outcome={t.outcome}>

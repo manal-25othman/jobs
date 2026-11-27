@@ -1,3 +1,4 @@
+import { isProduction } from '../configuration/configuration.service';
 /**
  * Import pipeline: Source → Raw → Normalize → Deduplicate → Map → Review → Publish.
  *
@@ -381,7 +382,7 @@ export async function importPack(pool: Pool, pack: Pack, files: readonly RawFile
 
     if (unmapped.length) throw new ImportError('map', 'unmapped references; nothing was written', unmapped);
     // Phase 4: a track imported after migration 0014 gets its first DRAFT configuration version — development_only outside production, inactive in production. Never a baseline.
-    await c.query('select ensure_track_config_version($1, $2, $3, $4)', [roleId, m.pack_version, `career-data import ${m.pack_id}@${m.pack_version}`, process.env['NODE_ENV'] === 'production' ? 'inactive' : 'development_only']);
+    await c.query('select ensure_track_config_version($1, $2, $3, $4)', [roleId, m.pack_version, `career-data import ${m.pack_id}@${m.pack_version}`, isProduction() ? 'inactive' : 'development_only']);
     await c.query(`insert into pack_validation_run (pack_id, pack_version, track_id, constraint_set_id, constraint_ref, resolution, passed) values ($1,$2,$3,$4,$5,$6,true)`,
       [m.pack_id, m.pack_version, m.pack_id, constraints.setId, constraints.ref, constraints.resolution]);
     if (opts.dryRun) await c.query('rollback'); else await c.query('commit');

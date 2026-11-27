@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "كل الأعطال مُصلحة ما عدا نقطة التحوّل: بقيت min-width:1280px فلا يظهر العمود الجانبي بجانب المحتوى على 1024px.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "unmet",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form وlabel لكل حقل، وbutton type=submit، وh1 ثم h2، وth scope=col لصف العناوين، وaside للعمود الجانبي.",
+    "a11y_keyboard_forms": "الحقول مسمّاة، ورسائل الخطأ في p مرتبطة بـaria-describedby مع aria-invalid، والتركيز ظاهر على الحقول والزر.",
+    "responsive_fixed": "التمرير الأفقي على 360 عولج (أُزيل القناع والجدول مرن داخل .table-wrap)، لكن styles.css أبقت @media (min-width:1280px) فيبقى العمود الجانبي تحت المحتوى على 1024px، وهو جزء صريح من المعيار.",
+    "validation_fixed": "EMAIL_PATTERN يتطلب نطاقًا وامتدادًا فيرفض sara@gmail، والرسالة بجانب الحقل، والخطأ لا يُبتلع.",
+    "root_cause_note": "الحالة تحتوي كودًا فقط بلا ملاحظات مكتوبة، فالحكم يعتمد على ملاحظة الخرّيج ويُترك للمراجِع البشري.",
+    "scope_discipline": "التغييرات في مواضع الأعطال، والصفحة لم تُعد كتابتها.",
+    "form_submission_flow": "لا إرسال مع حقل غير صالح، ورسالة لكل حقل، والقيم تبقى، والرسالة تُحدَّث عند الكتابة في الحقل المعلَّم.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

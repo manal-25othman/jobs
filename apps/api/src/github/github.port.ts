@@ -15,18 +15,26 @@ export interface InstallationGrant {
 export interface PullRequestInfo extends PullRequestShape { readonly headSha: string; readonly state: 'open' | 'closed' | 'merged' }
 
 /**
- * The only way the API reaches GitHub. Two implementations are planned: the simulated TEST double (now), and a GitHub
- * App adapter after the owner approves the design (not implemented; GITHUB_MODE has no value for it yet).
+ * The only way the API reaches GitHub. Two implementations: the simulated TEST double (`simulated-github.ts`) and the
+ * GitHub App adapter (`github-app.adapter.ts`, mode 'app'; tested only against a local mock server).
  * Every call is scoped to ONE installation; an adapter mints a short-lived installation token per call and never
  * stores it.
  */
 export interface GitHubPort {
-  readonly mode: 'simulated';
-  completeInstallation(p: { code: string; installationId: number; requestedLogin: string; selectRepositories: readonly string[] }): Promise<InstallationGrant>;
+  readonly mode: 'simulated' | 'app';
+  /**
+   * `requestedLogin`: simulated mode uses it as the synthetic login; the App adapter only checks it against the real
+   * login when given. `selectRepositories`: simulated mode only — with the App, the selection is what the user chose
+   * on GitHub.
+   */
+  completeInstallation(p: { code: string; installationId: number; requestedLogin?: string; selectRepositories?: readonly string[] }): Promise<InstallationGrant>;
   listInstallationRepos(installationId: number): Promise<readonly GitHubRepoInfo[]>;
   getCommit(installationId: number, fullName: string, sha: string): Promise<CommitShape | null>;
   listCommits(installationId: number, fullName: string, headSha: string, max: number): Promise<readonly CommitShape[]>;
   getPullRequest(installationId: number, fullName: string, n: number): Promise<PullRequestInfo | null>;
+  /** Open pull requests (newest first, ≤ 10) and the head of the default branch, for choosing what to submit. */
+  listPullRequests(installationId: number, fullName: string): Promise<readonly PullRequestInfo[]>;
+  defaultBranchHead(installationId: number, fullName: string): Promise<string | null>;
   /** The files of one commit. The adapter downloads the archive at that SHA; only allowed paths are returned. */
   snapshot(installationId: number, fullName: string, sha: string): Promise<readonly SubmittedFile[]>;
 }

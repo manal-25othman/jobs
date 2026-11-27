@@ -227,9 +227,11 @@ export async function restoreSafetyBaseline(pool: Pool, opts: { byLabel: string 
  */
 export async function publishPilotDemo(pool: Pool, opts: {
   readonly operatorId: string; readonly reason: string; readonly nodeEnv: string | undefined; readonly databaseUrl: string;
+  /** Phase C round 3: staging only under a named owner decision (see pilotDemoPublicationRefusal). */
+  readonly deployment?: 'development' | 'staging' | 'production'; readonly stagingDecision?: string | null;
 }): Promise<{ operator: string; published: { kind: 'activity_spec' | 'rubric_version'; id: string }[]; alreadyPublished: number }> {
   const host = databaseHost(opts.databaseUrl);
-  const envRefusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: true, isPilotContent: true, from: 'curated', reason: opts.reason });
+  const envRefusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: true, isPilotContent: true, from: 'curated', reason: opts.reason, deployment: opts.deployment ?? 'development', stagingDecision: opts.stagingDecision ?? null });
   if (envRefusal) throw new PilotLoadError(envRefusal);
   const operator = await withClient(pool, (c) => assertAuthorizedOperator(c, opts.operatorId));
   const rows = (await pool.query(`select 'activity_spec' as kind, a.id, a.status::text as status, a.is_demo_fixture from activity_spec a join pilot_content_load l on l.target_role_id = a.target_role_id
@@ -244,7 +246,7 @@ export async function publishPilotDemo(pool: Pool, opts: {
       await reviewTransition(pool, { entityKind: r.kind, entityId: r.id, to: 'curated', decidedBy: null, decidedByLabel: operator, rolePerformed: 'content_author',
         reason: `D-136 development pilot: DEMO pilot content complete for internal testing (${opts.reason})`, production: false });
     }
-    const refusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: r.is_demo_fixture, isPilotContent: true, from: 'curated', reason: opts.reason });
+    const refusal = pilotDemoPublicationRefusal({ nodeEnv: opts.nodeEnv, databaseHost: host, isDemoFixture: r.is_demo_fixture, isPilotContent: true, from: 'curated', reason: opts.reason, deployment: opts.deployment ?? 'development', stagingDecision: opts.stagingDecision ?? null });
     if (refusal) throw new PilotLoadError(`${r.kind} ${r.id}: ${refusal}`);
     await withClient(pool, async (c) => {
       await c.query('begin');

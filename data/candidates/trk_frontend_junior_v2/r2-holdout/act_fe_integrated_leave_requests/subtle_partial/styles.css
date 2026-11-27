@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+}
+
+.header { background: #1f5a4e; color: #fff; padding: 14px 16px; }
+.header h1 { margin: 0; font-size: 1.3rem; }
+
+main { max-width: 900px; margin: 0 auto; padding: 16px; }
+main h2 { font-size: 1.1rem; margin-top: 0; }
+
+.loading { color: #5f6b63; }
+.error { color: #a94442; background: #fff; border: 1px solid #a94442; border-radius: 8px; padding: 12px; }
+
+.request-list { list-style: none; margin: 0; padding: 0; }
+.request-row { display: flex; gap: 24px; background: #fff; padding: 10px 12px; border-bottom: 1px solid #e3e7df; }
+.request-row span { min-width: 140px; }
+.request-row .status-approved { color: #2f7d57; }
+.request-row .status-rejected { color: #a94442; }
+
+.retry {
+  font: inherit;
+  margin-inline-start: 8px;
+  padding: 4px 12px;
+  border: 1px solid #a94442;
+  border-radius: 6px;
+  background: #fff;
+  color: #a94442;
+  cursor: pointer;
+}
+.retry:focus-visible { outline: 3px solid #1f5a4e; outline-offset: 2px; }

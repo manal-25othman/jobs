@@ -27,6 +27,21 @@ export const BACKEND_NAME = 'namespace-dev';
 const ROOT_DIR = process.env.R2_ATTEMPT_ROOT ?? '/var/lib/naqla-r2';
 const CGROUP_ROOT = '/sys/fs/cgroup';
 const CONTROLLERS = ['memory', 'pids', 'cpu'] as const;
+/** cgroup v2 (unified hierarchy: most current hosts, GitHub-hosted runners) or v1 (one tree per controller). */
+const CGROUP_V2 = existsSync(join(CGROUP_ROOT, 'cgroup.controllers'));
+const V2_PARENT = join(CGROUP_ROOT, 'naqla-r2');
+
+function cgroupPathsFor(id: string): string[] {
+  return CGROUP_V2 ? [join(V2_PARENT, id)] : CONTROLLERS.map((c) => join(CGROUP_ROOT, c, 'naqla-r2', id));
+}
+
+function ensureV2Parent(): void {
+  mkdirSync(V2_PARENT, { recursive: true });
+  // Enable the controllers for the attempt groups below the parent (and on the root's subtree, when allowed).
+  for (const dir of [CGROUP_ROOT, V2_PARENT]) {
+    try { writeFileSync(join(dir, 'cgroup.subtree_control'), '+memory +pids +cpu'); } catch { /* already on, or delegated by the host */ }
+  }
+}
 const NOBODY = 65534;
 
 export function assertBackendAllowed(env: NodeJS.ProcessEnv = process.env): void {
@@ -43,7 +58,14 @@ export function probeBackend(): BackendProbe {
   if (process.platform !== 'linux') reasons.push('not linux');
   if (process.getuid?.() !== 0) reasons.push('the trusted runner must start as root to create namespaces and cgroups');
   for (const bin of ['/usr/bin/unshare', '/usr/bin/setpriv']) if (!existsSync(bin)) reasons.push(`missing ${bin}`);
-  for (const c of CONTROLLERS) if (!existsSync(join(CGROUP_ROOT, c))) reasons.push(`no cgroup v1 controller ${c}`);
+  if (CGROUP_V2) {
+    try {
+      const have = readFileSync(join(CGROUP_ROOT, 'cgroup.controllers'), 'utf8');
+      for (const c of CONTROLLERS) if (!have.split(/\s+/).includes(c)) reasons.push(`cgroup v2 controller ${c} unavailable`);
+    } catch { reasons.push('cgroup v2 controllers unreadable'); }
+  } else {
+    for (const c of CONTROLLERS) if (!existsSync(join(CGROUP_ROOT, c))) reasons.push(`no cgroup v1 controller ${c}`);
+  }
   return { available: reasons.length === 0, reasons };
 }
 
@@ -98,14 +120,23 @@ export function prepareAttempt(files: readonly SubmittedFile[], limits: RunnerLi
     writeFileSync(p, f.content, { mode: 0o644 });
   }
 
-  const cgroups = CONTROLLERS.map((c) => join(CGROUP_ROOT, c, 'naqla-r2', id));
+  const cgroups = cgroupPathsFor(id);
+  if (CGROUP_V2) ensureV2Parent();
   for (const cg of cgroups) mkdirSync(cg, { recursive: true });
+  if (CGROUP_V2) {
+    const cg = cgroups[0]!;
+    writeFileSync(join(cg, 'memory.max'), String(limits.memoryMiB * 1024 * 1024));
+    try { writeFileSync(join(cg, 'memory.swap.max'), '0'); } catch { /* no swap accounting */ }
+    writeFileSync(join(cg, 'pids.max'), String(limits.maxProcesses));
+    writeFileSync(join(cg, 'cpu.max'), `${limits.cpuPercent * 1000} 100000`);
+  } else {
   const [mem, pids, cpu] = cgroups as [string, string, string];
   writeFileSync(join(mem, 'memory.limit_in_bytes'), String(limits.memoryMiB * 1024 * 1024));
   try { writeFileSync(join(mem, 'memory.memsw.limit_in_bytes'), String(limits.memoryMiB * 1024 * 1024)); } catch { /* swap accounting off */ }
   writeFileSync(join(pids, 'pids.max'), String(limits.maxProcesses));
   writeFileSync(join(cpu, 'cpu.cfs_period_us'), '100000');
   writeFileSync(join(cpu, 'cpu.cfs_quota_us'), String(limits.cpuPercent * 1000));
+  }
 
   const ro = exposedDirs(exposure);
   const stage = ro.map((d, i) => `mkdir -p /tmp/.ro/${i}; mount --bind ${shq(d)} /tmp/.ro/${i}`).join('\n');
@@ -165,15 +196,15 @@ export function sweepStaleAttempts(olderThanMs = 10 * 60 * 1000): number {
   let swept = 0;
   const ids = new Set<string>();
   if (existsSync(ROOT_DIR)) for (const n of readdirSync(ROOT_DIR)) ids.add(n);
-  for (const c of CONTROLLERS) {
-    const base = join(CGROUP_ROOT, c, 'naqla-r2');
+  for (const c of CGROUP_V2 ? ['.'] : CONTROLLERS) {
+    const base = CGROUP_V2 ? V2_PARENT : join(CGROUP_ROOT, c, 'naqla-r2');
     if (existsSync(base)) for (const n of readdirSync(base)) if (/^a[0-9a-z]+$/.test(n)) ids.add(n);
   }
   for (const id of ids) {
     if (!/^a[0-9a-z]+$/.test(id)) continue;
     const ts = parseInt(id.slice(1, 9), 36);
     if (Number.isFinite(ts) && Date.now() - ts < olderThanMs) continue;
-    cleanupAttempt({ id, dir: join(ROOT_DIR, id), workDir: join(ROOT_DIR, id, 'work'), wrapper: '', limits: DEFAULT_LIMITS_FOR_SWEEP, cgroups: CONTROLLERS.map((c) => join(CGROUP_ROOT, c, 'naqla-r2', id)) });
+    cleanupAttempt({ id, dir: join(ROOT_DIR, id), workDir: join(ROOT_DIR, id, 'work'), wrapper: '', limits: DEFAULT_LIMITS_FOR_SWEEP, cgroups: cgroupPathsFor(id) });
     swept++;
   }
   return swept;
@@ -181,11 +212,14 @@ export function sweepStaleAttempts(olderThanMs = 10 * 60 * 1000): number {
 
 /** Memory high-water mark of the attempt (for calibration). */
 export function attemptPeakMemoryMiB(a: Attempt): number | null {
-  try { return Math.round(Number(readFileSync(join(a.cgroups[0]!, 'memory.max_usage_in_bytes'), 'utf8')) / 1048576); } catch { return null; }
+  try { return Math.round(Number(readFileSync(join(a.cgroups[0]!, CGROUP_V2 ? 'memory.peak' : 'memory.max_usage_in_bytes'), 'utf8')) / 1048576); } catch { return null; }
 }
 
 export function attemptOomKilled(a: Attempt): boolean {
-  try { return /oom_kill [1-9]/.test(readFileSync(join(a.cgroups[0]!, 'memory.oom_control'), 'utf8')) || Number(readFileSync(join(a.cgroups[0]!, 'memory.failcnt'), 'utf8')) > 0; } catch { return false; }
+  try {
+    if (CGROUP_V2) return /oom_kill [1-9]/.test(readFileSync(join(a.cgroups[0]!, 'memory.events'), 'utf8'));
+    return /oom_kill [1-9]/.test(readFileSync(join(a.cgroups[0]!, 'memory.oom_control'), 'utf8')) || Number(readFileSync(join(a.cgroups[0]!, 'memory.failcnt'), 'utf8')) > 0;
+  } catch { return false; }
 }
 
 export interface ProcessRun { code: number | null; signal: string | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }

@@ -1,0 +1,908 @@
+{
+ "_label": "RECORDED by the development runner for the SIMULATED GitHub snapshots — candidate packs, synthetic code. Served in staging with R2_MODE=recorded.",
+ "recordedAt": "2026-11-27T09:58:24.143Z",
+ "results": {
+  "act_fe_integrated_leave_requests:sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63": {
+   "activityId": "act_fe_integrated_leave_requests",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 13010,
+   "tests": [
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "root_cause_fixed",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل للخدمة الوهمية",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "الملفات الثلاثة موجودة (الملاحظات ورابط الـPull Request يتحقق منها المراجِع)",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.heading_and_landmarks",
+     "criterionKey": "semantic_structure",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "عنوان رئيسي واحد h1، وعناوين متسلسلة، ومعلم main",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.requests_as_list_or_table",
+     "criterionKey": "semantic_structure",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "الطلبات معروضة قائمةً (ul/ol) أو جدولًا بعناوين أعمدة",
+     "noteAr": null
+    },
+    {
+     "testId": "output.requests_follow_data",
+     "criterionKey": "data_states",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
+     "noteAr": null
+    },
+    {
+     "testId": "output.order_by_submission_date",
+     "criterionKey": "judgment_assumption_check",
+     "layer": "output",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: ترتيب الطلبات المعروضة بحسب تاريخ التقديم (الأحدث أولًا)",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.loading_visible",
+     "criterionKey": "data_states",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "رسالة التحميل ظاهرة أثناء الطلب وتختفي حين تظهر الطلبات",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.error_with_retry_button",
+     "criterionKey": "data_states",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "فشل الخدمة يُظهر رسالة واضحة وزر «إعادة المحاولة» حقيقيًا، دون رسالة تحميل",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.empty_message",
+     "criterionKey": "data_states",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "قائمة خالية تُظهر «لا طلبات إجازة سابقة» دون خطأ ولا تحميل",
+     "noteAr": null
+    },
+    {
+     "testId": "state.retry_completes_cleanly",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "إعادة المحاولة بعد الفشل: تحميل ظاهر، ثم الطلبات وحدها دون تحميل ولا خطأ",
+     "noteAr": null
+    },
+    {
+     "testId": "state.retry_then_empty_answer",
+     "criterionKey": "root_cause_fixed",
+     "layer": "functional",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: إعادة المحاولة التي تنتهي بقائمة خالية تُنهي التحميل وتُظهر حالة الفراغ",
+     "noteAr": null
+    },
+    {
+     "testId": "responsive.page_width_360",
+     "criterionKey": "responsive_layout",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل والطلبات معروضة",
+     "noteAr": "عرض المحتوى 360 على شاشة 360؛ عناصر تتجاوز الشاشة: 0"
+    },
+    {
+     "testId": "responsive.page_width_1024",
+     "criterionKey": "responsive_layout",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لا تمرير أفقي على 1024 بكسل والطلبات معروضة",
+     "noteAr": "عرض المحتوى 1024 على شاشة 1024"
+    },
+    {
+     "testId": "a11y.retry_by_keyboard",
+     "criterionKey": "a11y_basics",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "زر إعادة المحاولة يصله Tab بتركيز ظاهر، وEnter يعيد التحميل",
+     "noteAr": null
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": [
+    "shipped_data_embedded"
+   ]
+  },
+  "act_fe_integrated_leave_requests:sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280": {
+   "activityId": "act_fe_integrated_leave_requests",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 19553,
+   "tests": [
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "root_cause_fixed",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل للخدمة الوهمية",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "الملفات الثلاثة موجودة (الملاحظات ورابط الـPull Request يتحقق منها المراجِع)",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.heading_and_landmarks",
+     "criterionKey": "semantic_structure",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "عنوان رئيسي واحد h1، وعناوين متسلسلة، ومعلم main",
+     "noteAr": "لا عنوان رئيسي واحد أو العناوين غير متسلسلة · لا معلم main"
+    },
+    {
+     "testId": "semantic.requests_as_list_or_table",
+     "criterionKey": "semantic_structure",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "الطلبات معروضة قائمةً (ul/ol) أو جدولًا بعناوين أعمدة",
+     "noteAr": "الطلبات ليست عناصر قائمة ولا صفوف جدول له عناوين"
+    },
+    {
+     "testId": "output.requests_follow_data",
+     "criterionKey": "data_states",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
+     "noteAr": "طلبات لا تُعرض حقولها كاملة بالعربية: 6"
+    },
+    {
+     "testId": "output.order_by_submission_date",
+     "criterionKey": "judgment_assumption_check",
+     "layer": "output",
+     "mode": "supports_human",
+     "outcome": "fail",
+     "labelAr": "للمراجِع: ترتيب الطلبات المعروضة بحسب تاريخ التقديم (الأحدث أولًا)",
+     "noteAr": "الترتيب المعروض ليس من الأحدث إلى الأقدم بحسب تاريخ التقديم"
+    },
+    {
+     "testId": "data_states.loading_visible",
+     "criterionKey": "data_states",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "رسالة التحميل ظاهرة أثناء الطلب وتختفي حين تظهر الطلبات",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.error_with_retry_button",
+     "criterionKey": "data_states",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "فشل الخدمة يُظهر رسالة واضحة وزر «إعادة المحاولة» حقيقيًا، دون رسالة تحميل",
+     "noteAr": "عنصر إعادة المحاولة ليس زرًا"
+    },
+    {
+     "testId": "data_states.empty_message",
+     "criterionKey": "data_states",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "قائمة خالية تُظهر «لا طلبات إجازة سابقة» دون خطأ ولا تحميل",
+     "noteAr": "لا رسالة للقائمة الخالية"
+    },
+    {
+     "testId": "state.retry_completes_cleanly",
+     "criterionKey": "state_transitions",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "إعادة المحاولة بعد الفشل: تحميل ظاهر، ثم الطلبات وحدها دون تحميل ولا خطأ",
+     "noteAr": "بعد إعادة المحاولة بقيت حالتان متعارضتان أو لم تظهر الطلبات"
+    },
+    {
+     "testId": "state.retry_then_empty_answer",
+     "criterionKey": "root_cause_fixed",
+     "layer": "functional",
+     "mode": "supports_human",
+     "outcome": "fail",
+     "labelAr": "للمراجِع: إعادة المحاولة التي تنتهي بقائمة خالية تُنهي التحميل وتُظهر حالة الفراغ",
+     "noteAr": "بعد إعادة المحاولة بقائمة خالية لم تنته رسالة التحميل أو لم تظهر حالة الفراغ"
+    },
+    {
+     "testId": "responsive.page_width_360",
+     "criterionKey": "responsive_layout",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل والطلبات معروضة",
+     "noteAr": "عرض المحتوى 660 على شاشة 360؛ عناصر تتجاوز الشاشة: 12"
+    },
+    {
+     "testId": "responsive.page_width_1024",
+     "criterionKey": "responsive_layout",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لا تمرير أفقي على 1024 بكسل والطلبات معروضة",
+     "noteAr": "عرض المحتوى 1024 على شاشة 1024"
+    },
+    {
+     "testId": "a11y.retry_by_keyboard",
+     "criterionKey": "a11y_basics",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "زر إعادة المحاولة يصله Tab بتركيز ظاهر، وEnter يعيد التحميل",
+     "noteAr": "لوحة المفاتيح لا تصل إلى إعادة المحاولة"
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": []
+  },
+  "act_fe_debug_improve:sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7": {
+   "activityId": "act_fe_debug_improve",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 5935,
+   "tests": [
+    {
+     "testId": "quality.starter_lines_kept",
+     "criterionKey": "scope_discipline",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "حجم التغيير مقارنة بملفات البداية (للمراجِع: إصلاح لا إعادة كتابة)",
+     "noteAr": "بقي 63% من أسطر البداية (81 من 128)"
+    },
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "scope_discipline",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل لواجهات الصفحة العامة",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "الملفات الثلاثة موجودة",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.form_with_submit_button",
+     "criterionKey": "semantic_fixed",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "الحقول داخل نموذج form وزر الإرسال زر حقيقي",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.headings_and_table_headers",
+     "criterionKey": "semantic_fixed",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "العناوين متسلسلة دون قفز، ولعناوين الجدول خلايا th",
+     "noteAr": null
+    },
+    {
+     "testId": "a11y.fields_have_labels",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لكل حقل تسمية مرتبطة به (لا يكفي النص المؤقت)",
+     "noteAr": null
+    },
+    {
+     "testId": "a11y.keyboard_reaches_submit",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لوحة المفاتيح وحدها تصل إلى الحقول ثم زر الإرسال، وEnter يرسل",
+     "noteAr": null
+    },
+    {
+     "testId": "a11y.focus_visible_on_controls",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "التركيز ظاهر على الحقول وزر الإرسال عند التنقل بلوحة المفاتيح",
+     "noteAr": null
+    },
+    {
+     "testId": "a11y.field_errors_linked",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby) والحقل معلَّم aria-invalid",
+     "noteAr": null
+    },
+    {
+     "testId": "validation.invalid_addresses_refused",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "عناوين بريد غير صالحة متنوعة تُرفض برسالة عند الحقل",
+     "noteAr": null
+    },
+    {
+     "testId": "validation.common_addresses_accepted",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "عناوين بريد صالحة شائعة تُقبل",
+     "noteAr": null
+    },
+    {
+     "testId": "form.per_field_messages_when_empty",
+     "criterionKey": "form_submission_flow",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "إرسال النموذج فارغًا: لا إرسال، ولكل حقل مطلوب رسالته",
+     "noteAr": null
+    },
+    {
+     "testId": "form.values_kept_and_error_clears",
+     "criterionKey": "form_submission_flow",
+     "layer": "usability",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "ما أدخله المستخدم يبقى بعد الرفض، ورسالة الحقل تزول بعد تصحيحه",
+     "noteAr": null
+    },
+    {
+     "testId": "responsive.page_width_360",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل",
+     "noteAr": "عرض المحتوى 360 على شاشة 360؛ عناصر تتجاوز الشاشة: 0"
+    },
+    {
+     "testId": "responsive.schedule_reachable_360",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على 360 بكسل",
+     "noteAr": null
+    },
+    {
+     "testId": "responsive.sidebar_beside_1024",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "العمود الجانبي بجانب المحتوى على عرض 1024 بكسل",
+     "noteAr": null
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": []
+  },
+  "act_fe_debug_improve:sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a": {
+   "activityId": "act_fe_debug_improve",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 8550,
+   "tests": [
+    {
+     "testId": "quality.starter_lines_kept",
+     "criterionKey": "scope_discipline",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "حجم التغيير مقارنة بملفات البداية (للمراجِع: إصلاح لا إعادة كتابة)",
+     "noteAr": "بقي 100% من أسطر البداية (128 من 128)"
+    },
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "scope_discipline",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل لواجهات الصفحة العامة",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "الملفات الثلاثة موجودة",
+     "noteAr": null
+    },
+    {
+     "testId": "semantic.form_with_submit_button",
+     "criterionKey": "semantic_fixed",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "الحقول داخل نموذج form وزر الإرسال زر حقيقي",
+     "noteAr": "الحقول ليست داخل عنصر form واحد"
+    },
+    {
+     "testId": "semantic.headings_and_table_headers",
+     "criterionKey": "semantic_fixed",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "العناوين متسلسلة دون قفز، ولعناوين الجدول خلايا th",
+     "noteAr": "تسلسل العناوين غير مرتب · صف عناوين الجدول بلا خلايا th"
+    },
+    {
+     "testId": "a11y.fields_have_labels",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "لكل حقل تسمية مرتبطة به (لا يكفي النص المؤقت)",
+     "noteAr": "حقول بلا تسمية: 3 من 3"
+    },
+    {
+     "testId": "a11y.keyboard_reaches_submit",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "لوحة المفاتيح وحدها تصل إلى الحقول ثم زر الإرسال، وEnter يرسل",
+     "noteAr": "زر الإرسال أو أحد الحقول لا يصله Tab بالترتيب"
+    },
+    {
+     "testId": "a11y.focus_visible_on_controls",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "التركيز ظاهر على الحقول وزر الإرسال عند التنقل بلوحة المفاتيح",
+     "noteAr": "عناصر بلا تركيز ظاهر: 2 من 2"
+    },
+    {
+     "testId": "a11y.field_errors_linked",
+     "criterionKey": "a11y_keyboard_forms",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby) والحقل معلَّم aria-invalid",
+     "noteAr": "الرسالة غير مرتبطة بالحقل · الحقل غير معلَّم بأنه غير صالح"
+    },
+    {
+     "testId": "validation.invalid_addresses_refused",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "عناوين بريد غير صالحة متنوعة تُرفض برسالة عند الحقل",
+     "noteAr": "لا رسالة عند الحقل بعد إرسال قيمة غير صالحة (1 من 6)"
+    },
+    {
+     "testId": "validation.common_addresses_accepted",
+     "criterionKey": "validation_fixed",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "عناوين بريد صالحة شائعة تُقبل",
+     "noteAr": "لم يُقبل عنوان صالح (1 من 3)"
+    },
+    {
+     "testId": "form.per_field_messages_when_empty",
+     "criterionKey": "form_submission_flow",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "إرسال النموذج فارغًا: لا إرسال، ولكل حقل مطلوب رسالته",
+     "noteAr": "لا رسالة خاصة بكل حقل مطلوب"
+    },
+    {
+     "testId": "form.values_kept_and_error_clears",
+     "criterionKey": "form_submission_flow",
+     "layer": "usability",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "ما أدخله المستخدم يبقى بعد الرفض، ورسالة الحقل تزول بعد تصحيحه",
+     "noteAr": "لم يظهر رفض واضح لقيمة غير صالحة"
+    },
+    {
+     "testId": "responsive.page_width_360",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل",
+     "noteAr": "عرض المحتوى 736 على شاشة 360؛ عناصر تتجاوز الشاشة: 32"
+    },
+    {
+     "testId": "responsive.schedule_reachable_360",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على 360 بكسل",
+     "noteAr": "عناصر من الجدول لا يمكن رؤيتها: 4 من 6"
+    },
+    {
+     "testId": "responsive.sidebar_beside_1024",
+     "criterionKey": "responsive_fixed",
+     "layer": "responsive",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "العمود الجانبي بجانب المحتوى على عرض 1024 بكسل",
+     "noteAr": "العمود الجانبي ليس بجانب المحتوى"
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": []
+  },
+  "act_fe_change_request:sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930": {
+   "activityId": "act_fe_change_request",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 7169,
+   "tests": [
+    {
+     "testId": "quality.structure_kept",
+     "criterionKey": "problem_traced",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: البنية القائمة باقية (state وrenderTasks وloadTasks) وحجم التغيير محدود",
+     "noteAr": "بقي 87% من أسطر app.js الأصلية"
+    },
+    {
+     "testId": "quality.declared_identifiers",
+     "criterionKey": "js_correctness",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: لا متغيرات تُسند دون تعريف (متغيرات عامة عرضية)",
+     "noteAr": null
+    },
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "js_correctness",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل للخدمة الوهمية",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "ملف الكود موجود (الملاحظة والشرح يتحقق منهما المراجِع)",
+     "noteAr": null
+    },
+    {
+     "testId": "output.list_follows_data",
+     "criterionKey": "filter_in_state",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات",
+     "noteAr": null
+    },
+    {
+     "testId": "filter.control_labelled",
+     "criterionKey": "filter_in_state",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "عنصر اختيار الحالة موجود بخياراته الأربعة وله تسمية",
+     "noteAr": null
+    },
+    {
+     "testId": "filter.each_status_then_all",
+     "criterionKey": "filter_in_state",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "اختيار كل حالة يعرض مهامها فقط مع عددها، والعودة إلى «الكل» تعيدها جميعًا",
+     "noteAr": null
+    },
+    {
+     "testId": "filter.no_match_message",
+     "criterionKey": "empty_state_correct",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "حالة بلا مهام تُظهر رسالة «لا مهام بهذه الحالة» لا خطأ، ثم تعود القائمة",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.empty_answer_message",
+     "criterionKey": "empty_state_correct",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "قائمة خالية من الخدمة تُظهر «لا مهام بعد» دون رسالة خطأ ولا إعادة محاولة",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.error_and_empty_distinct",
+     "criterionKey": "root_cause_fixed",
+     "layer": "data_states",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: فشل الخدمة يُظهر خطأ مع إعادة محاولة، والقائمة الخالية تُظهر حالة فراغ — حالتان مختلفتان",
+     "noteAr": null
+    },
+    {
+     "testId": "errors.retry_recovers",
+     "criterionKey": "js_correctness",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بعد فشل التحميل، إعادة المحاولة تعرض القائمة دون أخطاء غير معالجة",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.loading_then_list",
+     "criterionKey": "js_correctness",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "رسالة التحميل ظاهرة أثناء الطلب، ثم تحل محلها القائمة",
+     "noteAr": null
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": []
+  },
+  "act_fe_change_request:sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c": {
+   "activityId": "act_fe_change_request",
+   "packVersion": "0.1.0",
+   "packStatus": "candidate",
+   "commitSha": null,
+   "snapshotHash": "sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c",
+   "origin": "synthetic",
+   "backend": "namespace-dev",
+   "limits": {
+    "cpuPercent": 100,
+    "memoryMiB": 512,
+    "maxProcesses": 512,
+    "diskMiB": 256,
+    "wallSeconds": 90,
+    "perTestSeconds": 10,
+    "maxInputBytes": 2097152
+   },
+   "status": "completed",
+   "durationMs": 7209,
+   "tests": [
+    {
+     "testId": "quality.structure_kept",
+     "criterionKey": "problem_traced",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: البنية القائمة باقية (state وrenderTasks وloadTasks) وحجم التغيير محدود",
+     "noteAr": "بقي 100% من أسطر app.js الأصلية"
+    },
+    {
+     "testId": "quality.declared_identifiers",
+     "criterionKey": "js_correctness",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "للمراجِع: لا متغيرات تُسند دون تعريف (متغيرات عامة عرضية)",
+     "noteAr": null
+    },
+    {
+     "testId": "gaming.environment_probing",
+     "criterionKey": "js_correctness",
+     "layer": "gaming",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "لا فحص لبيئة التشغيل ولا تعديل للخدمة الوهمية",
+     "noteAr": null
+    },
+    {
+     "testId": "quality.source_files_present",
+     "criterionKey": "deliverables_complete",
+     "layer": "quality",
+     "mode": "supports_human",
+     "outcome": "pass",
+     "labelAr": "ملف الكود موجود (الملاحظة والشرح يتحقق منهما المراجِع)",
+     "noteAr": null
+    },
+    {
+     "testId": "output.list_follows_data",
+     "criterionKey": "filter_in_state",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات",
+     "noteAr": null
+    },
+    {
+     "testId": "filter.control_labelled",
+     "criterionKey": "filter_in_state",
+     "layer": "a11y",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "عنصر اختيار الحالة موجود بخياراته الأربعة وله تسمية",
+     "noteAr": "لا عنصر اختيار للحالة بخياراته الأربعة"
+    },
+    {
+     "testId": "filter.each_status_then_all",
+     "criterionKey": "filter_in_state",
+     "layer": "functional",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "اختيار كل حالة يعرض مهامها فقط مع عددها، والعودة إلى «الكل» تعيدها جميعًا",
+     "noteAr": "لا عنصر اختيار للحالة"
+    },
+    {
+     "testId": "filter.no_match_message",
+     "criterionKey": "empty_state_correct",
+     "layer": "output",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "حالة بلا مهام تُظهر رسالة «لا مهام بهذه الحالة» لا خطأ، ثم تعود القائمة",
+     "noteAr": "لا عنصر اختيار للحالة"
+    },
+    {
+     "testId": "data_states.empty_answer_message",
+     "criterionKey": "empty_state_correct",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "fail",
+     "labelAr": "قائمة خالية من الخدمة تُظهر «لا مهام بعد» دون رسالة خطأ ولا إعادة محاولة",
+     "noteAr": "القائمة الخالية تُعرض كأنها خطأ"
+    },
+    {
+     "testId": "data_states.error_and_empty_distinct",
+     "criterionKey": "root_cause_fixed",
+     "layer": "data_states",
+     "mode": "supports_human",
+     "outcome": "fail",
+     "labelAr": "للمراجِع: فشل الخدمة يُظهر خطأ مع إعادة محاولة، والقائمة الخالية تُظهر حالة فراغ — حالتان مختلفتان",
+     "noteAr": "القائمة الخالية لا تُعرض حالة فراغ"
+    },
+    {
+     "testId": "errors.retry_recovers",
+     "criterionKey": "js_correctness",
+     "layer": "errors",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "بعد فشل التحميل، إعادة المحاولة تعرض القائمة دون أخطاء غير معالجة",
+     "noteAr": null
+    },
+    {
+     "testId": "data_states.loading_then_list",
+     "criterionKey": "js_correctness",
+     "layer": "data_states",
+     "mode": "automated",
+     "outcome": "pass",
+     "labelAr": "رسالة التحميل ظاهرة أثناء الطلب، ثم تحل محلها القائمة",
+     "noteAr": null
+    }
+   ],
+   "blockedRequests": 0,
+   "gamingSignals": []
+  }
+ }
+}

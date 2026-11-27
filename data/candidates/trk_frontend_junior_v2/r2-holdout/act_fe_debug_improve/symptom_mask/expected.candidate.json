@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "يبدو مُصلحًا على 360px لكنه يُخفي العَرَض: يُبقي body{overflow-x:hidden} والعرض الثابت 720px، ويخفي عمودي «المدرّبة» و«القاعة» على الجوال ويصغّر الخط.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "unmet",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form وlabel وbutton type=submit، والعناوين h1 ثم h2، وthead/th، وaside.",
+    "a11y_keyboard_forms": "الحقول مسمّاة بـlabel، ورسائل الخطأ مرتبطة بـaria-describedby، والزر يعمل بلوحة المفاتيح، والتركيز ظاهر بـoutline.",
+    "responsive_fixed": "لا تمرير أفقي على 360 فقط لأن styles.css تُبقي overflow-x:hidden على body وتخفي th/td للعمودين 4 و5 بـdisplay:none؛ وهذا بالضبط ما يذكره المرجع أنه لا يُحتسب (إبقاء القناع، تصغير الخط، حذف أعمدة)، وعمود «المدرّبة» موضوع الشكوى ما زال مختفيًا.",
+    "validation_fixed": "isValidEmail يتطلب نقطة وامتدادًا فيرفض sara@gmail، والرسالة بجانب حقل البريد.",
+    "root_cause_note": "الحالة تحتوي كودًا فقط بلا ملاحظات مكتوبة، فالحكم يعتمد على ملاحظة الخرّيج ويُترك للمراجِع البشري.",
+    "scope_discipline": "لا إعادة كتابة؛ التغييرات في مواضع الأعطال حتى لو كان إصلاح الجدول قناعًا.",
+    "form_submission_flow": "لا إرسال مع خطأ، ورسالة لكل حقل، والقيم تبقى، وتختفي رسالة الحقل عند الكتابة فيه.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="سجّلي في ورشة أساسيات تحليل البيانات">
+  <title>سجّلي الآن | ورشة تحليل البيانات</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="ws">
+  <a class="ws-skip" href="#ws-main">انتقلي إلى المحتوى</a>
+
+  <header class="ws-header">
+    <nav class="ws-nav" aria-label="الرئيسية">
+      <span class="ws-brand">أكاديمية المهارات</span>
+      <ul class="ws-nav__links">
+        <li><a href="#ws-agenda">البرنامج</a></li>
+        <li><a href="#ws-join">التسجيل</a></li>
+        <li><a href="#ws-faq">أسئلة</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section class="ws-hero">
+    <h1 class="ws-hero__title">ورشة أساسيات تحليل البيانات</h1>
+    <p class="ws-hero__text">يومان عمليان تنتقلين فيهما من بيانات فوضوية إلى أول لوحة متابعة تعرضينها على فريقك.</p>
+    <a class="ws-button ws-button--light" href="#ws-join">احجزي مقعدك</a>
+  </section>
+
+  <div class="ws-layout">
+    <main id="ws-main" class="ws-layout__main">
+      <section id="ws-agenda" class="ws-card" aria-labelledby="agenda-title">
+        <h2 id="agenda-title">برنامج الورشة</h2>
+        <div class="ws-table-scroll">
+          <table class="ws-table">
+            <caption class="ws-visually-hidden">مواعيد جلسات الورشة</caption>
+            <thead>
+              <tr>
+                <th scope="col">اليوم</th>
+                <th scope="col">الوقت</th>
+                <th scope="col">الموضوع</th>
+                <th scope="col">المدرّبة</th>
+                <th scope="col">القاعة</th>
+              </tr>
+            </thead>
+            <tbody id="agenda-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ws-join" class="ws-card" aria-labelledby="join-title">
+        <h2 id="join-title">احجزي مقعدك</h2>
+        <form id="join-form" class="ws-form" novalidate>
+          <div class="ws-field">
+            <label class="ws-field__label" for="fullName">الاسم الكامل</label>
+            <input class="ws-field__input" id="fullName" name="fullName" type="text" autocomplete="name" required aria-describedby="fullName-hint">
+            <p class="ws-field__hint" id="fullName-hint" aria-live="polite"></p>
+          </div>
+          <div class="ws-field">
+            <label class="ws-field__label" for="emailAddress">البريد الإلكتروني</label>
+            <input class="ws-field__input" id="emailAddress" name="emailAddress" type="email" autocomplete="email" required aria-describedby="emailAddress-hint">
+            <p class="ws-field__hint" id="emailAddress-hint" aria-live="polite"></p>
+          </div>
+          <div class="ws-field">
+            <label class="ws-field__label" for="mobile">رقم الجوال <span class="ws-muted">(اختياري)</span></label>
+            <input class="ws-field__input" id="mobile" name="mobile" type="tel" autocomplete="tel" aria-describedby="mobile-hint">
+            <p class="ws-field__hint" id="mobile-hint" aria-live="polite"></p>
+          </div>
+          <button class="ws-button" type="submit">سجّليني الآن</button>
+          <p class="ws-form__status" id="join-status" role="status"></p>
+        </form>
+      </section>
+
+      <section id="ws-faq" class="ws-card" aria-labelledby="faq-title">
+        <h2 id="faq-title">أسئلة متكررة</h2>
+        <details>
+          <summary>هل أحتاج خبرة سابقة؟</summary>
+          <p>لا، تكفي معرفة أساسية بجداول البيانات.</p>
+        </details>
+        <details>
+          <summary>هل أحضر حاسوبي؟</summary>
+          <p>نعم، يُفضَّل حاسوب محمول.</p>
+        </details>
+      </section>
+    </main>
+
+    <aside class="ws-layout__side ws-card" aria-labelledby="facts-title">
+      <h2 id="facts-title">معلومات سريعة</h2>
+      <dl class="ws-facts">
+        <dt>المقاعد</dt><dd>24</dd>
+        <dt>اللغة</dt><dd>العربية</dd>
+        <dt>الشهادة</dt><dd>حضور</dd>
+      </dl>
+    </aside>
+  </div>
+
+  <footer class="ws-footer">© أكاديمية المهارات</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

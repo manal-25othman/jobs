@@ -1,4 +1,4 @@
-# S0 (Package 7, planning files only) — NAQLA graduate app (Next.js). Not built or deployed by any pipeline yet.
+# NAQLA graduate app (Next.js) as a container — an alternative to Vercel. Built by CI (docker-build job).
 # Build from the repository root:  docker build -f ops/docker/app.Dockerfile --build-arg NEXT_PUBLIC_API_URL=... -t naqla-app .
 FROM node:22-bookworm-slim AS build
 ARG NEXT_PUBLIC_API_URL
@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 COPY packages ./packages
 COPY apps/app ./apps/app
 COPY apps/api/package.json ./apps/api/package.json
+COPY apps/runner/package.json ./apps/runner/package.json
 RUN npm ci --no-audit --no-fund
 RUN npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run build -w @naqla/contracts \
  && npm run build -w @naqla/agents && npm run build -w @naqla/app

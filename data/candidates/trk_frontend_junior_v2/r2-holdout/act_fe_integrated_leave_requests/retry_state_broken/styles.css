@@ -1,0 +1,30 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+  line-height: 1.6;
+}
+
+.page-header { background: #1f5a4e; color: #fff; padding: 14px 16px; }
+.page-header h1 { margin: 0; font-size: 1.35rem; }
+.page-header p { margin: 2px 0 0; color: #d6e8e1; }
+
+.page-main { max-width: 860px; margin: 0 auto; padding: 16px; }
+.page-main h2 { font-size: 1.1rem; }
+
+.box { background: #fff; border: 1px solid #e3e7df; border-radius: 10px; padding: 12px 14px; }
+.box--error { border-color: #a94442; color: #a94442; }
+
+.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item { background: #fff; border: 1px solid #e3e7df; border-radius: 10px; padding: 10px 14px; }
+.item__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-weight: 600; }
+.item__body { color: #5f6b63; font-size: .95rem; }
+.tag { font-weight: 400; font-size: .85rem; border-radius: 999px; padding: 0 10px; background: #eef1f5; }
+.tag--approved { background: #e3f3ea; color: #23744c; }
+.tag--rejected { background: #fbe9e9; color: #a94442; }
+
+.btn { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid #1f5a4e; background: #fff; color: #1f5a4e; cursor: pointer; }
+.btn:focus-visible { outline: 3px solid #1f5a4e; outline-offset: 2px; }

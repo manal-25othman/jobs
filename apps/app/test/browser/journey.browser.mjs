@@ -63,7 +63,8 @@ process.env.STORAGE_DRIVER = 'memory';
 // Phase C round 2: simulated GitHub (no request to GitHub) and the R2 development sandbox (synthetic code only).
 process.env.GITHUB_MODE = 'simulated';
 process.env.GITHUB_WEBHOOK_SECRET = 'ui-acceptance-only-webhook-secret-not-real-0123456789';
-process.env.R2_MODE = 'synthetic_dev';
+// CI hosts cannot run the development sandbox: UI_R2_MODE=recorded serves the recorded results instead (no code runs).
+process.env.R2_MODE = process.env.UI_R2_MODE ?? 'synthetic_dev';
 process.env.UPLOAD_MAX_BYTES = String(UPLOAD_MAX_BYTES);
 const { Test } = apiRequire('@nestjs/testing');
 const { SignJWT } = apiRequire('jose');
@@ -677,6 +678,7 @@ async function scenarioB15(browser) {
       const tr = await gp.locator('[data-testid="test-runs"]').innerText();
       check('B24d', 'evaluation page: the automated tests on that commit, with neutral labels, marked candidate and shadow; never skill proof; no test internals',
         tr.includes(pinned.commit_sha.slice(0, 7)) && /اختبارات مرشّحة لم يعتمدها خبير/.test(tr) && /لا تُثبت المهارة وحدها/.test(tr) && /وضع الظل/.test(tr)
+        && (process.env.R2_MODE !== 'recorded' || /مسجّلة مسبقًا/.test(tr))
         && !/expected|solution|reference|planted|REFERENCE/i.test(tr), tr.replace(/\n/g, ' | ').slice(0, 200));
       await gp.setViewportSize({ width: 390, height: 844 });
       const ov = await gp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

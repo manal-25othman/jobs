@@ -1,3 +1,4 @@
+import { deploymentEnv } from '@naqla/config';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../infra/db.service';
@@ -8,7 +9,11 @@ import { classificationEntriesInEffect } from './professional-classification';
 export const GOVERNED_TABLES = ['verification_policy', 'assessment_context_policy', 'claim_policy', 'challenge_policy', 'track_config_version', 'readiness_rule_set', 'grounding_lexicon', 'pack_constraint_set'] as const;
 export type GovernedTable = (typeof GOVERNED_TABLES)[number];
 
-export function isProduction(): boolean { return process.env['NODE_ENV'] === 'production'; }
+/**
+ * Governance "production": a real launch (NAQLA_ENV=production). Staging (NAQLA_ENV=staging) is NOT production here — it
+ * keeps the labelled pilot behaviour — while the infrastructure checks keep reading NODE_ENV (packages/config).
+ */
+export function isProduction(): boolean { return deploymentEnv() === 'production'; }
 
 /** Governance columns every governed table shares. */
 export function governedFromRow(r: Record<string, unknown>): GovernedConfig {

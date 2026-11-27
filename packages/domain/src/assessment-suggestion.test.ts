@@ -52,3 +52,15 @@ test('calibration metrics: agreement, kappa, false accept on mandatory, rejectio
   assert.equal(r.unescalatedErrorRate, 0); assert.equal(r.escalationRate, 1);
   assert.match(r.noticeAr, /لا تمنح اعتمادًا آليًا/);
 });
+
+test('integrity signals block a «met» built on passing tests; a failed reviewer signal suggests a weak «unmet»', () => {
+  const tampered = suggestCriterion(base, { ...shadow, gamingSignals: ['provided_service_modified'] });
+  assert.equal(tampered.suggestion, 'uncertain'); assert.ok(tampered.escalationReasons.includes('integrity_blocks_met'));
+  const dataOnly = suggestCriterion(base, { ...shadow, gamingSignals: ['provided_data_changed'] });
+  assert.equal(dataOnly.suggestion, 'met', 'a changed data file only escalates');
+  const weak = suggestCriterion({ ...base, evaluatorType: 'human', tests: tests('human_only'), testLabels: [{ labelAr: 'حجم التغيير مقارنة بمواد البداية', outcome: 'fail', mode: 'supports_human' }] }, shadow);
+  assert.equal(weak.suggestion, 'unmet'); assert.ok(weak.confidence <= 0.35); assert.ok(weak.escalationReasons.includes('reviewer_signal_failed'));
+  assert.doesNotThrow(() => assertSuggestionGrounded(weak, { ...base, evaluatorType: 'human', tests: tests('human_only'), testLabels: [{ labelAr: 'حجم التغيير مقارنة بمواد البداية', outcome: 'fail', mode: 'supports_human' }] }));
+  const conflict = suggestCriterion({ ...base, testLabels: [...base.testLabels, { labelAr: 'إشارة للمراجِع', outcome: 'fail', mode: 'supports_human' }] }, shadow);
+  assert.equal(conflict.suggestion, 'uncertain');
+});

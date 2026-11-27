@@ -120,9 +120,20 @@ export function assertReviewTransition(d: ReviewDecision): void {
 export function pilotDemoPublicationRefusal(p: {
   readonly nodeEnv: string | undefined; readonly databaseHost: string | null;
   readonly isDemoFixture: boolean; readonly isPilotContent: boolean; readonly from: ReviewState; readonly reason: string;
+  /**
+   * Phase C round 3: a PRIVATE staging deployment may take the same exception ONLY under a named owner decision
+   * (e.g. `D-149`) recorded in the decision log — never by default, never in production.
+   */
+  readonly deployment?: 'development' | 'staging' | 'production';
+  readonly stagingDecision?: string | null;
 }): string | null {
-  if (p.nodeEnv !== 'development' && p.nodeEnv !== 'test') return `refused outside local development (NODE_ENV=${p.nodeEnv ?? 'unset'}): production and staging never take this exception`;
-  if (!isLocalDatabaseHost(p.databaseHost)) return `refused: the database (${p.databaseHost ?? 'unknown host'}) is not a local development database; staging and production never take this exception`;
+  const staging = p.deployment === 'staging';
+  if (staging) {
+    if (!p.stagingDecision || !/^D-\d{3}$/.test(p.stagingDecision)) return 'refused in staging: the pilot exception needs a named owner decision (PILOT_STAGING_DECISION=D-nnn) — it is not granted by default';
+  } else {
+    if (p.nodeEnv !== 'development' && p.nodeEnv !== 'test') return `refused outside local development (NODE_ENV=${p.nodeEnv ?? 'unset'}): production and staging never take this exception`;
+    if (!isLocalDatabaseHost(p.databaseHost)) return `refused: the database (${p.databaseHost ?? 'unknown host'}) is not a local development database; staging and production never take this exception`;
+  }
   if (!p.isDemoFixture || !p.isPilotContent) return 'refused: only DEMO-fixture content recorded as a development pilot load can take this exception';
   if (p.from !== 'curated') return `refused: pilot content is published from curated (found '${p.from}')`;
   if (!p.reason.trim()) return 'refused: a pilot publication states why';

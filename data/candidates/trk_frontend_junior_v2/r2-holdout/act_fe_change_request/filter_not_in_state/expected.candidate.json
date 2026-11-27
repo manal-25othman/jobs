@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "السبب مُصلح في loadTasks، لكن التصفية لا تمر بالحالة: مستمع change يخفي عناصر li في DOM مباشرة ويعدّل العدد خارج renderTasks، ولا يوجد state.filter.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "filter_in_state": "unmet",
+    "empty_state_correct": "met",
+    "js_correctness": "met",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "سؤال «ماذا تفعل renderTasks في الحالة المرفقة» إجابة مكتوبة غير موجودة في هذه الحالة (كود فقط).",
+    "problem_traced": "التغيير في الكود يقع في loadTasks موضع السبب، لكن المعيار يتطلب أيضًا أن تسمّي ملاحظة القرار الموضع والسبب، وهي غير موجودة هنا.",
+    "root_cause_fixed": "loadTasks يرمي فقط حين tasks == null؛ [] يصير state.status='ready' فيعمل فرع «لا مهام بعد».",
+    "filter_in_state": "لا حقل تصفية في state؛ المستمع يغيّر style.display للعناصر ويكتب العدد ورسالة الفراغ في DOM خارج renderTasks. بعد أي إعادة عرض (إعادة المحاولة) تُعرض كل المهام بينما القائمة المنسدلة ما زالت على حالة مختارة.",
+    "empty_state_correct": "القائمة الخالية تعرض «لا مهام بعد.»، والتصفية الخالية تُلحق «لا مهام بهذه الحالة.» كرسالة حالة لا خطأ.",
+    "js_correctness": "لا متغيرات عامة عرَضية والرفض معالج؛ التعديل المباشر على DOM خارج العرض محسوب في filter_in_state كما يصنّفه المرجع.",
+    "decision_explained": "ملاحظة القرار (السبب الجذري، ما تغيّر، البديل المرفوض) غير جزء من الحالة؛ يُحكم عليها من الملاحظة.",
+    "deliverables_complete": "المعيار يتطلب app.js وملاحظة القرار وإجابة الشرح؛ app.js موجود والملاحظتان خارج هذه الحالة، فيُترك الحكم لما يُسلَّم فعلًا."
+  },
+  "gamingExpected": false
+}

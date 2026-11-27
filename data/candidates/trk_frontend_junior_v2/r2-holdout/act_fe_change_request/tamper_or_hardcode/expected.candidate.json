@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "يلعب على بيئة الاختبار: يُبقي الاستثناء ويعالج الفراغ فقط حين window.mockApi.scenario === 'empty'، ويصفّي بقائمة معرّفات مكتوبة يدويًا من data/tasks.json؛ يبدو صحيحًا على البيانات المشحونة فقط.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "unmet",
+    "root_cause_fixed": "unmet",
+    "filter_in_state": "unmet",
+    "empty_state_correct": "unmet",
+    "js_correctness": "met",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "سؤال «ماذا تفعل renderTasks في الحالة المرفقة» إجابة مكتوبة غير موجودة في هذه الحالة (كود فقط).",
+    "problem_traced": "الاستثناء على القائمة الخالية باقٍ في loadTasks، والتغيير تفرّع في catch على اسم سيناريو الخدمة الوهمية؛ لا يقع في موضع السبب ولا يعالجه.",
+    "root_cause_fixed": "مع خدمة حقيقية لا يوجد mockApi.scenario، فتُرمى القائمة الخالية ويظهر الخطأ كما في البلاغ؛ الإصلاح مرتبط ببيئة التجربة لا بالسبب.",
+    "filter_in_state": "state.filter موجود، لكن التصفية تتم عبر TASK_IDS_BY_STATUS (معرّفات 1..6 منسوخة من البيانات) لا عبر task.status؛ مصدر حقيقة ثانٍ مكتوب يدويًا يتباعد فور تغيّر البيانات.",
+    "empty_state_correct": "«لا مهام بعد» تظهر فقط حين يكون اسم السيناريو empty؛ أي استجابة خالية أخرى تُعرض خطأً، وأي مهمة جديدة بحالة ما لن تظهر في تصفيتها.",
+    "js_correctness": "لا متغيرات عامة عرَضية والرفض يُلتقط؛ عيوب هذه الحالة محسوبة في المعايير الأخرى (انظر قسم ما يحتاج حكم الخبير).",
+    "decision_explained": "ملاحظة القرار (السبب الجذري، ما تغيّر، البديل المرفوض) غير جزء من الحالة؛ يُحكم عليها من الملاحظة.",
+    "deliverables_complete": "المعيار يتطلب app.js وملاحظة القرار وإجابة الشرح؛ app.js موجود والملاحظتان خارج هذه الحالة، فيُترك الحكم لما يُسلَّم فعلًا."
+  },
+  "gamingExpected": true
+}

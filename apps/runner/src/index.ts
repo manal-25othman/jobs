@@ -3,4 +3,5 @@ export * from './sandbox.js';
 export * from './harness.js';
 export * from './run.js';
 export * from './gaming.js';
+export * from './integrity.js';
 export * from './packs/index.js';

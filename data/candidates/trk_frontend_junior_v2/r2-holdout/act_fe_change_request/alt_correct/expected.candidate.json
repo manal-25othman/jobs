@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "صحيح بأسلوب مختلف: التحقق من شكل الاستجابة Array.isArray في loadTasks، والتصفية بمجموعة أزرار راديو داخل fieldset/legend مع تفويض الحدث، والحقل state.activeFilter.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "met",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "سؤال «ماذا تفعل renderTasks في الحالة المرفقة» إجابة مكتوبة غير موجودة في هذه الحالة (كود فقط).",
+    "problem_traced": "التغيير في الكود يقع في loadTasks موضع السبب، لكن المعيار يتطلب أيضًا أن تسمّي ملاحظة القرار الموضع والسبب، وهي غير موجودة هنا.",
+    "root_cause_fixed": "في loadTasks لم يعد [] يُرمى استثناءً؛ يُرمى فقط حين لا تكون الاستجابة مصفوفة، فتصير الحالة ready ويعمل فرع «لا مهام بعد» القائم.",
+    "filter_in_state": "مستمع change على fieldset يضع state.activeFilter ثم يستدعي renderTasks(state)، وrenderTasks تحسب المعروض من state.tasks وstate.activeFilter؛ مصدر حقيقة واحد.",
+    "empty_state_correct": "القائمة الخالية تعرض «لا مهام بعد.» والتصفية الخالية «لا مهام بهذه الحالة.»، ولا رسالة خطأ.",
+    "js_correctness": "لا متغيرات عامة عرَضية (const/let)، والرفض يُلتقط ويحوّل الحالة إلى error مع إعادة المحاولة، والتعديل على state في موضعين واضحين فقط.",
+    "decision_explained": "ملاحظة القرار (السبب الجذري، ما تغيّر، البديل المرفوض) غير جزء من الحالة؛ يُحكم عليها من الملاحظة.",
+    "deliverables_complete": "المعيار يتطلب app.js وملاحظة القرار وإجابة الشرح؛ app.js موجود والملاحظتان خارج هذه الحالة، فيُترك الحكم لما يُسلَّم فعلًا."
+  },
+  "gamingExpected": false
+}

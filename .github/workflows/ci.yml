@@ -1,10 +1,9 @@
-# CI for development tests only (Phase C round 2, owner decision 8: activated after the permission and cost review in
-# docs/ops/research/GITHUB-APP-INTEGRATION-RESEARCH.md §Q10).
+# CI for development tests only (Phase C round 2, owner decision 8; extended in round 3, item 8).
 #  - Read-only token (`contents: read`; every other permission is then `none`). No secrets. No deploy. No
-#    pull_request_target. Runs only what a contributor runs locally. Public repository: standard runners are free.
-#  - The R2 sandbox tests need root and cgroup v1; on hosted runners they skip with a stated reason, and the API e2e
-#    records "R2 did not run" (synthetic code is never run outside the development sandbox).
-#  - The browser journey needs a built app and Chromium; it runs locally (apps/app/test/browser) until added here.
+#    pull_request_target. No image is pushed anywhere.
+#  - Every job writes a summary that separates PASSED, FAILED and SKIPPED tests (a skipped test is not a pass).
+#  - The isolation job runs the R2 development sandbox as root on a throwaway hosted runner (cgroup v2), on
+#    SYNTHETIC code only; nothing it runs can reach a secret (there are none in this workflow).
 name: ci
 on:
   pull_request:
@@ -12,9 +11,13 @@ on:
     branches: [main, 'claude/career-os-graduates-y42s9z']
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash   # explicit bash = -eo pipefail: a failing test is never hidden by `| tee`
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -32,12 +35,15 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm }
       - run: npm ci
-      - run: npm test                       # domain, config, agents, app unit tests
-      - run: npm run verify                 # boundaries, frozen prototype, tokens, documentation
+      - name: unit tests (domain, config, agents, app)
+        run: npm test 2>&1 | tee unit.log
+      - run: npm run verify
       - run: npm run build -w @naqla/runner && npm run build -w @naqla/api
-      - run: node --test --test-concurrency=1 apps/runner/dist/sandbox.test.js apps/runner/dist/run.test.js   # skips without root + cgroup v1
+      - name: API unit specs (GitHub App adapter against a local mock, HTTP guards)
+        working-directory: apps/api
+        run: node --test dist/src/**/*.spec.js 2>&1 | tee ../../spec.log
       - name: database proofs (RLS as authenticated, rollback round-trip)
-        run: DATABASE_URL=$PGURL NAQLA_TEST_DB=naqla_dbproof bash scripts/db-test.sh
+        run: DATABASE_URL=$PGURL NAQLA_TEST_DB=naqla_dbproof bash scripts/db-test.sh 2>&1 | tee db.log
       - name: e2e database
         run: |
           psql -q "$PGURL" -c "create database naqla_e2e"
@@ -45,4 +51,74 @@ jobs:
           DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node scripts/career-data.mjs import trk_frontend_junior
       - name: API e2e
         working-directory: apps/api
-        run: DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node --test --test-concurrency=1 dist/test/*.e2e.js
+        run: DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node --test --test-concurrency=1 dist/test/*.e2e.js 2>&1 | tee ../../e2e.log
+      - name: summary
+        if: always()
+        run: node scripts/ci-test-summary.mjs "unit=unit.log" "api-spec=spec.log" "api-e2e=e2e.log" "db-proofs=db.log" >> "$GITHUB_STEP_SUMMARY"
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_HOST_AUTH_METHOD: trust }
+        ports: ['55432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run build -w @naqla/contracts && npm run build -w @naqla/agents && npm run build -w @naqla/runner && npm run build -w @naqla/api
+      - name: e2e database
+        run: |
+          psql -q postgresql://postgres@127.0.0.1:55432/postgres -c "create database naqla_e2e"
+          for f in supabase/migrations/*.sql supabase/seed/*.sql; do psql -q -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55432/naqla_e2e -f "$f" >/dev/null; done
+          DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node scripts/career-data.mjs import trk_frontend_junior
+      - name: browser journey (real browser, real API, real database; R2 results recorded, no code runs)
+        run: |
+          export UI_CHROME="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          UI_R2_MODE=recorded UI_SHOTS_DIR=$PWD/ui-shots DATABASE_URL=postgresql://postgres@127.0.0.1:55432/naqla_e2e node apps/app/test/browser/journey.browser.mjs 2>&1 | tee browser.log
+      - name: summary
+        if: always()
+        run: node scripts/ci-test-summary.mjs "browser=browser.log" >> "$GITHUB_STEP_SUMMARY"
+
+  isolation:
+    # R2 development sandbox: namespaces + cgroup v2 + nobody, on a throwaway runner, SYNTHETIC code only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run build -w @naqla/domain && npm run build -w @naqla/runner
+      - name: allow Chromium's own sandbox inside the namespace sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: sandbox attack tests, browser attempts and candidate packs (as root)
+        run: |
+          export R2_CHROMIUM="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          sudo -E env "PATH=$PATH" "R2_CHROMIUM=$R2_CHROMIUM" node --test --test-concurrency=1 apps/runner/dist/sandbox.test.js apps/runner/dist/run.test.js apps/runner/dist/packs/packs.test.js 2>&1 | tee isolation.log
+      - name: summary
+        if: always()
+        run: node scripts/ci-test-summary.mjs "isolation=isolation.log" >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the API image (not pushed)
+        run: docker build -f ops/docker/api.Dockerfile -t naqla-api:ci .
+      - name: build the app image (not pushed)
+        run: docker build -f ops/docker/app.Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.invalid --build-arg NEXT_PUBLIC_APP_URL=https://app.invalid -t naqla-app:ci .
+      - name: the API image refuses to start without production configuration (no secret is baked in)
+        run: |
+          set +e
+          docker run --rm -e NODE_ENV=production naqla-api:ci > run.log 2>&1
+          code=$?
+          cat run.log | tail -5
+          test $code -ne 0 && grep -qiE "NAQLA_ENV|required|configuration" run.log

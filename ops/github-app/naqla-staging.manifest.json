@@ -1,0 +1,23 @@
+{
+  "name": "NAQLA Staging",
+  "url": "https://STAGING-WEB.example",
+  "description": "NAQLA STAGING only. Reads code, commits and pull requests of the repositories you select. Never writes.",
+  "hook_attributes": {
+    "url": "https://STAGING-API.example/v1/webhooks/github",
+    "active": true
+  },
+  "redirect_url": "https://STAGING-API.example/v1/github/manifest-redirect",
+  "callback_urls": [
+    "https://STAGING-APP.example/github/callback"
+  ],
+  "setup_url": "https://STAGING-APP.example/github/callback",
+  "setup_on_update": true,
+  "public": false,
+  "default_permissions": {
+    "contents": "read",
+    "metadata": "read",
+    "pull_requests": "read"
+  },
+  "default_events": [],
+  "request_oauth_on_install": true
+}

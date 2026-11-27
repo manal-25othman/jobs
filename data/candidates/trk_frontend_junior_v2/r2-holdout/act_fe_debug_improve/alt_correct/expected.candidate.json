@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout, not approved by an expert",
+  "_author": "independent holdout author (no access to tests)",
+  "_about": "إصلاح صحيح في مواضع الأعطال بأسلوب مختلف عن الحل المرجعي: رسائل حقول تُنشأ في JS، وتحقق من البريد بتقطيع النص لا بتعبير منتظم، ونقطة تحوّل 64em.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "met",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "في index.html: نموذج form وlabel for لكل حقل، وزر button type=submit، والعناوين h1 ثم h2، وعناوين الجدول th scope=col داخل thead، والعمود الجانبي aside.",
+    "a11y_keyboard_forms": "كل حقل له label، ورسالة الخطأ تُنشأ بجانب الحقل وتُربط به بـaria-describedby مع aria-invalid في app.js، والتركيز ظاهر بـoutline متقطع بدل outline:none.",
+    "responsive_fixed": "أُزيل overflow-x:hidden من body، والجدول width:100% داخل حاوية خاصة overflow-x:auto، و.content{min-width:0}، ونقطة التحوّل 64em (=1024px) فيظهر العمود الجانبي على 1024.",
+    "validation_fixed": "emailLooksValid يشترط نطاقًا فيه نقطة وامتدادًا من حرفين فأكثر فيرفض sara@gmail ويقبل العناوين الشائعة، والرسالة بجانب حقل البريد، والحقل type=email.",
+    "root_cause_note": "الحالة تحتوي كودًا فقط بلا ملاحظات مكتوبة، فالحكم يعتمد على ملاحظة الخرّيج ويُترك للمراجِع البشري.",
+    "scope_discipline": "الصفحة نفسها بأصنافها ونصوصها؛ التغييرات في مواضع الأعطال (الجدول، نقطة التحوّل، الزر، الحقول، التحقق) دون إعادة كتابة.",
+    "form_submission_flow": "لا يُرسل النموذج مع حقل غير صالح، ولكل حقل رسالته، وتبقى القيم بعد الفشل، وتختفي رسالة الحقل عند تصحيحه عبر مستمع input، ولا زر معطّل.",
+    "deliverables_complete": "الملفات الثلاثة index.html وstyles.css وapp.js موجودة."
+  },
+  "gamingExpected": false
+}

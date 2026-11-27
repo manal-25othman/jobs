@@ -1,3 +1,4 @@
+import { isProduction } from '../configuration/configuration.service';
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
@@ -52,7 +53,7 @@ export function buildGateway(db: DbService): AgentGateway {
         const { rows } = await c.query(`select count(*)::int as n from agent_invocation where user_id = $1 and created_at > now() - interval '1 day'`, [userId]);
         return rows[0].n; }) },
     { newId: () => randomUUID(), now: () => new Date().toISOString() },
-    { production: process.env['NODE_ENV'] === 'production' },
+    { production: isProduction() },
   );
 }
 
