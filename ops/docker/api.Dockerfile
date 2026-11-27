@@ -3,7 +3,7 @@
 # The API refuses to start without valid production configuration (packages/config): no secret is baked in here.
 FROM node:22-bookworm-slim AS build
 WORKDIR /repo
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 COPY apps/app/package.json ./apps/app/package.json

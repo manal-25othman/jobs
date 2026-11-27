@@ -57,7 +57,7 @@ jobs:
         run: node scripts/ci-test-summary.mjs "unit=unit.log" "api-spec=spec.log" "api-e2e=e2e.log" "db-proofs=db.log" >> "$GITHUB_STEP_SUMMARY"
 
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright 1.56 has no browser build for ubuntu-latest (26.04)
     timeout-minutes: 45
     services:
       postgres:
@@ -87,7 +87,7 @@ jobs:
 
   isolation:
     # R2 development sandbox: namespaces + cgroup v2 + nobody, on a throwaway runner, SYNTHETIC code only.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # same Playwright constraint
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
