@@ -105,6 +105,9 @@ export const ENV_SPEC: readonly VarSpec[] = [
   { name: 'SUPABASE_JWT_SECRET', scope: 'api', required: true, secret: true,
     description: 'The Supabase project JWT secret. The API verifies every access token signature with it.',
     example: 'local-jwt-secret-change-me', validate: nonEmpty },
+  { name: 'SUPABASE_JWKS_URL', scope: 'api', required: false, secret: false,
+    description: 'Optional. The project\'s public signing keys (https://<project>.supabase.co/auth/v1/.well-known/jwks.json). When set, tokens signed with asymmetric keys (ES256/RS256) are verified against it; HS256 tokens still use SUPABASE_JWT_SECRET.',
+    example: '', validate: (v) => (/^https:\/\/[^\s]+\/\.well-known\/jwks\.json$/.test(v) ? null : 'must be an https URL ending in /.well-known/jwks.json') },
 
   { name: 'STORAGE_DRIVER', scope: 'api', required: false, secret: false,
     description: 'supabase (default) or memory. memory is refused when NODE_ENV=production.',

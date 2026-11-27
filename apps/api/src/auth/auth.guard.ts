@@ -1,7 +1,7 @@
 import {
   CanActivate, ExecutionContext, Injectable, ForbiddenException, UnauthorizedException, Logger,
 } from '@nestjs/common';
-import { jwtVerify } from 'jose';
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify, type JWTPayload } from 'jose';
 import type { Request } from 'express';
 
 export interface AuthenticatedUser {
@@ -18,14 +18,34 @@ declare module 'express' {
 /**
  * Verifies a Supabase Auth access token.
  *
- * Supabase signs user JWTs with the project's JWT secret (HS256) and puts the
- * user id in `sub`. Verifying here rather than trusting a header means the API
+ * Supabase signs user JWTs either with the project's JWT secret (HS256) or, on
+ * projects using asymmetric signing keys, with ES256/RS256 keys published at the
+ * project's JWKS URL (SUPABASE_JWKS_URL). The user id is in `sub`. Verifying here rather than trusting a header means the API
  * is safe to expose directly: a forged `sub` fails the signature check.
  *
  * Only the end-user path is implemented. No social login, no admin console, no
  * organisation membership — none of it is needed to secure this slice.
  */
 class StagingRefusal extends Error {}
+
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+
+/**
+ * HS256 → the shared secret. ES256/RS256 → the JWKS (only when SUPABASE_JWKS_URL is configured; never fetched from a
+ * URL inside the token). Any other algorithm, including `none`, is refused.
+ */
+export async function verifySupabaseToken(token: string, secret: string, jwksUrl?: string): Promise<JWTPayload> {
+  const alg = decodeProtectedHeader(token).alg;
+  if (alg === 'HS256') {
+    return (await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ['HS256'] })).payload;
+  }
+  if ((alg === 'ES256' || alg === 'RS256') && jwksUrl) {
+    let keys = jwksCache.get(jwksUrl);
+    if (!keys) { keys = createRemoteJWKSet(new URL(jwksUrl)); jwksCache.set(jwksUrl, keys); }
+    return (await jwtVerify(token, keys, { algorithms: ['ES256', 'RS256'] })).payload;
+  }
+  throw new Error(`unsupported signing algorithm ${String(alg)}`);
+}
 
 /**
  * Staging (NAQLA_ENV=staging) is a PRIVATE trial: only addresses on STAGING_ALLOWED_EMAILS (exact e-mails or @domain
@@ -63,9 +83,7 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     try {
-      const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-        algorithms: ['HS256'],
-      });
+      const payload = await verifySupabaseToken(token, secret, process.env['SUPABASE_JWKS_URL']);
       const sub = typeof payload.sub === 'string' ? payload.sub : null;
       if (!sub) throw new Error('token carries no subject');
 
