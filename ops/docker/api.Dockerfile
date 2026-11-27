@@ -15,6 +15,8 @@ RUN npm run build -w @naqla/domain && npm run build -w @naqla/config && npm run 
 RUN npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-bookworm-slim
+# psql for the staging pre-deploy migrations (scripts/staging/setup-staging.mjs --step container).
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 WORKDIR /srv
 COPY --from=build --chown=node:node /repo /srv

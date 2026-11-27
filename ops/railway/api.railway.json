@@ -1,12 +1,18 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
-  "_note": "NAQLA API on Railway (STAGING). Set this file as the service's config-as-code path. Field names follow Railway's config schema; verify against docs.railway.com when the service is created (see docs/ops/STAGING-DEPLOYMENT-PLAN.md).",
-  "build": { "builder": "DOCKERFILE", "dockerfilePath": "ops/docker/api.Dockerfile" },
+  "_note": "NAQLA API on Railway (STAGING). Set this file as the service's config-as-code path. Field names follow Railway's config schema; verify against docs.railway.com when the service is created (see docs/ops/STAGING-DEPLOYMENT-PLAN.md). preDeployCommand applies migrations, data, invited accounts and the decision-gated publish once (ledger naqla_migration).",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "ops/docker/api.Dockerfile"
+  },
   "deploy": {
     "healthcheckPath": "/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5,
-    "numReplicas": 1
+    "numReplicas": 1,
+    "preDeployCommand": [
+      "node scripts/staging/setup-staging.mjs --step container"
+    ]
   }
 }
