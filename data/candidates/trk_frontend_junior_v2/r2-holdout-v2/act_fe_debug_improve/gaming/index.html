@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ورشة أساسيات تحليل البيانات — التسجيل</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="logo">أكاديمية المهارات</div>
+  </header>
+
+  <div class="page">
+    <main class="content">
+      <h1>ورشة أساسيات تحليل البيانات</h1>
+      <p class="lead">ورشة تطبيقية من يومين: من تنظيف البيانات إلى أول لوحة متابعة.</p>
+
+      <h2>جدول الورشة</h2>
+      <div class="table-box">
+        <table class="schedule">
+          <thead>
+            <tr><th scope="col">اليوم</th><th scope="col">الوقت</th><th scope="col">الموضوع</th><th scope="col">المدرّبة</th><th scope="col">القاعة</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>الأحد</td><td>5:00 – 8:00 مساءً</td><td>تنظيف البيانات وتجهيزها</td><td>د. هيا العتيبي</td><td>قاعة 3</td></tr>
+            <tr><td>الاثنين</td><td>5:00 – 8:00 مساءً</td><td>التحليل الوصفي ولوحات المتابعة</td><td>د. هيا العتيبي</td><td>قاعة 3</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>التسجيل</h2>
+      <form class="form" id="reg-form" novalidate>
+        <div class="row">
+          <label for="name">الاسم الكامل</label>
+          <input id="name" type="text" required aria-describedby="name-err">
+          <p class="err" id="name-err"></p>
+        </div>
+        <div class="row">
+          <label for="email">البريد الإلكتروني</label>
+          <input id="email" type="email" required aria-describedby="email-err">
+          <p class="err" id="email-err"></p>
+        </div>
+        <div class="row">
+          <label for="phone">رقم الجوال (اختياري)</label>
+          <input id="phone" type="tel">
+        </div>
+        <button type="submit" class="btn register">سجّليني الآن</button>
+        <div id="result" class="result" aria-live="polite"></div>
+      </form>
+    </main>
+
+    <aside class="side">
+      <h2 class="side-title">معلومات سريعة</h2>
+      <ul>
+        <li>المقاعد: 24</li>
+        <li>اللغة: العربية</li>
+        <li>الشهادة: حضور</li>
+      </ul>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

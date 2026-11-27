@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "كل شيء مُصلح عدا نقطة التحوّل min-width: 1025px، فلا يظهر العمود الجانبي بجانب المحتوى على 1024 بالضبط.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "unmet",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form وlabel وbutton submit، وعناوين h2، وth للجدول، وaside.",
+    "a11y_keyboard_forms": "الحقول مسمّاة والأخطاء مرتبطة بحقولها، والنموذج يعمل بلوحة المفاتيح، والتركيز ظاهر.",
+    "responsive_fixed": "لا تمرير أفقي على 360، لكن نقطة التحوّل 1025px تجعل العمود الجانبي تحت المحتوى على عرض 1024، والمطلوب ظهوره بجانبه عند 1024 فأكثر.",
+    "validation_fixed": "التحقق يرفض sara@gmail وما فيه @ مكرّرة برسالة بجانب الحقل.",
+    "root_cause_note": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "scope_discipline": "تغييرات موضعية دون إعادة كتابة.",
+    "form_submission_flow": "لا إرسال مع حقل غير صالح، ورسالة لكل حقل، والقيم تبقى، والخطأ يُمسح عند الكتابة.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

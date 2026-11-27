@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "يخفي الأعراض: onclick على الـdiv بدل زر حقيقي، وإبقاء overflow-x: hidden مع تصغير الجدول بـtransform: scale.",
+  "criteria": {
+    "semantic_fixed": "unmet",
+    "a11y_keyboard_forms": "unmet",
+    "responsive_fixed": "unmet",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "زر التسجيل ما زال div بـrole وonclick، ولا يوجد عنصر form، والعمود الجانبي div؛ تحسّن العناوين وth لا يكفي.",
+    "a11y_keyboard_forms": "الـdiv يأخذ التركيز بـtabindex لكن Enter والمسافة لا يفعّلانه، وoutline: none ما زال يخفي التركيز، والرسائل غير مرتبطة بحقولها.",
+    "responsive_fixed": "بقي القناع overflow-x: hidden وبقي العرض الثابت 720px، والجدول مصغّر بصريًا فقط حتى صار غير مقروء، ويُقص أيضًا على 1024.",
+    "validation_fixed": "isValidEmail صارت تتطلب نطاقًا بامتداد فترفض sara@gmail، ولكل حقل رسالة بجانبه.",
+    "root_cause_note": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "scope_discipline": "التغييرات صغيرة وفي مواضع الأعطال، وإن كانت لا تعالج أسبابها.",
+    "form_submission_flow": "لا تسجيل مع حقل غير صالح، ورسالة لكل حقل، والقيم تبقى؛ رسالة الحقل تُمسح عند الضغط التالي لا أثناء الكتابة.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

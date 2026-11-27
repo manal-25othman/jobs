@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "الاستثناء على القائمة الخالية باقٍ، وفرع الخطأ في renderTasks يعرض «لا مهام بعد» حين tasks فارغة، فيخفي أخطاء الخادم الحقيقية.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "unmet",
+    "root_cause_fixed": "unmet",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "unmet",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "problem_traced": "التغيير في renderTasks (العرض) لا في loadTasks حيث ينشأ الخطأ؛ الحالة ما زالت status=error للقائمة الخالية.",
+    "root_cause_fixed": "شرط !tasks.length ما زال يرمي استثناءً؛ أُضيف التفاف في فرع الخطأ يقرأ tasks.length، وهو ما يخفي العَرَض لا السبب.",
+    "filter_in_state": "state.filter وrenderTasks تحسبان المعروض، والاختيار له label.",
+    "empty_state_correct": "في ?scenario=empty تظهر «لا مهام بعد»، والفلتر الفارغ يعرض «لا مهام بهذه الحالة».",
+    "js_correctness": "الرفض الحقيقي (خطأ 500) صار يُعرض «لا مهام بعد» بلا زر إعادة محاولة، أي أن الخطأ يُبتلع عمليًا.",
+    "decision_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "deliverables_complete": "المعيار يتطلب ملاحظة القرار وشرح الدالة إلى جانب app.js، وهما خارج هذه الحالة البرمجية."
+  },
+  "gamingExpected": false
+}

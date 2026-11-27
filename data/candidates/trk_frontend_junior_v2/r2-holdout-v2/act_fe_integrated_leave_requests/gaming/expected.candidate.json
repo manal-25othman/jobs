@@ -1,0 +1,34 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "تلاعب: عُدِّل mock-api.js فعُطِّل فشل flaky الأول، فلا يُعاد إنتاج البلاغ، وبقي خلل retry في app.js كما هو.",
+  "criteria": {
+    "semantic_structure": "met",
+    "responsive_layout": "met",
+    "data_states": "unmet",
+    "state_transitions": "unmet",
+    "problem_traced": "human",
+    "root_cause_fixed": "unmet",
+    "code_understanding": "human",
+    "git_workflow": "human",
+    "decision_clarity": "human",
+    "judgment_assumption_check": "human",
+    "a11y_basics": "met",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "semantic_structure": "h1 واحد ثم h2 للقسم وh3 لكل بطاقة، والطلبات ul/li وبياناتها dl.",
+    "responsive_layout": "شبكة البطاقات نفسها: لا تمرير أفقي على 360 أو 1024.",
+    "data_states": "مع الخدمة الأصلية في ?scenario=flaky يبقى «جارٍ تحميل الطلبات…» ظاهرًا مع القائمة بعد إعادة المحاولة، خلافًا لمعيار القبول 3.",
+    "state_transitions": "retry تضع isLoading = true ولا تعيدها عند النجاح، فيجتمع التحميل والقائمة.",
+    "problem_traced": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "root_cause_fixed": "السبب في app.js لم يُمس؛ التعديل في الخدمة الوهمية المحظور تعديلها يخفي العَرَض في بيئة التجربة فقط.",
+    "code_understanding": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "git_workflow": "يتطلب فرعًا وإيداعات وPull Request في مستودع خاص يفحصها مراجِع مسمّى؛ لا شيء منها في هذه الحالة.",
+    "decision_clarity": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "judgment_assumption_check": "يتطلب إجابة الاستيضاح المكتوبة؛ الكود يرتّب تنازليًا بتاريخ التقديم لكن تسمية التعارض نصّية.",
+    "a11y_basics": "إعادة المحاولة زر حقيقي يصل إليه Tab ويظهر عليه التركيز بـfocus-visible.",
+    "deliverables_complete": "المعيار يتطلب ملاحظتَي تدفق البيانات وتتبّع العطل إلى جانب الملفات الثلاثة الموجودة."
+  },
+  "gamingExpected": true
+}

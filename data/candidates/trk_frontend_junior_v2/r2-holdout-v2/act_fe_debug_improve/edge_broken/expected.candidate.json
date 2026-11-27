@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "يعمل مع sara@gmail والعناوين الصحيحة، لكن عنوانًا بلا @ يرمي TypeError في onsubmit فيُرسَل النموذج فعليًا وتُعاد الصفحة وتضيع القيم.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "met",
+    "validation_fixed": "unmet",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "unmet",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form وlabel وbutton submit وعناوين مرتبة وth وaside.",
+    "a11y_keyboard_forms": "الحقول مسمّاة ورسائلها مرتبطة بها، والنموذج بلوحة المفاتيح، والتركيز ظاهر.",
+    "responsive_fixed": "أُزيل القناع، والجدول مرن داخل حاوية تمرير، والعمود الجانبي يظهر عند 1024.",
+    "validation_fixed": "emailError تقرأ parts[1].indexOf دون فحص وجود @، فعنوان مثل saragmail.com يرمي استثناءً قبل return false: لا رسالة، والنموذج يُرسَل بـGET وتُعاد الصفحة؛ الخطأ مبتلع.",
+    "root_cause_note": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "scope_discipline": "تغييرات موضعية دون إعادة كتابة.",
+    "form_submission_flow": "مع بريد بلا @ يُرسَل النموذج وتضيع القيم المدخلة بإعادة تحميل الصفحة، والخطأ لا يُمسح أثناء التصحيح بل تُعاد الصفحة.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

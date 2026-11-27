@@ -1,0 +1,49 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+  background: #f7f6f2;
+  color: #1f2a24;
+  line-height: 1.6;
+}
+
+.header { background: #1f5a4e; color: #fff; padding: 14px 16px; }
+.header h1 { margin: 0; font-size: 1.3rem; }
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+.intro { color: #5f6b63; margin-top: 0; }
+
+.loading { color: #5f6b63; }
+.notice { background: #fff; border: 1px solid #e3e7df; border-radius: 10px; padding: 14px 16px; }
+.notice--error { border-color: #a94442; color: #a94442; }
+.notice--error p { margin: 0 0 8px; }
+
+.requests { width: 100%; border-collapse: collapse; background: #fff; }
+.requests caption { text-align: start; font-weight: 600; padding-bottom: 8px; }
+.requests th, .requests td { padding: 10px 12px; border-bottom: 1px solid #e3e7df; text-align: start; }
+.requests th { background: #e5f1ed; }
+
+.pill { display: inline-block; border-radius: 999px; padding: 0 10px; font-size: .9rem; background: #eef2f5; }
+.pill--approved { background: #e3f3ea; color: #2f7d57; }
+.pill--rejected { background: #fbecec; color: #a94442; }
+.pill--pending { background: #fff4d6; color: #7a5b00; }
+
+/* narrow screens: each row becomes a block, header labels come from data-label */
+@media (max-width: 639px) {
+  .requests thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .requests tr { display: block; border-bottom: 8px solid #f7f6f2; }
+  .requests td { display: flex; justify-content: space-between; gap: 12px; }
+  .requests td::before { content: attr(data-label); color: #5f6b63; }
+}
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #1f5a4e;
+  background: #fff;
+  color: #1f5a4e;
+  cursor: pointer;
+}
+button:focus-visible { outline: 3px solid #1f5a4e; outline-offset: 2px; }

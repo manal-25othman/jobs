@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "حل صحيح مختلف: واجهة التحقق المدمجة setCustomValidity مع فحص نطاق إضافي، جدول يتحوّل بطاقات تحت 600px، تخطيط flex بنقطة 64em.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "met",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "form مع button submit، وlabel لكل حقل، وأقسام section بعناوين h2، وth بنطاق col، وaside للمعلومات الجانبية.",
+    "a11y_keyboard_forms": "الحقول مسمّاة، ورسائل الخطأ في عناصر مرتبطة بـaria-describedby، والزر حقيقي يعمل بـTab وEnter، والتركيز ظاهر بـfocus-visible.",
+    "responsive_fixed": "أُزيل القناع، والجدول يصير بطاقات على الشاشات الضيقة فلا تمرير أفقي على 360، و64em تساوي 1024px فيظهر العمود الجانبي بجانب المحتوى.",
+    "validation_fixed": "type=email وحده يقبل sara@gmail فأضيف فحص نطاق بنقطة وامتداد وعلامة @ واحدة، والرسالة بجانب الحقل.",
+    "root_cause_note": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "scope_discipline": "بقيت الصفحة ومحتواها كما هي، والتغيير في الجدول والتخطيط والنموذج وهي مواضع الأعطال، وإن كان أوسع قليلًا من الحل الأول.",
+    "form_submission_flow": "لا إرسال مع خطأ، ولكل حقل رسالته، وتبقى القيم، ويعاد فحص الحقل أثناء تصحيحه فتختفي رسالته.",
+    "deliverables_complete": "الملفات الثلاثة موجودة."
+  },
+  "gamingExpected": false
+}

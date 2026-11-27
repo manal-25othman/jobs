@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "إصلاح موضعي قريب من الأصل: form وlabel وزر submit، جدول داخل حاوية تمرير خاصة، نقطة تحوّل 1024، تحقق بتعبير منتظم ورسائل لكل حقل.",
+  "criteria": {
+    "semantic_fixed": "met",
+    "a11y_keyboard_forms": "met",
+    "responsive_fixed": "met",
+    "validation_fixed": "met",
+    "root_cause_note": "human",
+    "scope_discipline": "met",
+    "form_submission_flow": "met",
+    "deliverables_complete": "met"
+  },
+  "explanationAr": {
+    "semantic_fixed": "الزر صار button type=submit داخل form، ولكل حقل label، والعناوين h1 ثم h2، وعناوين الجدول th داخل thead، والعمود الجانبي aside.",
+    "a11y_keyboard_forms": "كل حقل مُسمّى وأخطاؤه مرتبطة به بـaria-describedby وaria-invalid، والنموذج يُرسَل بلوحة المفاتيح، والتركيز ظاهر بإطار واضح.",
+    "responsive_fixed": "أُزيل overflow-x: hidden وصار الجدول بعرض 100% داخل حاوية overflow-x: auto، فلا تمرير أفقي للصفحة على 360، ونقطة التحوّل 1024 تُظهر العمود الجانبي بجانب المحتوى.",
+    "validation_fixed": "التحقق يتطلب اسمًا@نطاقًا.امتدادًا فيرفض sara@gmail وما لا @ فيه، برسالة بجانب حقل البريد، ولا يُبتلع الخطأ.",
+    "root_cause_note": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "scope_discipline": "التعديلات في مواضع الأعطال (المحدِّد والزر والجدول والنقطة والتحقق) دون إعادة كتابة الصفحة.",
+    "form_submission_flow": "لا إرسال مع حقل فارغ أو غير صالح، ولكل حقل رسالته، وتبقى القيم بعد الفشل، ويُمسح خطأ الحقل عند تعديله.",
+    "deliverables_complete": "الملفات الثلاثة index.html وstyles.css وapp.js موجودة."
+  },
+  "gamingExpected": false
+}

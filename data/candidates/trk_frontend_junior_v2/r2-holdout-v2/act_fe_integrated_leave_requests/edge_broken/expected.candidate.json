@@ -1,0 +1,34 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "السبب مُصلح بـfinally، لكن render تقرأ sorted[0].submittedAt قبل فحص الفراغ: مع قائمة خالية يرمي TypeError وتبقى رسالة التحميل.",
+  "criteria": {
+    "semantic_structure": "met",
+    "responsive_layout": "met",
+    "data_states": "unmet",
+    "state_transitions": "met",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "code_understanding": "human",
+    "git_workflow": "human",
+    "decision_clarity": "human",
+    "judgment_assumption_check": "human",
+    "a11y_basics": "met",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "semantic_structure": "عنوان رئيسي واحد h1 داخل header، وmain، وجدول بـthead وth scope=col.",
+    "responsive_layout": "لا تمرير أفقي على 360 أو 1024.",
+    "data_states": "في ?scenario=empty ينهار render قبل فرع «لا طلبات إجازة سابقة» فيبقى «جارٍ تحميل الطلبات…» على الشاشة.",
+    "state_transitions": "الحالة نفسها سليمة (isLoading=false وerror=null وrequests=[])، وإعادة المحاولة تمسح الخطأ؛ العطل في عرض حالة الفراغ.",
+    "problem_traced": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "root_cause_fixed": "دالة load واحدة وisLoading تُطفأ في finally لمسارَي النجاح والفشل.",
+    "code_understanding": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "git_workflow": "يتطلب فرعًا وإيداعات وPull Request في مستودع خاص يفحصها مراجِع مسمّى؛ لا شيء منها في هذه الحالة.",
+    "decision_clarity": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "judgment_assumption_check": "يتطلب إجابة الاستيضاح المكتوبة؛ الكود يرتّب تنازليًا بتاريخ التقديم لكن تسمية التعارض نصّية.",
+    "a11y_basics": "إعادة المحاولة زر حقيقي يصل إليه Tab ويظهر عليه التركيز بـfocus-visible.",
+    "deliverables_complete": "المعيار يتطلب ملاحظتَي تدفق البيانات وتتبّع العطل إلى جانب الملفات الثلاثة الموجودة."
+  },
+  "gamingExpected": false
+}

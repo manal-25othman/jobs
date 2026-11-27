@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "السبب مُصلح والتصفية سليمة، لكن loadTasks صارت .then بلا catch: خطأ 500 يترك «جارٍ تحميل المهام…» للأبد بلا رسالة ولا إعادة محاولة.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "unmet",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "problem_traced": "الجزء البرمجي سليم (التغيير في loadTasks موضع السبب)، لكن المعيار يتطلب أن تسمّي ملاحظة القرار الموضع والسبب، وهي غير موجودة.",
+    "root_cause_fixed": "لا رمي على القائمة الخالية؛ النتيجة تصير ready فيعمل فرع «لا مهام بعد».",
+    "filter_in_state": "state.filter تغيّره أزرار الاختيار وrenderTasks تتبعه، داخل fieldset بـlegend.",
+    "empty_state_correct": "«لا مهام بعد» للقائمة الخالية و«لا مهام بهذه الحالة» للفلتر الفارغ.",
+    "js_correctness": "وعد fetchTasks المرفوض غير معالج (unhandled rejection)، فتبقى الحالة loading ولا يصل العرض إلى فرع الخطأ أبدًا.",
+    "decision_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "deliverables_complete": "المعيار يتطلب ملاحظة القرار وشرح الدالة إلى جانب app.js، وهما خارج هذه الحالة البرمجية."
+  },
+  "gamingExpected": false
+}

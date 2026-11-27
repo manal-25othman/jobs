@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "الشرط المعيب صار فحص Array.isArray في loadTasks، وتصفية بـselect له label وحقل state.filter ودالة مساعدة في العرض.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "met",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "problem_traced": "الجزء البرمجي سليم (التغيير في loadTasks موضع السبب)، لكن المعيار يتطلب أن تسمّي ملاحظة القرار الموضع والسبب، وهي غير موجودة.",
+    "root_cause_fixed": "لم يعد [] يُرمى استثناءً؛ القائمة الخالية تصبح status=ready فيعمل فرع «لا مهام بعد»، ويبقى الخطأ الحقيقي خطأً.",
+    "filter_in_state": "state.filter مصدر الحقيقة الوحيد، وتغيير الاختيار يحدّث الحالة ثم يستدعي renderTasks التي تحسب المعروض والعدد.",
+    "empty_state_correct": "القائمة الخالية تعرض «لا مهام بعد» والفلتر بلا نتائج يعرض «لا مهام بهذه الحالة»، لا رسالة خطأ.",
+    "js_correctness": "لا متغيرات عامة عرضية، والرفض ملتقط ويُعرض خطأً مع إعادة محاولة، والتحوّر محصور في state.",
+    "decision_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "deliverables_complete": "المعيار يتطلب ملاحظة القرار وشرح الدالة إلى جانب app.js، وهما خارج هذه الحالة البرمجية."
+  },
+  "gamingExpected": false
+}

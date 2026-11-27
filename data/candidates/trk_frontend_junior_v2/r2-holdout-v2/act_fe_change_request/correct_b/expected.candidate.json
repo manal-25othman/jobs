@@ -1,0 +1,26 @@
+{
+  "_label": "CANDIDATE — independent holdout v2, not approved by an expert",
+  "_author": "independent holdout v2 author (no access to tests or earlier sets)",
+  "_about": "حذف شرط الرمي فقط، وتصفية بمجموعة أزرار aria-pressed وتفويض أحداث، والحساب داخل renderTasks.",
+  "criteria": {
+    "component_explained": "human",
+    "problem_traced": "human",
+    "root_cause_fixed": "met",
+    "filter_in_state": "met",
+    "empty_state_correct": "met",
+    "js_correctness": "met",
+    "decision_explained": "human",
+    "deliverables_complete": "human"
+  },
+  "explanationAr": {
+    "component_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "problem_traced": "الجزء البرمجي سليم (التغيير في loadTasks موضع السبب)، لكن المعيار يتطلب أن تسمّي ملاحظة القرار الموضع والسبب، وهي غير موجودة.",
+    "root_cause_fixed": "حُذف الشرط الذي يحوّل القائمة الخالية إلى استثناء في loadTasks نفسها.",
+    "filter_in_state": "state.statusFilter يتغير بالنقر ثم renderTasks تعرض المهام وتزامن aria-pressed من الحالة؛ لا نسخة مصفّاة مخزّنة.",
+    "empty_state_correct": "«لا مهام بعد» للقائمة الخالية و«لا مهام بهذه الحالة» للفلتر الفارغ.",
+    "js_correctness": "لا متغيرات عامة عرضية، والرفض ملتقط، والحالة تتغير في موضعين واضحين فقط.",
+    "decision_explained": "يعتمد على ملاحظة مكتوبة غير موجودة في هذه الحالة البرمجية؛ يحكم فيه المراجِع البشري.",
+    "deliverables_complete": "المعيار يتطلب ملاحظة القرار وشرح الدالة إلى جانب app.js، وهما خارج هذه الحالة البرمجية."
+  },
+  "gamingExpected": false
+}

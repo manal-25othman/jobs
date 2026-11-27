@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>طلبات الإجازة</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1>طلبات الإجازة السابقة</h1>
+  </header>
+  <main>
+    <section class="panel" aria-labelledby="list-heading">
+      <h2 id="list-heading">طلباتي</h2>
+      <div id="app"></div>
+    </section>
+  </main>
+
+  <template id="request-template">
+    <li class="card">
+      <h3 class="card__type"></h3>
+      <dl class="card__facts">
+        <div><dt>الفترة</dt><dd class="f-period"></dd></div>
+        <div><dt>عدد الأيام</dt><dd class="f-days"></dd></div>
+        <div><dt>الحالة</dt><dd class="f-status"></dd></div>
+        <div><dt>تاريخ التقديم</dt><dd class="f-submitted"></dd></div>
+      </dl>
+    </li>
+  </template>
+
+  <script src="mock-api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

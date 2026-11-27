@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مهام الفريق</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>مهام الفريق</h1>
+    <p class="subtitle">ما يعمل عليه الفريق هذا الأسبوع</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="tasks-title">
+      <h2 id="tasks-title">المهام</h2>
+      <div class="filters" role="group" aria-label="تصفية المهام حسب الحالة" id="filters">
+        <button type="button" data-filter="all" aria-pressed="true">الكل</button>
+        <button type="button" data-filter="new" aria-pressed="false">جديدة</button>
+        <button type="button" data-filter="in_progress" aria-pressed="false">قيد التنفيذ</button>
+        <button type="button" data-filter="done" aria-pressed="false">منجزة</button>
+      </div>
+      <div id="tasks" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="mock-api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
