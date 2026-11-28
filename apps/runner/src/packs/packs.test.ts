@@ -2,6 +2,9 @@
  * Candidate packs for the three junior-frontend activities, run against SYNTHETIC submissions
  * (data/candidates/trk_frontend_junior_v2/r2/<activity>/<case>/). Each case carries `expected.candidate.json`
  * — a CANDIDATE expectation, not approved by an expert — and this suite checks the pack still produces it.
+ * Since 0.3.0 the packs vary their inputs per run from a seed: every run uses a fresh seed (printed with the case, and
+ * reproducible with R2_SEED=<seed>), so a passing suite says the expectation holds for the inputs drawn this time.
+ * `skipped` in an expectation means «not applicable»: the state the test needs never appears on that page.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,11 +15,15 @@ import { probeBackend } from '../sandbox.js';
 import { runAttempt } from '../run.js';
 import type { TestPack } from '../pack.js';
 import { PACKS } from './index.js';
+import { pinnedViewportWidth } from '../gaming.js';
+import { INVALID_CLASSES, invalidEmail, mobileWidths, rng, validEmail } from './lib.js';
 
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const CAND = join(ROOT, 'data', 'candidates', 'trk_frontend_junior_v2');
 const ACTIVITIES = ['act_fe_debug_improve', 'act_fe_change_request', 'act_fe_integrated_leave_requests'] as const;
-const CASES = ['reference_like', 'starter_unchanged', 'partial', 'wrong_fix', 'edge_data', 'gaming'] as const;
+/** The six original cases, plus every case later added to the dev set (0.3.0: targeted_hardcoding, alternative_*). */
+const BASE_CASES = ['reference_like', 'starter_unchanged', 'partial', 'wrong_fix', 'edge_data', 'gaming'] as const;
+const casesOf = (activity: string): string[] => readdirSync(join(CAND, 'r2', activity)).filter((n) => statSync(join(CAND, 'r2', activity, n)).isDirectory()).sort();
 const LABEL = 'CANDIDATE — not approved by an expert';
 
 const probe = probeBackend();
@@ -24,7 +31,7 @@ const skip = probe.available ? false : `development backend unavailable here: ${
 
 interface Expected {
   readonly _label: string;
-  readonly tests: Readonly<Record<string, 'pass' | 'fail'>>;
+  readonly tests: Readonly<Record<string, 'pass' | 'fail' | 'skipped'>>;
   readonly criteria: Readonly<Record<string, 'met' | 'unmet' | 'human'>>;
   readonly gamingSignalsAtLeast: readonly string[];
 }
@@ -50,7 +57,7 @@ for (const activity of ACTIVITIES) {
     assert.ok(pack, `${activity} is registered`);
     assert.equal(pack.activityId, activity);
     assert.equal(pack.status, 'candidate');
-    assert.equal(pack.version, '0.2.0');
+    assert.equal(pack.version, '0.3.0');
     const keys = new Set(criteriaOf(activity));
     const all = entries(pack);
     assert.ok(all.length >= 8 && all.length <= 20, `${all.length} tests`);
@@ -76,7 +83,10 @@ for (const activity of ACTIVITIES) {
     const pack = PACKS[activity]!;
     const ids = entries(pack).map((t) => t.id).sort();
     const keys = criteriaOf(activity).sort();
-    for (const c of CASES) {
+    const cases = casesOf(activity);
+    for (const c of BASE_CASES) assert.ok(cases.includes(c), `${c} is in the dev set`);
+    assert.ok(cases.length >= BASE_CASES.length + 2, 'at least two cases added for the 0.3.0 weakness classes');
+    for (const c of cases) {
       const exp = readJson<Expected>(join(CAND, 'r2', activity, c, 'expected.candidate.json'));
       assert.equal(exp._label, LABEL, `${c}: labelled as a candidate`);
       assert.deepEqual(Object.keys(exp.tests).sort(), ids, `${c}: test ids`);
@@ -86,7 +96,7 @@ for (const activity of ACTIVITIES) {
   });
 
   const starterFiles = loadCode(join(CAND, 'materials', activity, 'graduate'));
-  for (const c of CASES) {
+  for (const c of casesOf(activity)) {
     test(`${activity} / ${c}: outcomes match the candidate expectation`, { skip }, async () => {
       const pack = PACKS[activity]!;
       const dir = join(CAND, 'r2', activity, c);
@@ -99,7 +109,32 @@ for (const activity of ACTIVITIES) {
       for (const s of exp.gamingSignalsAtLeast) assert.ok(r.gamingSignals.includes(s), `gaming signal ${s} missing (got ${r.gamingSignals.join(',')})`);
       if (exp.gamingSignalsAtLeast.length === 0) assert.deepEqual(r.gamingSignals, [], 'no gaming signals on a non-gaming case');
       assert.ok(r.durationMs < 60_000, `attempt took ${r.durationMs} ms`);
-      console.log(`# ${activity}/${c}: ${r.durationMs} ms`);
+      console.log(`# ${activity}/${c}: ${r.durationMs} ms (R2_SEED=${r.inputSeed})`);
     });
   }
 }
+
+test('viewport_width_pinned: fires on one-width layout rules only', () => {
+  const css = (content: string) => pinnedViewportWidth([{ path: 'styles.css', content }]);
+  for (const q of ['@media (width: 360px) { a { b: c } }', '@media (min-width: 1024px) and (max-width: 1024px) {}', '@media (min-width: 64em) and (max-width: 1024px) {}',
+    '@media (360px <= width <= 361px) {}', '@media screen and (max-width: 600px), (width: 1024px) {}']) assert.ok(css(q), q);
+  for (const q of ['@media (min-width: 640px) {}', '@media (max-width: 600px) {}', '@media (min-width: 600px) and (max-width: 900px) {}', '@media (width >= 1024px) {}',
+    '@media (prefers-color-scheme: dark) {}', '@media print {}']) assert.ok(!css(q), q);
+  assert.ok(pinnedViewportWidth([{ path: 'app.js', content: 'if (window.innerWidth === 360) fit();' }]));
+  assert.ok(pinnedViewportWidth([{ path: 'index.html', content: '<link rel="stylesheet" media="(width: 1024px)" href="x.css">' }]));
+  assert.ok(!pinnedViewportWidth([{ path: 'app.js', content: 'if (el.scrollWidth > el.clientWidth) scroll();' }]));
+});
+
+test('varied inputs: deterministic per seed, different across seeds, and of the stated classes', () => {
+  const draw = (seed: number) => { const r = rng(seed, 'probe'); return [validEmail(r), ...INVALID_CLASSES.map((k) => invalidEmail(r, k)), ...mobileWidths(r).map((v) => String(v.width))]; };
+  assert.deepEqual(draw(42), draw(42));
+  assert.notDeepEqual(draw(42), draw(43));
+  const r = rng(7, 'classes');
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  for (let i = 0; i < 200; i++) {
+    assert.match(validEmail(r), ok);
+    for (const k of INVALID_CLASSES) assert.doesNotMatch(invalidEmail(r, k), ok, k);
+    const w = mobileWidths(r).map((v) => v.width);
+    assert.equal(w[0], 360); assert.ok(w[1]! >= 340 && w[1]! < 360 && w[2]! > 360 && w[2]! <= 430, w.join());
+  }
+});

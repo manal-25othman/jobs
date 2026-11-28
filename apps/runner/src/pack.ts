@@ -17,6 +17,11 @@ export interface LayoutMetrics {
 
 /** What a test can do. Every query here is answered by the engine or an isolated world, never by page globals. */
 export interface PageDriver {
+  /**
+   * The attempt's input seed. Tests derive their varied inputs from it (viewport widths, names, addresses, data
+   * records), so the values differ from run to run and cannot be special-cased, yet a run can be reproduced.
+   */
+  readonly seed: number;
   /** Opens a page of the submission at a viewport (default 1280×800). Network outside the submission is blocked. */
   open(path?: string, viewport?: Viewport): Promise<void>;
   layout(): Promise<LayoutMetrics>;
@@ -46,7 +51,11 @@ export interface PageDriver {
   pageErrors(): readonly string[];
 }
 
-export interface TestOutcomeReport { readonly pass: boolean; readonly noteAr?: string }
+/**
+ * `notApplicable`: the state the test needs was never reached (e.g. no error state, so no retry control to try). The
+ * runner reports it as `skipped`: never a pass, never a fail — the defect that blocked it is measured by its own test.
+ */
+export interface TestOutcomeReport { readonly pass: boolean; readonly notApplicable?: boolean; readonly noteAr?: string }
 
 export interface PackTest {
   /** Neutral id, e.g. `responsive.page_width_360`. Must not name a planted defect or the expected value. */

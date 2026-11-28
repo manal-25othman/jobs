@@ -37,7 +37,7 @@ export class Driver implements PageDriver {
   private readonly overrides = new Map<string, string>();
   blocked = 0;
 
-  constructor(private readonly browser: Browser, private readonly files: readonly SubmittedFile[], private readonly entry: string, private readonly stepTimeoutMs: number) {}
+  constructor(private readonly browser: Browser, private readonly files: readonly SubmittedFile[], private readonly entry: string, private readonly stepTimeoutMs: number, readonly seed: number = 1) {}
 
   async open(path: string = this.entry, viewport: Viewport = DEFAULT_VIEWPORT): Promise<void> {
     await this.close();

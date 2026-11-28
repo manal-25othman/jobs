@@ -34,6 +34,10 @@ export type TestLayer = (typeof TEST_LAYERS)[number];
 export const TEST_MODES = ['automated', 'supports_human'] as const;
 export type TestMode = (typeof TEST_MODES)[number];
 
+/**
+ * `skipped`: the test did not observe anything — the attempt's deadline passed, or the state it needs was never reached
+ * (not applicable, e.g. no error state so no retry control to try). Never counts toward «met» (see summarizeByCriterion).
+ */
 export const TEST_OUTCOMES = ['pass', 'fail', 'error', 'timeout', 'skipped'] as const;
 export type TestOutcome = (typeof TEST_OUTCOMES)[number];
 
@@ -168,6 +172,8 @@ export interface TestRunResult {
   readonly blockedRequests: number;
   /** Static signals that the code may be targeting the test environment. For a person to look at, never a verdict. */
   readonly gamingSignals: readonly string[];
+  /** Seed the pack derived its varied inputs from (viewport widths, names, data records): reproduces the run. */
+  readonly inputSeed?: number;
 }
 
 const MAX_NOTE = 200;
@@ -180,6 +186,7 @@ export function assertTestRunResult(r: TestRunResult): TestRunResult {
   assertCommitSha(r.commitSha);
   if (!/^sha256:[0-9a-f]{64}$/.test(r.snapshotHash)) throw new DomainError('[r2_result] A result must name the snapshot hash it ran on.');
   assertRunnerLimits(r.limits);
+  if (r.inputSeed !== undefined && (!Number.isInteger(r.inputSeed) || r.inputSeed <= 0)) throw new DomainError('[r2_result] The input seed must be a positive integer.');
   const ids = new Set<string>();
   for (const t of r.tests) {
     if (ids.has(t.testId)) throw new DomainError(`[r2_result] Duplicate test id ${t.testId}.`);

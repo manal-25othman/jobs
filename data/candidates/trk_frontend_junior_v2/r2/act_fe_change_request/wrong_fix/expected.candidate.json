@@ -13,7 +13,7 @@
     "filter.no_match_message": "fail",
     "data_states.empty_answer_message": "pass",
     "data_states.error_and_empty_distinct": "fail",
-    "errors.retry_recovers": "fail",
+    "errors.retry_recovers": "skipped",
     "output.other_tasks_same_shape": "pass",
     "data_states.loading_then_list": "pass"
   },

@@ -13,12 +13,12 @@
     "data_states.error_with_retry_button": "pass",
     "data_states.empty_message": "pass",
     "state.retry_completes_cleanly": "pass",
-    "state.retry_then_empty_answer": "pass",
+    "state.loading_ends_after_retry": "pass",
     "state.retry_success_clears_error": "pass",
     "state.second_retry_cycle": "pass",
     "state.second_retry_ends_empty": "pass",
-    "responsive.page_width_360": "pass",
-    "responsive.page_width_1024": "pass",
+    "responsive.page_width_mobile_range": "pass",
+    "responsive.page_width_desktop_range": "pass",
     "a11y.retry_by_keyboard": "pass"
   },
   "criteria": {

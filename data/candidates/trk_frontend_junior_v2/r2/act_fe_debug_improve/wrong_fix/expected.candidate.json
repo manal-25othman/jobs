@@ -15,10 +15,10 @@
     "validation.common_addresses_accepted": "pass",
     "validation.each_submission_follows_input": "fail",
     "form.per_field_messages_when_empty": "fail",
-    "form.values_kept_and_error_clears": "fail",
-    "responsive.page_width_360": "pass",
-    "responsive.schedule_reachable_360": "fail",
-    "responsive.sidebar_beside_1024": "fail"
+    "form.values_kept_and_error_clears": "pass",
+    "responsive.page_width_mobile_range": "pass",
+    "responsive.schedule_reachable_mobile_range": "fail",
+    "responsive.sidebar_beside_wide_range": "fail"
   },
   "criteria": {
     "semantic_fixed": "unmet",

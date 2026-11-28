@@ -10,6 +10,79 @@ import { gamingSignals } from '../gaming.js';
 export const MOBILE: Viewport = { width: 360, height: 740 };
 export const TABLET: Viewport = { width: 1024, height: 768 };
 
+/* ───────────────────────────── varied inputs (0.3.0) ───────────────────────────── */
+
+/** Deterministic PRNG (mulberry32) for one attempt seed, salted per test so tests do not share one stream. */
+export function rng(seed: number, salt: string): () => number {
+  let a = seed >>> 0;
+  for (let i = 0; i < salt.length; i++) a = Math.imul(a ^ salt.charCodeAt(i), 2654435761) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+export type Rand = () => number;
+export const int = (r: Rand, lo: number, hi: number): number => lo + Math.floor(r() * (hi - lo + 1));
+export const one = <T>(r: Rand, xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+export function shuffle<T>(r: Rand, xs: readonly T[]): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j]!, a[i]!]; }
+  return a;
+}
+
+/**
+ * Several viewports inside a RANGE around the width the brief names, not the single announced width: the named width
+ * itself, one below and one above it (seeded). Layout written for one exact width passes at most one of them.
+ */
+export function widthsAround(r: Rand, named: number, below: readonly [number, number], above: readonly [number, number], height: number): Viewport[] {
+  return [named, int(r, below[0], below[1]), int(r, above[0], above[1])].map((width) => ({ width, height: height + int(r, -60, 60) }));
+}
+export const mobileWidths = (r: Rand): Viewport[] => widthsAround(r, 360, [340, 358], [362, 430], 740);
+
+const AR_FIRST = ['منى', 'سارة', 'ريم', 'نورة', 'هيا', 'لمى', 'جود', 'رهف', 'دانة', 'غادة', 'أسيل', 'شهد', 'عبير', 'منيرة', 'ليان', 'هند', 'فهد', 'خالد', 'سعد', 'ماجد', 'بدر', 'تركي', 'يزيد', 'وليد', 'عبدالله', 'سلمان', 'عمر', 'نواف'];
+const AR_FAMILY = ['الشهري', 'القحطاني', 'العتيبي', 'الحربي', 'الغامدي', 'الزهراني', 'المطيري', 'الدوسري', 'الشمري', 'العنزي', 'السبيعي', 'القرني', 'البلوي', 'الجهني', 'الرشيدي'];
+const LAT_FIRST = ['Sara', 'Rana', 'Lina', 'Noor', 'Huda', 'Maha', 'Omar', 'Faisal', 'Yousef', 'Tariq', 'Reem', 'Dana'];
+const LAT_FAMILY = ['Saleh', 'Alharbi', 'Qahtani', 'Alotaibi', 'Hassan', 'Nasser', 'Ghamdi', 'Rashed'];
+const LAT_LOCAL = ['sara', 'rana', 'lina', 'noor', 'huda', 'maha', 'omar', 'faisal', 'yousef', 'tariq', 'reem', 'dana', 'alanoud', 'abeer', 'nawaf'];
+const DOMAIN = ['example', 'mail', 'inbox', 'post', 'webmail', 'my-mail', 'office'];
+const TLD = ['com', 'net', 'org', 'sa', 'co', 'info', 'com.sa', 'edu.sa'];
+
+/** A plausible person name: Arabic (one or two parts) or Latin. */
+export function personName(r: Rand): string {
+  const k = r();
+  if (k < 0.45) return `${one(r, AR_FIRST)} ${one(r, AR_FAMILY)}`;
+  if (k < 0.65) return one(r, AR_FIRST);
+  return `${one(r, LAT_FIRST)} ${one(r, LAT_FAMILY)}`;
+}
+const local = (r: Rand): string => {
+  const a = one(r, LAT_LOCAL); const k = r();
+  return k < 0.3 ? a : k < 0.55 ? `${a}.${one(r, LAT_LOCAL)}` : k < 0.75 ? `${a}${int(r, 1, 99)}` : k < 0.9 ? `${a}_${one(r, LAT_LOCAL)}` : `${a}-${one(r, LAT_LOCAL)}`;
+};
+const host = (r: Rand): string => (r() < 0.25 ? `${one(r, ['mx', 'team', 'hr', 'students'])}.` : '') + one(r, DOMAIN);
+
+/** A common valid address (dots, digits, `_`, `-`, `+tag`, sub-domains, two-part TLDs). */
+export function validEmail(r: Rand): string {
+  const tag = r() < 0.2 ? `+${one(r, ['ws', 'events', 'news'])}` : '';
+  return `${local(r)}${tag}@${host(r)}.${one(r, TLD)}`;
+}
+
+/** The classes of invalid address every reasonable rule rejects; one fresh value per class and run. */
+export const INVALID_CLASSES = ['no_at', 'no_local', 'no_domain', 'no_dot_domain', 'space', 'double_at'] as const;
+export function invalidEmail(r: Rand, kind: (typeof INVALID_CLASSES)[number]): string {
+  const l = local(r); const h = host(r); const t = one(r, TLD);
+  switch (kind) {
+    case 'no_at': return `${l}.${h}.${t}`;
+    case 'no_local': return `@${h}.${t}`;
+    case 'no_domain': return `${l}@`;
+    case 'no_dot_domain': return `${l}@${one(r, DOMAIN)}`;
+    case 'space': return `${l} ${one(r, LAT_LOCAL)}@${h}.${t}`;
+    case 'double_at': return `${l}@@${h}.${t}`;
+  }
+}
+
 /**
  * Helpers defined inside every isolated-world expression. They only read the shared DOM (and, to let the trusted
  * driver click a control it found semantically, set a neutral `data-r2-target` attribute on it).
@@ -38,9 +111,29 @@ const realButton = (el) => !!el && (el.tagName === 'BUTTON' || (el.tagName === '
   || (el.getAttribute('role') === 'button' && el.tabIndex >= 0));
 const findButton = (re) => [...document.querySelectorAll('button, input[type=button], input[type=submit], [role=button]')]
   .find((b) => vis(b) && re.test(b.textContent || b.value || '')) || null;
-const describedBy = (el) => (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean)
-  .map((id) => document.getElementById(id)).filter(Boolean);
+const idsOf = (el, attr) => (el.getAttribute(attr) || '').split(/\s+/).filter(Boolean).map((id) => document.getElementById(id)).filter(Boolean);
+const describedBy = (el) => [...idsOf(el, 'aria-describedby'), ...idsOf(el, 'aria-errormessage')];
 const linkedMsg = (el) => (el ? describedBy(el).map(txt).join(' ').trim() : '');
+/* Folded text for matching wording, not format: Latin digits, no tashkeel / tatweel / bidi marks, one alef, ى→ي, ة→ه. */
+const digitsLatin = (s) => String(s || '').replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0));
+const fold = (s) => digitsLatin(s).replace(/[\u064B-\u0652\u0670\u0640]/g, '').replace(/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, '')
+  .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+/* Accessible name of a control (role + name lookup): aria-labelledby, aria-label, the value of an input button, text, title. */
+const accName = (el) => {
+  if (!el) return '';
+  const by = idsOf(el, 'aria-labelledby').map((e) => e.textContent).join(' ');
+  const own = el.tagName === 'INPUT' ? el.value : (el.textContent || '');
+  return (by || el.getAttribute('aria-label') || own || el.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+};
+const CONTROL_SEL = 'button, input[type=button], input[type=submit], input[type=reset], a[href], [role=button], [role=link], [role=menuitem]';
+const controls = (root) => [...(root || document).querySelectorAll(CONTROL_SEL)].filter(vis);
+/* Retry, by role and name with its usual synonyms (folded): إعادة المحاولة/التحميل، أعيدي، حاولي (مجددًا)، مرة أخرى، Retry. */
+const RETRY_RE = /اعاد[هت]\s*(ال)?(محاول|تحميل|طلب|جلب|اتصال)|اعيد|حاول|مر[هت] اخر|retry|try again|reload/;
+const retryControl = (root) => controls(root).find((b) => RETRY_RE.test(fold(accName(b)))) || null;
+/* A retry affordance that is not a control (e.g. a clickable span): still found, so a test can say it is not a button. */
+const RETRY_TEXT_RE = /اعاد[هت]\s*(ال)?(محاول|تحميل)|اعيدي|retry/;
+const retryLike = (root) => retryControl(root) || [...(root || document.body).querySelectorAll('*')]
+  .filter((e) => vis(e) && fold(e.textContent).length <= 40 && RETRY_TEXT_RE.test(fold(e.textContent)) && ![...e.children].some((c) => RETRY_TEXT_RE.test(fold(c.textContent))))[0] || null;
 const ownBox = (el) => {
   let box = el;
   while (box.parentElement && box.parentElement !== document.body && box.parentElement.querySelectorAll('input, select, textarea').length === 1) box = box.parentElement;
@@ -83,8 +176,8 @@ const headingsOrdered = () => {
   return true;
 };
 const hasNumber = (text, n) => {
-  const ar = String(n).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
-  return new RegExp('(^|[^0-9٠-٩])(' + n + '|' + ar + ')([^0-9٠-٩]|$)').test(text) || (n === 1 && /واحد/.test(text));
+  const t = digitsLatin(text);
+  return new RegExp('(^|[^0-9])' + n + '([^0-9]|$)').test(t) || (n === 1 && /واحد|يوم(ا)? فقط/.test(fold(t))) || (n === 2 && /يومان|يومين|اثنان|اثنين/.test(fold(t)));
 };
 `;
 
@@ -109,6 +202,8 @@ export async function clickTagged(p: PageDriver, key: string): Promise<boolean> 
 
 export const pass = (noteAr?: string): TestOutcomeReport => (noteAr === undefined ? { pass: true } : { pass: true, noteAr });
 export const fail = (noteAr?: string): TestOutcomeReport => (noteAr === undefined ? { pass: false } : { pass: false, noteAr });
+/** The state the test needs never appeared: reported `skipped`, never pass nor fail (another test owns that defect). */
+export const notApplicable = (noteAr: string): TestOutcomeReport => ({ pass: false, notApplicable: true, noteAr });
 
 /* ───────────────────────────── static (text-only) helpers ───────────────────────────── */
 
@@ -142,7 +237,8 @@ export function starterRetention(files: readonly SubmittedFile[], starter: reado
 
 /** Environment-probing signals, plus a changed copy of a provided mock service the graduate is told not to edit. */
 export function probingReport(files: readonly SubmittedFile[], starter: readonly SubmittedFile[], untouched: readonly string[] = []): TestOutcomeReport {
-  const signals = gamingSignals(files);
+  // viewport_width_pinned is left to the run's gamingSignals (escalation): it concerns layout, not this criterion.
+  const signals = gamingSignals(files).filter((g) => g !== 'viewport_width_pinned');
   const changed = untouched.filter((p) => {
     const s = fileAt(starter, p);
     const c = fileAt(files, p);

@@ -16,9 +16,9 @@
     "validation.each_submission_follows_input": "fail",
     "form.per_field_messages_when_empty": "pass",
     "form.values_kept_and_error_clears": "pass",
-    "responsive.page_width_360": "pass",
-    "responsive.schedule_reachable_360": "pass",
-    "responsive.sidebar_beside_1024": "fail"
+    "responsive.page_width_mobile_range": "pass",
+    "responsive.schedule_reachable_mobile_range": "pass",
+    "responsive.sidebar_beside_wide_range": "fail"
   },
   "criteria": {
     "semantic_fixed": "met",

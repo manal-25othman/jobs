@@ -68,3 +68,18 @@ test('escalation: candidate packs, gaming signals and inconclusive runs always g
   assert.deepEqual(r.reasons, ['run_timeout', 'gaming_signals']);
   assert.equal(needsHumanEscalation({ ...base, packStatus: 'approved' }).escalate, false);
 });
+
+test('a not-applicable test (skipped) never counts toward «all passed»; an input seed must be a positive integer', () => {
+  const t = (outcome: 'pass' | 'skipped', id: string) => ({ testId: id, criterionKey: 'state_transitions', layer: 'functional' as const, mode: 'automated' as const, outcome, labelAr: 'تحوّل', noteAr: null });
+  const r: TestRunResult = { ...base, tests: [t('pass', 'state.a'), t('skipped', 'state.b')] };
+  const s = summarizeByCriterion(r).find((x) => x.criterionKey === 'state_transitions')!;
+  assert.equal(s.automatedPassed, 1);
+  assert.equal(s.automatedInconclusive, 1);
+  assert.equal(s.observation, 'inconclusive');
+  const allSkipped = summarizeByCriterion({ ...base, tests: [t('skipped', 'state.b')] })[0]!;
+  assert.equal(allSkipped.observation, 'inconclusive');
+  assert.equal(allSkipped.automatedPassed, 0);
+  assert.doesNotThrow(() => assertTestRunResult({ ...base, inputSeed: 12345 }));
+  assert.throws(() => assertTestRunResult({ ...base, inputSeed: 0 }), /input seed/);
+  assert.throws(() => assertTestRunResult({ ...base, inputSeed: 1.5 }), /input seed/);
+});

@@ -6,6 +6,7 @@ import {
   DEFAULT_R2_LIMITS, DomainError, assertCommitSha, assertRunnableOrigin, assertRunnerLimits, assertSubmittedFiles,
   assertTestRunResult, snapshotHash, type CodeOrigin, type RunnerLimits, type SubmittedFile, type TestResultEntry, type TestRunResult,
 } from '@naqla/domain';
+import { randomInt } from 'node:crypto';
 import { BACKEND_NAME, chromiumEntry, cleanupAttempt, prepareAttempt, type Attempt } from './sandbox.js';
 import { Driver, launchSandboxedBrowser } from './harness.js';
 import type { TestPack } from './pack.js';
@@ -19,6 +20,16 @@ export interface AttemptInput {
   readonly commitSha: string | null;
   readonly origin: CodeOrigin;
   readonly limits?: RunnerLimits;
+  /** Input seed for the pack's varied inputs. Default: `R2_SEED` from the environment, else a fresh random seed. */
+  readonly seed?: number;
+}
+
+/** A positive 31-bit seed: the caller's, `R2_SEED`, or a random one (recorded in the result to reproduce the run). */
+export function attemptSeed(given?: number): number {
+  const env = Number(process.env.R2_SEED);
+  const s = given ?? (Number.isInteger(env) && env > 0 ? env : randomInt(1, 2 ** 31 - 1));
+  if (!Number.isInteger(s) || s <= 0 || s >= 2 ** 31) throw new DomainError('[r2_input] The input seed must be a positive 31-bit integer.');
+  return s;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> {
@@ -33,12 +44,13 @@ export async function runAttempt(input: AttemptInput): Promise<TestRunResult> {
   assertCommitSha(input.commitSha);
   assertSubmittedFiles(input.files, limits);
   const { pack } = input;
+  const seed = attemptSeed(input.seed);
   if (!input.files.some((f) => f.path === pack.entry)) throw new DomainError(`[r2_input] The submission has no ${pack.entry}.`);
 
   const tests: TestResultEntry[] = [];
   for (const c of pack.staticChecks) {
     let outcome: TestResultEntry['outcome'] = 'error'; let noteAr: string | null = null;
-    try { const r = c.run(input.files, input.starterFiles ?? []); outcome = r.pass ? 'pass' : 'fail'; noteAr = r.noteAr ?? null; } catch { outcome = 'error'; }
+    try { const r = c.run(input.files, input.starterFiles ?? []); outcome = r.notApplicable ? 'skipped' : r.pass ? 'pass' : 'fail'; noteAr = r.noteAr ?? null; } catch { outcome = 'error'; }
     tests.push({ testId: c.id, criterionKey: c.criterionKey, layer: c.layer, mode: c.mode, outcome, labelAr: c.labelAr, noteAr });
   }
 
@@ -49,7 +61,7 @@ export async function runAttempt(input: AttemptInput): Promise<TestRunResult> {
   try {
     attempt = prepareAttempt(input.files, limits, 'browser');
     const browser = await launchSandboxedBrowser(chromiumEntry(attempt), Math.min(30_000, limits.wallSeconds * 1000));
-    const driver = new Driver(browser, input.files, pack.entry, limits.perTestSeconds * 1000);
+    const driver = new Driver(browser, input.files, pack.entry, limits.perTestSeconds * 1000, seed);
     try {
       for (const t of pack.tests) {
         const left = deadline - Date.now();
@@ -58,7 +70,7 @@ export async function runAttempt(input: AttemptInput): Promise<TestRunResult> {
         try {
           const r = await withTimeout(t.run(driver), Math.min(left, limits.perTestSeconds * 1000));
           if (r === 'timeout') outcome = 'timeout';
-          else { outcome = r.pass ? 'pass' : 'fail'; noteAr = r.noteAr ?? null; }
+          else { outcome = r.notApplicable ? 'skipped' : r.pass ? 'pass' : 'fail'; noteAr = r.noteAr ?? null; }
         } catch { outcome = 'error'; }
         await driver.close();
         driver.resetDataModes();
@@ -79,6 +91,6 @@ export async function runAttempt(input: AttemptInput): Promise<TestRunResult> {
   return assertTestRunResult({
     activityId: pack.activityId, packVersion: pack.version, packStatus: pack.status, commitSha: input.commitSha,
     snapshotHash: snapshotHash(input.files), origin: input.origin, backend: BACKEND_NAME, limits, status,
-    durationMs: Date.now() - started, tests, blockedRequests: blocked, gamingSignals: [...new Set([...gamingSignals(input.files), ...integritySignals(input.files, input.starterFiles ?? [])])].sort(),
+    durationMs: Date.now() - started, tests, blockedRequests: blocked, inputSeed: seed, gamingSignals: [...new Set([...gamingSignals(input.files), ...integritySignals(input.files, input.starterFiles ?? [])])].sort(),
   });
 }

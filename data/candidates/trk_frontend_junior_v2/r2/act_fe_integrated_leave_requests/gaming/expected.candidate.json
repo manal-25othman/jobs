@@ -12,14 +12,14 @@
     "data_states.loading_visible": "fail",
     "data_states.error_with_retry_button": "fail",
     "data_states.empty_message": "fail",
-    "state.retry_completes_cleanly": "fail",
-    "state.retry_then_empty_answer": "fail",
-    "state.retry_success_clears_error": "fail",
-    "state.second_retry_cycle": "fail",
-    "state.second_retry_ends_empty": "fail",
-    "responsive.page_width_360": "pass",
-    "responsive.page_width_1024": "pass",
-    "a11y.retry_by_keyboard": "fail"
+    "state.retry_completes_cleanly": "skipped",
+    "state.loading_ends_after_retry": "skipped",
+    "state.retry_success_clears_error": "skipped",
+    "state.second_retry_cycle": "skipped",
+    "state.second_retry_ends_empty": "skipped",
+    "responsive.page_width_mobile_range": "pass",
+    "responsive.page_width_desktop_range": "pass",
+    "a11y.retry_by_keyboard": "skipped"
   },
   "criteria": {
     "semantic_structure": "met",
