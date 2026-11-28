@@ -1,10 +1,10 @@
 {
  "_label": "RECORDED by the development runner for the SIMULATED GitHub snapshots — candidate packs, synthetic code. Served in staging with R2_MODE=recorded.",
- "recordedAt": "2026-11-27T10:49:42.896Z",
+ "recordedAt": "2026-11-28T15:45:55.295Z",
  "results": {
   "act_fe_integrated_leave_requests:sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63": {
    "activityId": "act_fe_integrated_leave_requests",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:185a7ae1a87b1d64b62b1fb4635845e0c6160921031ca65ee7c231b99db2af63",
@@ -20,7 +20,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 21864,
+   "durationMs": 25046,
    "tests": [
     {
      "testId": "gaming.environment_probing",
@@ -64,7 +64,7 @@
      "layer": "output",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
+     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته (تاريخان بأي صيغة شائعة)، وعدد أيامه، أيًّا كانت البيانات (تتولّد في كل تشغيل)",
      "noteAr": null
     },
     {
@@ -122,12 +122,12 @@
      "noteAr": null
     },
     {
-     "testId": "state.retry_then_empty_answer",
+     "testId": "state.loading_ends_after_retry",
      "criterionKey": "root_cause_fixed",
      "layer": "functional",
      "mode": "supports_human",
      "outcome": "pass",
-     "labelAr": "للمراجِع: إعادة المحاولة التي تنتهي بقائمة خالية تُنهي التحميل وتُظهر حالة الفراغ",
+     "labelAr": "للمراجِع: بعد إعادة محاولة ناجحة ينتهي التحميل، سواء أرجعت الخدمة طلبات أم قائمة خالية",
      "noteAr": null
     },
     {
@@ -158,22 +158,22 @@
      "noteAr": null
     },
     {
-     "testId": "responsive.page_width_360",
+     "testId": "responsive.page_width_mobile_range",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل والطلبات معروضة",
-     "noteAr": "عرض المحتوى 360 على شاشة 360؛ عناصر تتجاوز الشاشة: 0"
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على عروض جوال متعددة (360 وعرضان آخران بين 340 و430 بكسل) والطلبات معروضة",
+     "noteAr": "نجح على 3 عروض: 360، 347، 379"
     },
     {
-     "testId": "responsive.page_width_1024",
+     "testId": "responsive.page_width_desktop_range",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "لا تمرير أفقي على 1024 بكسل والطلبات معروضة",
-     "noteAr": "عرض المحتوى 1024 على شاشة 1024"
+     "labelAr": "لا تمرير أفقي على 1024 بكسل وعلى عرضين آخرين بين 900 و1440 بكسل والطلبات معروضة",
+     "noteAr": "نجح على 3 عروض: 1024، 943، 1354"
     },
     {
      "testId": "a11y.retry_by_keyboard",
@@ -186,11 +186,12 @@
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   },
   "act_fe_integrated_leave_requests:sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280": {
    "activityId": "act_fe_integrated_leave_requests",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:e00ff159acba1e4bda51895dfd4e48f5306650fa6f18ca0996a929d7aeb57280",
@@ -206,7 +207,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 33895,
+   "durationMs": 35271,
    "tests": [
     {
      "testId": "gaming.environment_probing",
@@ -250,7 +251,7 @@
      "layer": "output",
      "mode": "automated",
      "outcome": "fail",
-     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته، وعدد أيامه، أيًّا كانت البيانات",
+     "labelAr": "كل طلب يعرض نوعه وحالته بالعربية، وفترته (تاريخان بأي صيغة شائعة)، وعدد أيامه، أيًّا كانت البيانات (تتولّد في كل تشغيل)",
      "noteAr": "طلبات لا تُعرض حقولها كاملة بالعربية: 7"
     },
     {
@@ -308,13 +309,13 @@
      "noteAr": "بعد إعادة المحاولة بقيت حالتان متعارضتان أو لم تظهر الطلبات"
     },
     {
-     "testId": "state.retry_then_empty_answer",
+     "testId": "state.loading_ends_after_retry",
      "criterionKey": "root_cause_fixed",
      "layer": "functional",
      "mode": "supports_human",
      "outcome": "fail",
-     "labelAr": "للمراجِع: إعادة المحاولة التي تنتهي بقائمة خالية تُنهي التحميل وتُظهر حالة الفراغ",
-     "noteAr": "بعد إعادة المحاولة بقائمة خالية لم تنته رسالة التحميل أو لم تظهر حالة الفراغ"
+     "labelAr": "للمراجِع: بعد إعادة محاولة ناجحة ينتهي التحميل، سواء أرجعت الخدمة طلبات أم قائمة خالية",
+     "noteAr": "بعد إعادة المحاولة وظهور الطلبات لم ينته التحميل"
     },
     {
      "testId": "state.retry_success_clears_error",
@@ -344,22 +345,22 @@
      "noteAr": "التحميل ما زال ظاهرًا · لا رسالة للقائمة الخالية"
     },
     {
-     "testId": "responsive.page_width_360",
+     "testId": "responsive.page_width_mobile_range",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "fail",
-     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل والطلبات معروضة",
-     "noteAr": "عرض المحتوى 660 على شاشة 360؛ عناصر تتجاوز الشاشة: 12"
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على عروض جوال متعددة (360 وعرضان آخران بين 340 و430 بكسل) والطلبات معروضة",
+     "noteAr": "على عرض 360: عرض المحتوى 660؛ عناصر تتجاوز الشاشة: 12"
     },
     {
-     "testId": "responsive.page_width_1024",
+     "testId": "responsive.page_width_desktop_range",
      "criterionKey": "responsive_layout",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "لا تمرير أفقي على 1024 بكسل والطلبات معروضة",
-     "noteAr": "عرض المحتوى 1024 على شاشة 1024"
+     "labelAr": "لا تمرير أفقي على 1024 بكسل وعلى عرضين آخرين بين 900 و1440 بكسل والطلبات معروضة",
+     "noteAr": "نجح على 3 عروض: 1024، 943، 1354"
     },
     {
      "testId": "a11y.retry_by_keyboard",
@@ -372,11 +373,12 @@
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   },
   "act_fe_debug_improve:sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7": {
    "activityId": "act_fe_debug_improve",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:ea85c47de9ede418c2451f5719f1f5a6bdbd8e2fb52132ab5a63ff8f93ee93d7",
@@ -392,7 +394,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 6393,
+   "durationMs": 8093,
    "tests": [
     {
      "testId": "quality.starter_lines_kept",
@@ -472,7 +474,7 @@
      "layer": "a11y",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby) والحقل معلَّم aria-invalid",
+     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby أو aria-errormessage) والحقل معلَّم aria-invalid",
      "noteAr": null
     },
     {
@@ -481,7 +483,7 @@
      "layer": "functional",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "عناوين بريد غير صالحة متنوعة تُرفض برسالة عند الحقل",
+     "labelAr": "عناوين بريد غير صالحة من ستة أنواع (تتولّد في كل تشغيل) تُرفض برسالة عند الحقل",
      "noteAr": null
     },
     {
@@ -490,7 +492,7 @@
      "layer": "functional",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "عناوين بريد صالحة شائعة تُقبل",
+     "labelAr": "عناوين بريد صالحة شائعة (تتولّد في كل تشغيل) تُقبل",
      "noteAr": null
     },
     {
@@ -499,7 +501,7 @@
      "layer": "functional",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة دون إعادة فتح الصفحة: كل نتيجة تتبع ما أُدخل، فلا نجاح قديم بعد رفض ولا رسالة قديمة بعد قبول",
+     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة (تتولّد في كل تشغيل) دون إعادة فتح الصفحة: كل قرار قبول أو رفض يتبع ما أُدخل",
      "noteAr": null
     },
     {
@@ -517,43 +519,44 @@
      "layer": "usability",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "ما أدخله المستخدم يبقى بعد الرفض، ورسالة الحقل تزول بعد تصحيحه",
+     "labelAr": "بعد الرفض يبقى ما أُدخل، وبعد التصحيح تزول رسالة الحقل ويُقبل، وبعد رفض لاحق لا تبقى رسالة النجاح السابقة",
      "noteAr": null
     },
     {
-     "testId": "responsive.page_width_360",
+     "testId": "responsive.page_width_mobile_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل",
-     "noteAr": "عرض المحتوى 360 على شاشة 360؛ عناصر تتجاوز الشاشة: 0"
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على عروض جوال متعددة (360 وعرضان آخران بين 340 و430 بكسل)",
+     "noteAr": "نجح على 3 عروض: 360، 355، 374"
     },
     {
-     "testId": "responsive.schedule_reachable_360",
+     "testId": "responsive.schedule_reachable_mobile_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على 360 بكسل",
-     "noteAr": null
+     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على عروض جوال متعددة",
+     "noteAr": "نجح على 3 عروض: 360، 352، 403"
     },
     {
-     "testId": "responsive.sidebar_beside_1024",
+     "testId": "responsive.sidebar_beside_wide_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "العمود الجانبي بجانب المحتوى على عرض 1024 بكسل",
-     "noteAr": null
+     "labelAr": "العمود الجانبي بجانب المحتوى على 1024 بكسل وعلى عرضين أوسع (يتغيّران في كل تشغيل)",
+     "noteAr": "نجح على 3 عروض: 1024، 1166، 1417"
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   },
   "act_fe_debug_improve:sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a": {
    "activityId": "act_fe_debug_improve",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:3c5e9ff86536ce362cde8cb2e3c4dcd058d945d11ea07ddf6b610416584cfc5a",
@@ -569,7 +572,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 9800,
+   "durationMs": 9465,
    "tests": [
     {
      "testId": "quality.starter_lines_kept",
@@ -648,89 +651,90 @@
      "criterionKey": "a11y_keyboard_forms",
      "layer": "a11y",
      "mode": "automated",
-     "outcome": "fail",
-     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby) والحقل معلَّم aria-invalid",
-     "noteAr": "الرسالة غير مرتبطة بالحقل · الحقل غير معلَّم بأنه غير صالح"
+     "outcome": "skipped",
+     "labelAr": "رسالة خطأ الحقل مرتبطة به (aria-describedby أو aria-errormessage) والحقل معلَّم aria-invalid",
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
      "testId": "validation.invalid_addresses_refused",
      "criterionKey": "validation_fixed",
      "layer": "functional",
      "mode": "automated",
-     "outcome": "fail",
-     "labelAr": "عناوين بريد غير صالحة متنوعة تُرفض برسالة عند الحقل",
-     "noteAr": "لا رسالة عند الحقل بعد إرسال قيمة غير صالحة (1 من 6)"
+     "outcome": "skipped",
+     "labelAr": "عناوين بريد غير صالحة من ستة أنواع (تتولّد في كل تشغيل) تُرفض برسالة عند الحقل",
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
      "testId": "validation.common_addresses_accepted",
      "criterionKey": "validation_fixed",
      "layer": "functional",
      "mode": "automated",
-     "outcome": "fail",
-     "labelAr": "عناوين بريد صالحة شائعة تُقبل",
-     "noteAr": "لم يُقبل عنوان صالح (1 من 3)"
+     "outcome": "skipped",
+     "labelAr": "عناوين بريد صالحة شائعة (تتولّد في كل تشغيل) تُقبل",
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
      "testId": "validation.each_submission_follows_input",
      "criterionKey": "validation_fixed",
      "layer": "functional",
      "mode": "automated",
-     "outcome": "fail",
-     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة دون إعادة فتح الصفحة: كل نتيجة تتبع ما أُدخل، فلا نجاح قديم بعد رفض ولا رسالة قديمة بعد قبول",
-     "noteAr": "لم يُقبل تسجيل صالح (1 من 4)"
+     "outcome": "skipped",
+     "labelAr": "تسجيلات متتالية بأسماء وعناوين مختلفة (تتولّد في كل تشغيل) دون إعادة فتح الصفحة: كل قرار قبول أو رفض يتبع ما أُدخل",
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
      "testId": "form.per_field_messages_when_empty",
      "criterionKey": "form_submission_flow",
      "layer": "errors",
      "mode": "automated",
-     "outcome": "fail",
+     "outcome": "skipped",
      "labelAr": "إرسال النموذج فارغًا: لا إرسال، ولكل حقل مطلوب رسالته",
-     "noteAr": "لا رسالة خاصة بكل حقل مطلوب"
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
      "testId": "form.values_kept_and_error_clears",
      "criterionKey": "form_submission_flow",
      "layer": "usability",
      "mode": "automated",
-     "outcome": "fail",
-     "labelAr": "ما أدخله المستخدم يبقى بعد الرفض، ورسالة الحقل تزول بعد تصحيحه",
-     "noteAr": "لم يظهر رفض واضح لقيمة غير صالحة"
+     "outcome": "skipped",
+     "labelAr": "بعد الرفض يبقى ما أُدخل، وبعد التصحيح تزول رسالة الحقل ويُقبل، وبعد رفض لاحق لا تبقى رسالة النجاح السابقة",
+     "noteAr": "لا استجابة ظاهرة لأي إرسال، فلا حكم هنا (زر الإرسال يُقاس في البنية الدلالية)"
     },
     {
-     "testId": "responsive.page_width_360",
+     "testId": "responsive.page_width_mobile_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "fail",
-     "labelAr": "لا محتوى يتجاوز عرض الشاشة على 360 بكسل",
-     "noteAr": "عرض المحتوى 736 على شاشة 360؛ عناصر تتجاوز الشاشة: 32"
+     "labelAr": "لا محتوى يتجاوز عرض الشاشة على عروض جوال متعددة (360 وعرضان آخران بين 340 و430 بكسل)",
+     "noteAr": "على عرض 360: عرض المحتوى 736؛ عناصر تتجاوز الشاشة: 32"
     },
     {
-     "testId": "responsive.schedule_reachable_360",
+     "testId": "responsive.schedule_reachable_mobile_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "fail",
-     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على 360 بكسل",
-     "noteAr": "عناصر من الجدول لا يمكن رؤيتها: 4 من 6"
+     "labelAr": "كل أعمدة جدول الورشة ظاهرة أو قابلة للتمرير داخل حاويتها على عروض جوال متعددة",
+     "noteAr": "على عرض 360: عناصر من الجدول لا يمكن رؤيتها: 4 من 6"
     },
     {
-     "testId": "responsive.sidebar_beside_1024",
+     "testId": "responsive.sidebar_beside_wide_range",
      "criterionKey": "responsive_fixed",
      "layer": "responsive",
      "mode": "automated",
      "outcome": "fail",
-     "labelAr": "العمود الجانبي بجانب المحتوى على عرض 1024 بكسل",
-     "noteAr": "العمود الجانبي ليس بجانب المحتوى"
+     "labelAr": "العمود الجانبي بجانب المحتوى على 1024 بكسل وعلى عرضين أوسع (يتغيّران في كل تشغيل)",
+     "noteAr": "على عرض 1024: العمود الجانبي ليس بجانب المحتوى"
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   },
   "act_fe_change_request:sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930": {
    "activityId": "act_fe_change_request",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:ecfead660e432298b69a7798800b64247af6e4d825847f43cfd055be681f6930",
@@ -746,7 +750,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 9016,
+   "durationMs": 8396,
    "tests": [
     {
      "testId": "quality.structure_kept",
@@ -786,11 +790,11 @@
     },
     {
      "testId": "output.list_follows_data",
-     "criterionKey": "filter_in_state",
+     "criterionKey": "js_correctness",
      "layer": "output",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات",
+     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات (تتولّد في كل تشغيل)",
      "noteAr": null
     },
     {
@@ -844,7 +848,7 @@
      "layer": "data_states",
      "mode": "supports_human",
      "outcome": "pass",
-     "labelAr": "للمراجِع: فشل الخدمة يُظهر خطأ مع إعادة محاولة، والقائمة الخالية تُظهر حالة فراغ — حالتان مختلفتان",
+     "labelAr": "للمراجِع: فشل الخدمة يبقى خطأً (لا يُعرض فراغًا)، والقائمة الخالية حالة فراغ لا خطأ — حالتان مختلفتان",
      "noteAr": null
     },
     {
@@ -876,11 +880,12 @@
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   },
   "act_fe_change_request:sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c": {
    "activityId": "act_fe_change_request",
-   "packVersion": "0.2.0",
+   "packVersion": "0.3.0",
    "packStatus": "candidate",
    "commitSha": null,
    "snapshotHash": "sha256:72531712e134619592992b340f18878afeb66ae9b12ef159107160da9626b07c",
@@ -896,7 +901,7 @@
     "maxInputBytes": 2097152
    },
    "status": "completed",
-   "durationMs": 10633,
+   "durationMs": 10144,
    "tests": [
     {
      "testId": "quality.structure_kept",
@@ -936,11 +941,11 @@
     },
     {
      "testId": "output.list_follows_data",
-     "criterionKey": "filter_in_state",
+     "criterionKey": "js_correctness",
      "layer": "output",
      "mode": "automated",
      "outcome": "pass",
-     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات",
+     "labelAr": "القائمة الافتراضية تعرض مهام الخدمة كلها وعددها، أيًّا كانت البيانات (تتولّد في كل تشغيل)",
      "noteAr": null
     },
     {
@@ -994,7 +999,7 @@
      "layer": "data_states",
      "mode": "supports_human",
      "outcome": "fail",
-     "labelAr": "للمراجِع: فشل الخدمة يُظهر خطأ مع إعادة محاولة، والقائمة الخالية تُظهر حالة فراغ — حالتان مختلفتان",
+     "labelAr": "للمراجِع: فشل الخدمة يبقى خطأً (لا يُعرض فراغًا)، والقائمة الخالية حالة فراغ لا خطأ — حالتان مختلفتان",
      "noteAr": "القائمة الخالية لا تُعرض حالة فراغ"
     },
     {
@@ -1026,6 +1031,7 @@
     }
    ],
    "blockedRequests": 0,
+   "inputSeed": 20261128,
    "gamingSignals": []
   }
  }
